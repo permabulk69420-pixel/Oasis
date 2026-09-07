@@ -16,7 +16,7 @@ const HAND_GRIP_OFFSETS = Object.freeze({
   right: Object.freeze({ position: Object.freeze([0, 0, 0]), rotation: Object.freeze([0, 0, -Math.PI / 2]) })
 });
 
-const PRIMARY_FACE_BUTTON = 4; // Quest A / X in xr-standard.
+const PRIMARY_FACE_BUTTON = 4; // Quest X on left; right A is reserved for jump.
 const loader = new GLTFLoader();
 const gripMatrix = new THREE.Matrix4();
 
@@ -188,7 +188,8 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
     for (const state of states) {
       const buttons = state.inputSource?.gamepad?.buttons || [];
       const primary = Boolean(buttons[PRIMARY_FACE_BUTTON]?.pressed);
-      if (primary && !state.primaryDown && state.handedness) state.pointing = !state.pointing;
+      // Keep the old point toggle on left X only. Right A is gameplay jump now.
+      if (state.handedness === 'left' && primary && !state.primaryDown) state.pointing = !state.pointing;
       state.primaryDown = primary;
 
       if (!state.mixerState) continue;
