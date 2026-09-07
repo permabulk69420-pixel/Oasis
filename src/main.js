@@ -3,6 +3,7 @@ import './style.css';
 import { createHeightField, clamp, stickAxis, stickVector, pivotRig, SPAWN, WATER } from './world.js';
 import { createTerrain } from './terrain.js';
 import { createMaterials, createWater } from './materials.js';
+import { createVRHands } from './hands.js';
 
 const canvas = document.querySelector('#world');
 const welcome = document.querySelector('#welcome');
@@ -38,6 +39,11 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.07, 6500);
 const rig = new THREE.Group();
 rig.add(camera); scene.add(rig);
+const hands = createVRHands({
+  renderer,
+  scene,
+  onError: (message) => console.warn('[Oasis hands]', message)
+});
 camera.position.set(0, 1.68, 0);
 camera.rotation.order = 'YXZ';
 camera.rotation.x = -0.045;
@@ -218,6 +224,7 @@ function readInput() {
 function frame(time) {
   const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0;
   lastTime = time;
+  hands.update(dt);
   rig.updateMatrixWorld(true);
   if (renderer.xr.isPresenting) renderer.xr.updateCamera(camera);
   const activeCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
