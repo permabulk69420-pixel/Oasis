@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { HALF_WORLD, GRID_STEP, clamp, noise, terrainHeight } from './world.js';
+import { createPickupRocks } from './rocks.js';
 
 const CHUNK_SIZE = 62.5;
 const LEVELS = [32, 16, 8, 4];
@@ -85,6 +86,11 @@ export function createTerrain(field, material) {
   outerGeo.setIndex(outerIndex); outerGeo.computeBoundingSphere();
   const horizon = new THREE.Mesh(outerGeo, material); horizon.name = 'Distant dune continuation'; group.add(horizon);
 
+  // Small pickup rocks are cheap enough that LOD would add more complexity than value.
+  // Keep one instanced mesh and only populate matrices for rocks within draw distance.
+  const pickupRocks = createPickupRocks({ field });
+  group.add(pickupRocks.mesh);
+
   function update(x, z) {
     for (const chunk of chunks) {
       const distance = Math.hypot(x - chunk.x, z - chunk.z);
@@ -93,7 +99,8 @@ export function createTerrain(field, material) {
       if (level > chunk.level && distance < [154, 298, 490][chunk.level]) level = chunk.level;
       if (level !== chunk.level) { chunk.mesh.geometry = chunk.geometries[level]; chunk.level = level; }
     }
+    pickupRocks.update(x, z);
   }
   update(0, 0);
-  return { group, update, chunks };
+  return { group, update, chunks, pickupRocks };
 }
