@@ -51,12 +51,19 @@ function setPose(state, name, amount) {
   action.time = THREE.MathUtils.clamp(amount, 0, 1);
 }
 
-export function createVRHands({ renderer, parent, onError = console.warn }) {
+export function createVRHands({ renderer, scene, parent = null, onError = console.warn }) {
+  // Oasis moves/turns a camera rig through the world. Match dumbgame by putting
+  // WebXR controller and grip nodes under that rig rather than directly in scene space.
+  const controllerParent = parent
+    || scene?.children?.find((child) => child.isGroup && child.children.some((item) => item.isCamera))
+    || scene;
+  if (!controllerParent) throw new Error('VR hands require an XR player rig or scene parent.');
+
   const controllers = [renderer.xr.getController(0), renderer.xr.getController(1)];
   const grips = [renderer.xr.getControllerGrip(0), renderer.xr.getControllerGrip(1)];
   for (let i = 0; i < controllers.length; i += 1) {
-    parent.add(controllers[i]);
-    parent.add(grips[i]);
+    controllerParent.add(controllers[i]);
+    controllerParent.add(grips[i]);
   }
 
   const models = { left: null, right: null };
