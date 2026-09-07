@@ -18,14 +18,13 @@ function load(loader, filename, onLoad) {
     `${ROOT}${filename}`,
     onLoad,
     undefined,
-    () => { /* Optional PBR map: procedural sand remains active when absent. */ },
+    () => { /* Optional map: the material keeps its neutral fallback when absent. */ },
   );
 }
 
 /**
- * Hot-swaps the optional dune-sand PBR set into the existing Quest-friendly sand shader.
- * The material is fully usable before/without these files, so the repo can be deployed
- * while the texture folder is still empty.
+ * Loads the dune-sand material maps. Height is used only for a subtle near-field
+ * parallax offset; the large dunes remain real terrain geometry.
  */
 export function attachSandPBR(renderer, uniforms) {
   const textureLoader = new THREE.TextureLoader();
@@ -45,5 +44,11 @@ export function attachSandPBR(renderer, uniforms) {
     uniforms.uHasPbrRoughness.value = 1;
   });
 
-  // AO, metallic and height maps are intentionally unused for this terrain test.
+  load(textureLoader, 'sand-dunes1_height.png', (texture) => {
+    uniforms.uPbrHeight.value = configure(texture, renderer);
+    uniforms.uHasPbrHeight.value = 1;
+  });
+
+  // AO and metallic remain intentionally unused. Sand is non-metallic, and the
+  // normal/height pair already carries the small-scale relief we need here.
 }
