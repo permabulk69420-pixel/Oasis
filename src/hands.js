@@ -51,12 +51,12 @@ function setPose(state, name, amount) {
   action.time = THREE.MathUtils.clamp(amount, 0, 1);
 }
 
-export function createVRHands({ renderer, scene, onError = console.warn }) {
+export function createVRHands({ renderer, parent, onError = console.warn }) {
   const controllers = [renderer.xr.getController(0), renderer.xr.getController(1)];
   const grips = [renderer.xr.getControllerGrip(0), renderer.xr.getControllerGrip(1)];
   for (let i = 0; i < controllers.length; i += 1) {
-    scene.add(controllers[i]);
-    scene.add(grips[i]);
+    parent.add(controllers[i]);
+    parent.add(grips[i]);
   }
 
   const models = { left: null, right: null };
