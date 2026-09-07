@@ -80,13 +80,30 @@ const atmosphere = /* glsl */`
   float cloudDensity(vec2 worldXZ) {
     return smoothstep(0.47, 0.66, cloudNoise(worldXZ));
   }
+  float cloudShadowDensity(vec2 worldXZ) {
+    // The visible sky can get away with one tile because perspective hides the repetition.
+    // Ground shadows cannot. Two differently scaled/rotated projections make the combined
+    // repeat distance enormous while costing only one additional tiny texture lookup.
+    vec2 wind = cloudWind();
+    vec2 uvA = worldXZ / 1680.0 + wind * 0.74 + vec2(0.137, 0.619);
+    vec2 rotated = vec2(
+      dot(worldXZ, vec2(0.8192, -0.5735)),
+      dot(worldXZ, vec2(0.5735, 0.8192))
+    );
+    vec2 uvB = rotated / 2713.0 + vec2(-wind.y, wind.x) * 0.43 + vec2(0.731, 0.284);
+    vec2 a = texture2D(uCloudMap, uvA).rg;
+    vec2 b = texture2D(uCloudMap, uvB).rg;
+    float broad = a.r * 0.57 + b.r * 0.43;
+    float edge = a.g * 0.55 + b.g * 0.45;
+    return smoothstep(0.475, 0.625, broad * 0.88 + edge * 0.12);
+  }
   float cloudShadow(vec3 worldPosition) {
-    // Sample where a ray toward the sun intersects the cloud plane. This keeps the broad
-    // ground shadows spatially related to the visible cloud layer instead of merely scrolling.
+    // Sample where a ray toward the sun intersects the cloud plane. The anti-tiled shadow
+    // field stays broad and soft instead of stamping the same cloud cell across the desert.
     float daylight = smoothstep(0.04, 0.24, uSun.y);
     float invSunHeight = 1.0 / max(uSun.y, 0.18);
     vec2 cloudPoint = worldPosition.xz + uSun.xz * (CLOUD_HEIGHT - worldPosition.y) * invSunHeight;
-    return 1.0 - cloudDensity(cloudPoint) * 0.28 * daylight;
+    return 1.0 - cloudShadowDensity(cloudPoint) * 0.24 * daylight;
   }
   vec3 skyColor(vec3 ray) {
     float altitude = max(ray.y, 0.0);
