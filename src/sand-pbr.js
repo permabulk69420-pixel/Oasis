@@ -24,7 +24,7 @@ function load(loader, filename, onLoad) {
 }
 
 /**
- * Hot-swaps the optional 1K sand PBR set into the existing Quest-friendly sand shader.
+ * Hot-swaps the optional 2K sand PBR set into the existing Quest-friendly sand shader.
  * The material is fully usable before/without these files, so the repo can be deployed
  * while the texture folder is still empty.
  */
@@ -32,22 +32,22 @@ export function attachSandPBR(renderer, uniforms) {
   const textureLoader = new THREE.TextureLoader();
   const exrLoader = new EXRLoader();
 
-  load(textureLoader, 'park_sand_diff_1k.jpg', (texture) => {
+  load(textureLoader, 'coast_sand_02_diff_2k.jpg', (texture) => {
     uniforms.uPbrBase.value = configure(texture, renderer, true);
     uniforms.uHasPbrBase.value = 1;
   });
 
-  load(exrLoader, 'park_sand_nor_gl_1k.exr', (texture) => {
+  load(exrLoader, 'coast_sand_02_nor_gl_2k.exr', (texture) => {
     uniforms.uPbrNormal.value = configure(texture, renderer);
     uniforms.uHasPbrNormal.value = 1;
   });
 
-  load(exrLoader, 'park_sand_rough_1k.exr', (texture) => {
+  load(exrLoader, 'coast_sand_02_rough_2k.exr', (texture) => {
     uniforms.uPbrRoughness.value = configure(texture, renderer);
     uniforms.uHasPbrRoughness.value = 1;
   });
 
-  // park_sand_disp_1k.png intentionally is not loaded. Oasis already has true dune
+  // coast_sand_02_disp_2k.png intentionally is not loaded. Oasis already has true dune
   // geometry; vertex displacement here would require much denser terrain meshes and is
   // a poor trade on standalone Quest. The file can live beside the other maps for later.
 }
