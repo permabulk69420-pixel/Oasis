@@ -235,34 +235,27 @@ function frame(time) {
   }
   if (playing) {
     const input = readInput();
-
-    // Head direction is only used to preserve the desktop/view orientation. In VR,
-    // locomotion below deliberately uses the left controller instead of headset gaze.
-    activeCamera.getWorldDirection(direction); direction.y = 0;
-    if (direction.lengthSq() < 0.001) direction.copy(lastDirection);
-    direction.normalize();
     const turn = -input.turn * TURN_SPEED * dt;
     if (turn) {
       // Turn around the headset, preserving room-scale offsets instead of orbiting the rig origin.
       const rotated = pivotRig(rig.position.x, rig.position.z, head.x, head.z, turn);
       rig.position.x = rotated.x; rig.position.z = rotated.z; rig.rotation.y += turn;
     }
-    direction.applyAxisAngle(up, turn); lastDirection.copy(direction);
 
-    movementForward.copy(direction);
     if (renderer.xr.isPresenting) {
-      const leftController = hands.states?.find((state) => state.handedness === 'left')?.controller;
-      if (leftController) {
-        leftController.getWorldDirection(movementForward);
-        movementForward.y = 0;
-      } else {
-        // If the controller pose is momentarily unavailable, keep movement tied to
-        // the player's stick-turn orientation rather than falling back to head gaze.
-        movementForward.set(0, 0, -1).applyQuaternion(rig.quaternion);
-      }
-      if (movementForward.lengthSq() < 0.001) movementForward.set(0, 0, -1).applyQuaternion(rig.quaternion);
+      // VR locomotion is body/rig-relative. Headset gaze and controller aim never steer movement.
+      movementForward.set(0, 0, -1).applyQuaternion(rig.quaternion);
       movementForward.y = 0;
+      if (movementForward.lengthSq() < 0.001) movementForward.set(0, 0, -1);
       movementForward.normalize();
+      lastDirection.copy(movementForward);
+    } else {
+      activeCamera.getWorldDirection(direction);
+      direction.y = 0;
+      if (direction.lengthSq() < 0.001) direction.copy(lastDirection);
+      direction.normalize();
+      movementForward.copy(direction);
+      lastDirection.copy(direction);
     }
 
     right.crossVectors(movementForward, up);
