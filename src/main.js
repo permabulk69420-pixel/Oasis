@@ -80,7 +80,7 @@ let previousPointer = { x: 0, y: 0 };
 let touchMove = { x: 0, z: 0 };
 const keys = new Set();
 const velocity = new THREE.Vector3();
-const direction = new THREE.Vector3(0, 0, -1), right = new THREE.Vector3(), head = new THREE.Vector3();
+const direction = new THREE.Vector3(0, 0, -1), movementForward = new THREE.Vector3(), right = new THREE.Vector3(), head = new THREE.Vector3();
 const target = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
 const lastDirection = new THREE.Vector3(0.6, 0, -0.8);
 const WALK_SPEED = 2.6, FAST_SPEED = 5.2, TURN_SPEED = 1.4;
@@ -235,6 +235,9 @@ function frame(time) {
   }
   if (playing) {
     const input = readInput();
+
+    // Head direction is only used to preserve the desktop/view orientation. In VR,
+    // locomotion below deliberately uses the left controller instead of headset gaze.
     activeCamera.getWorldDirection(direction); direction.y = 0;
     if (direction.lengthSq() < 0.001) direction.copy(lastDirection);
     direction.normalize();
@@ -245,8 +248,25 @@ function frame(time) {
       rig.position.x = rotated.x; rig.position.z = rotated.z; rig.rotation.y += turn;
     }
     direction.applyAxisAngle(up, turn); lastDirection.copy(direction);
-    right.crossVectors(direction, up);
-    target.copy(right).multiplyScalar(input.x).addScaledVector(direction, -input.z);
+
+    movementForward.copy(direction);
+    if (renderer.xr.isPresenting) {
+      const leftController = hands.states?.find((state) => state.handedness === 'left')?.controller;
+      if (leftController) {
+        leftController.getWorldDirection(movementForward);
+        movementForward.y = 0;
+      } else {
+        // If the controller pose is momentarily unavailable, keep movement tied to
+        // the player's stick-turn orientation rather than falling back to head gaze.
+        movementForward.set(0, 0, -1).applyQuaternion(rig.quaternion);
+      }
+      if (movementForward.lengthSq() < 0.001) movementForward.set(0, 0, -1).applyQuaternion(rig.quaternion);
+      movementForward.y = 0;
+      movementForward.normalize();
+    }
+
+    right.crossVectors(movementForward, up);
+    target.copy(right).multiplyScalar(input.x).addScaledVector(movementForward, -input.z);
     target.multiplyScalar(input.fast ? FAST_SPEED : WALK_SPEED);
     velocity.lerp(target, 1 - Math.exp(-dt * (target.lengthSq() ? 18 : 28)));
     const dx = velocity.x * dt, dz = velocity.z * dt;
