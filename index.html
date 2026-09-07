@@ -11,12 +11,16 @@
     <canvas id="world" aria-label="Desert landscape"></canvas>
     <section id="welcome" aria-label="Start exploring">
       <h1>Oasis</h1>
+      <label class="seated-option">
+        <input id="seated-mode" type="checkbox" />
+        <span>Seated VR mode</span>
+      </label>
       <div class="actions">
         <button id="enter-vr" disabled>Checking VR…</button>
         <button id="explore" class="secondary">Explore</button>
       </div>
-      <p id="controls">WASD to move · Mouse to look · Shift to move faster</p>
-      <p class="vr-help">In VR: left stick to move · right stick to turn</p>
+      <p id="controls">WASD to move · Mouse to look · Shift to sprint · Space to jump</p>
+      <p class="vr-help">In VR: left stick to move · left grip to sprint · right stick to turn · A to jump</p>
       <p id="status" role="status">Shaping the sand…</p>
     </section>
     <button id="menu" aria-label="Open controls" hidden>Controls</button>
