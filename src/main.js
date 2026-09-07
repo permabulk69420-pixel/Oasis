@@ -4,6 +4,7 @@ import { createHeightField, clamp, stickAxis, stickVector, pivotRig, SPAWN, WATE
 import { createTerrain } from './terrain.js';
 import { createMaterials, createWater } from './materials.js';
 import { createVRHands } from './hands.js';
+import { createDayNightCycle } from './day-night.js';
 
 const canvas = document.querySelector('#world');
 const welcome = document.querySelector('#welcome');
@@ -58,6 +59,7 @@ scene.add(terrain.group);
 scene.add(createWater(field, materials.water));
 const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), materials.sky);
 sky.frustumCulled = false; sky.renderOrder = -10; sky.name = 'Sky'; scene.add(sky);
+const dayNight = createDayNightCycle({ scene, renderer, materials });
 rig.position.set(SPAWN.x, field.sample(SPAWN.x, SPAWN.z), SPAWN.z);
 
 // Development-only camera fixtures for repeatable visual inspection. No travel shortcuts ship.
@@ -232,6 +234,7 @@ function readInput() {
 function frame(time) {
   const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0;
   lastTime = time;
+  dayNight.update(dt);
   hands.update(dt);
   rig.updateMatrixWorld(true);
   if (renderer.xr.isPresenting) renderer.xr.updateCamera(camera);
