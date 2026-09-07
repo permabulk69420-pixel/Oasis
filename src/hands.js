@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { clone } from 'three/addons/utils/SkeletonUtils.js';
 
 // Exact hand assets from dumbgame, pinned to the source commit so Oasis always
 // receives the same meshes/rig/animations even if dumbgame changes later.
@@ -117,7 +118,7 @@ export function createVRHands({ renderer, scene, onError = console.warn }) {
     if (!gltf || (handedness !== 'left' && handedness !== 'right')) return;
 
     detach(state);
-    const root = prepareModel(gltf.scene.clone(true));
+    const root = prepareModel(clone(gltf.scene));
     root.name = `${handedness}-vr-hand`;
 
     const offset = HAND_GRIP_OFFSETS[handedness];
