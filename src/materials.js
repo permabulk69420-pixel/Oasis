@@ -115,7 +115,7 @@ const atmosphere = /* glsl */`
     vec2 b = texture2D(uCloudMap, uvB).rg;
     float broad = a.r * 0.57 + b.r * 0.43;
     float edge = a.g * 0.55 + b.g * 0.45;
-    return smoothstep(0.475, 0.625, broad * 0.88 + edge * 0.12);
+    return smoothstep(0.505, 0.645, broad * 0.88 + edge * 0.12);
   }
 
   float cloudShadow(vec3 worldPosition) {
@@ -292,8 +292,9 @@ export function createMaterials(renderer, field) {
           float planeDistance = max(CLOUD_HEIGHT - cameraPosition.y, 1.0) / max(ray.y, 0.06);
           vec2 cloudPoint = cameraPosition.xz + ray.xz * planeDistance;
           float rawCloud = skyCloudNoise(cloudPoint);
-          float cloud = smoothstep(0.45, 0.62, rawCloud) * horizonFade;
-          float dense = smoothstep(0.56, 0.70, rawCloud);
+          // Keep the same cloud shapes and motion but expose substantially more blue sky.
+          float cloud = smoothstep(0.49, 0.65, rawCloud) * horizonFade * 0.86;
+          float dense = smoothstep(0.60, 0.74, rawCloud);
           float daylight = smoothstep(-0.07, 0.16, uSun.y);
           float twilight = 1.0 - smoothstep(0.0, 0.30, abs(uSun.y));
           vec3 cloudColor = mix(vec3(0.075, 0.09, 0.13), vec3(0.90, 0.91, 0.89), daylight);
