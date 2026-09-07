@@ -2,8 +2,92 @@ import * as THREE from 'three';
 import { SUN, WATER } from './world.js';
 import { attachSandPBR } from './sand-pbr.js';
 
+const CLOUD_TEXTURE_SIZE = 256;
+
+function hash2(x, y, seed) {
+  let h = Math.imul((x + seed) | 0, 0x45d9f3b) ^ Math.imul((y - seed) | 0, 0x27d4eb2d);
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13;
+  return (h >>> 0) / 4294967295;
+}
+
+function periodicValueNoise(u, v, frequency, seed) {
+  const x = u * frequency;
+  const y = v * frequency;
+  const x0 = Math.floor(x), y0 = Math.floor(y);
+  const tx0 = x - x0, ty0 = y - y0;
+  const tx = tx0 * tx0 * (3 - 2 * tx0);
+  const ty = ty0 * ty0 * (3 - 2 * ty0);
+  const wrap = value => ((value % frequency) + frequency) % frequency;
+  const a = hash2(wrap(x0), wrap(y0), seed);
+  const b = hash2(wrap(x0 + 1), wrap(y0), seed);
+  const c = hash2(wrap(x0), wrap(y0 + 1), seed);
+  const d = hash2(wrap(x0 + 1), wrap(y0 + 1), seed);
+  return THREE.MathUtils.lerp(THREE.MathUtils.lerp(a, b, tx), THREE.MathUtils.lerp(c, d, tx), ty);
+}
+
+function cloudTexture() {
+  // A tiny, deterministic, tileable two-channel FBM field. The GPU only samples this once
+  // per cloud/shadow lookup; generating it at startup avoids expensive procedural noise per pixel.
+  const data = new Uint8Array(CLOUD_TEXTURE_SIZE * CLOUD_TEXTURE_SIZE * 4);
+  for (let y = 0; y < CLOUD_TEXTURE_SIZE; y++) {
+    const v = y / CLOUD_TEXTURE_SIZE;
+    for (let x = 0; x < CLOUD_TEXTURE_SIZE; x++) {
+      const u = x / CLOUD_TEXTURE_SIZE;
+      const broad =
+        periodicValueNoise(u, v, 3, 17) * 0.52 +
+        periodicValueNoise(u, v, 6, 31) * 0.26 +
+        periodicValueNoise(u, v, 12, 47) * 0.14 +
+        periodicValueNoise(u, v, 24, 71) * 0.08;
+      const detail =
+        periodicValueNoise(u, v, 7, 113) * 0.54 +
+        periodicValueNoise(u, v, 14, 137) * 0.27 +
+        periodicValueNoise(u, v, 28, 163) * 0.13 +
+        periodicValueNoise(u, v, 56, 191) * 0.06;
+      const i = (y * CLOUD_TEXTURE_SIZE + x) * 4;
+      data[i] = Math.round(THREE.MathUtils.clamp(broad, 0, 1) * 255);
+      data[i + 1] = Math.round(THREE.MathUtils.clamp(detail, 0, 1) * 255);
+      data[i + 2] = 0;
+      data[i + 3] = 255;
+    }
+  }
+  const texture = new THREE.DataTexture(data, CLOUD_TEXTURE_SIZE, CLOUD_TEXTURE_SIZE, THREE.RGBAFormat);
+  texture.name = 'Procedural cloud field — 256px';
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 const atmosphere = /* glsl */`
   uniform vec3 uSun;
+  uniform sampler2D uCloudMap;
+  uniform float uCloudTime;
+  const float CLOUD_HEIGHT = 1250.0;
+  const float CLOUD_SCALE = 1050.0;
+
+  vec2 cloudWind() {
+    // About 1.3 m/s across the cloud plane: visible movement without time-lapse speed.
+    return vec2(0.00118, 0.00039) * uCloudTime;
+  }
+  float cloudNoise(vec2 worldXZ) {
+    vec2 rg = texture2D(uCloudMap, worldXZ / CLOUD_SCALE + cloudWind()).rg;
+    return rg.x * 0.78 + rg.y * 0.22;
+  }
+  float cloudDensity(vec2 worldXZ) {
+    return smoothstep(0.47, 0.66, cloudNoise(worldXZ));
+  }
+  float cloudShadow(vec3 worldPosition) {
+    // Sample where a ray toward the sun intersects the cloud plane. This keeps the broad
+    // ground shadows spatially related to the visible cloud layer instead of merely scrolling.
+    float daylight = smoothstep(0.04, 0.24, uSun.y);
+    float invSunHeight = 1.0 / max(uSun.y, 0.18);
+    vec2 cloudPoint = worldPosition.xz + uSun.xz * (CLOUD_HEIGHT - worldPosition.y) * invSunHeight;
+    return 1.0 - cloudDensity(cloudPoint) * 0.28 * daylight;
+  }
   vec3 skyColor(vec3 ray) {
     float altitude = max(ray.y, 0.0);
     vec3 horizon = vec3(0.56, 0.65, 0.69);
@@ -39,7 +123,12 @@ export function createMaterials(renderer, field) {
   const elevation = new THREE.DataTexture(elevationData, 513, 513, THREE.RGBAFormat);
   elevation.minFilter = elevation.magFilter = THREE.LinearFilter;
   elevation.needsUpdate = true;
-  const shared = { uSun: { value: new THREE.Vector3(SUN.x, SUN.y, SUN.z).normalize() } };
+  const clouds = cloudTexture();
+  const shared = {
+    uSun: { value: new THREE.Vector3(SUN.x, SUN.y, SUN.z).normalize() },
+    uCloudMap: { value: clouds },
+    uCloudTime: { value: 0 },
+  };
   const sand = new THREE.ShaderMaterial({
     uniforms: {
       ...shared,
@@ -108,7 +197,8 @@ export function createMaterials(renderer, field) {
         float normalFade = 1.0 - smoothstep(20.0, 70.0, distance);
         vec3 n = normalize(mix(baseNormal, mappedNormal, uHasPbrNormal * normalFade));
 
-        float sun = max(dot(n, uSun), 0.0) * mix(0.10, 1.0, vData.r);
+        float cloudLight = cloudShadow(vWorld);
+        float sun = max(dot(n, uSun), 0.0) * mix(0.10, 1.0, vData.r) * cloudLight;
         vec3 proceduralBase = mix(vec3(0.61, 0.375, 0.165), vec3(0.77, 0.545, 0.285), vData.g);
         vec3 textureBase = texture2D(uPbrBase, pbrUv).rgb * mix(0.94, 1.06, vData.g);
         vec3 base = mix(proceduralBase, textureBase, uHasPbrBase);
@@ -125,7 +215,7 @@ export function createMaterials(renderer, field) {
         vec3 halfVector = normalize(view + uSun);
         float specPower = mix(82.0, 7.0, roughness);
         float specStrength = mix(0.24, 0.018, roughness);
-        float specular = pow(max(dot(n, halfVector), 0.0), specPower) * specStrength * mix(0.25, 1.0, vData.r);
+        float specular = pow(max(dot(n, halfVector), 0.0), specPower) * specStrength * mix(0.25, 1.0, vData.r) * cloudLight;
         vec3 color = base * light + vec3(1.0, 0.88, 0.70) * specular;
         color = air(color, -view, distance);
         gl_FragColor = vec4(color, 1.0);
@@ -154,6 +244,25 @@ export function createMaterials(renderer, field) {
         vec3 color = skyColor(ray);
         float sun = smoothstep(0.99996, 0.999989, dot(ray, uSun));
         color += vec3(7.0, 5.9, 4.0) * sun;
+
+        // Intersect the view ray with a single high cloud plane. This is visually much richer
+        // than a painted sky dome but costs just one tiny texture sample per sky pixel.
+        float horizonFade = smoothstep(0.045, 0.19, ray.y);
+        if (horizonFade > 0.001) {
+          float planeDistance = max(CLOUD_HEIGHT - cameraPosition.y, 1.0) / max(ray.y, 0.06);
+          vec2 cloudPoint = cameraPosition.xz + ray.xz * planeDistance;
+          float rawCloud = cloudNoise(cloudPoint);
+          float cloud = smoothstep(0.43, 0.66, rawCloud) * horizonFade;
+          float dense = smoothstep(0.58, 0.76, rawCloud);
+          float daylight = smoothstep(-0.07, 0.16, uSun.y);
+          float twilight = 1.0 - smoothstep(0.0, 0.30, abs(uSun.y));
+          vec3 cloudColor = mix(vec3(0.075, 0.09, 0.13), vec3(0.90, 0.91, 0.89), daylight);
+          cloudColor *= 1.0 - dense * 0.17;
+          float sunFacing = pow(max(dot(ray, uSun), 0.0), 7.0);
+          cloudColor += vec3(0.48, 0.25, 0.10) * twilight * sunFacing * 0.65;
+          color = mix(color, cloudColor, cloud * (0.56 + daylight * 0.22));
+        }
+
         gl_FragColor = vec4(color, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -227,7 +336,7 @@ export function createMaterials(renderer, field) {
       }
     `,
   });
-  return { sand, sky, water };
+  return { sand, sky, water, clouds };
 }
 
 export function createWater(field, material) {
