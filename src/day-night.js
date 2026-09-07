@@ -56,13 +56,15 @@ export function createDayNightCycle({ scene, renderer, materials }) {
 
   scene.add(hemisphere, sunlight, sunlight.target, moonlight, moonlight.target);
 
-  // createMaterials shares the same uSun uniform object across sand, sky and water.
+  // createMaterials shares the same uSun/uCloudTime uniform objects across sand, sky and water.
   const sunDirection = materials.sand.uniforms.uSun.value;
+  const cloudTime = materials.sand.uniforms.uCloudTime || null;
   const moonDirection = new THREE.Vector3();
   const tempSky = new THREE.Color();
   const tempGround = new THREE.Color();
 
   let elapsedSeconds = elapsedFromPhase(INITIAL_PHASE);
+  let cloudSeconds = 0;
   let paused = false;
   let state = null;
 
@@ -113,8 +115,12 @@ export function createDayNightCycle({ scene, renderer, materials }) {
   }
 
   function update(dt) {
-    if (!paused && Number.isFinite(dt) && dt > 0) {
-      elapsedSeconds = (elapsedSeconds + dt) % CYCLE_SECONDS;
+    if (Number.isFinite(dt) && dt > 0) {
+      if (!paused) elapsedSeconds = (elapsedSeconds + dt) % CYCLE_SECONDS;
+      // Cloud drift is environmental motion, so pausing the accelerated sun cycle does not
+      // freeze the wind. Wrap occasionally to keep the uniform numerically tidy.
+      cloudSeconds = (cloudSeconds + dt) % 100000;
+      if (cloudTime) cloudTime.value = cloudSeconds;
     }
     apply();
     return state;
