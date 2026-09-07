@@ -67,8 +67,13 @@ rig.position.set(SPAWN.x, field.sample(SPAWN.x, SPAWN.z), SPAWN.z);
 if (import.meta.env.DEV) {
   const view = new URLSearchParams(location.search).get('view');
   if (view === 'shore') {
-    rig.position.set(WATER.x - 29, field.sample(WATER.x - 29, WATER.z + 19), WATER.z + 19);
-    rig.rotation.y = -Math.atan2(29, 19); camera.rotation.x = -0.13;
+    const dx = WATER.radiusX * 1.05, dz = WATER.radiusZ * 0.80;
+    rig.position.set(WATER.x - dx, field.sample(WATER.x - dx, WATER.z + dz), WATER.z + dz);
+    rig.rotation.y = -Math.atan2(dx, dz); camera.rotation.x = -0.13;
+  }
+  if (view === 'oasis') {
+    rig.position.set(WATER.x - 88, WATER.y + 76, WATER.z + 86);
+    rig.rotation.y = -Math.atan2(88, 86); camera.rotation.x = -0.58;
   }
   if (view === 'wide') {
     rig.position.set(-90, field.sample(-90, 30) + 8, 30);

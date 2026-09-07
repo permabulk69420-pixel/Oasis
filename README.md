@@ -11,7 +11,8 @@ Desktop: **Explore**, WASD / arrow up and down to walk, mouse to look, Shift to 
 ## World
 
 - The walkable area is 1,000 × 1,000 metres, centred on `(0, 0)`.
-- The pool centre is `(300, -400)`, exactly 500 metres from spawn. It is approximately 48 × 34 metres, with an irregular shoreline and a maximum depth of 0.88 metres.
+- The pool centre is `(300, -400)`, exactly 500 metres from spawn. It is approximately 80 × 68 metres, with an irregular shoreline and a maximum depth of 0.88 metres.
+- A bare sandy bank surrounds the water, followed by a grass band on a gently sloping shelf. Add your grass texture using the instructions in `public/textures/grass/README.md`; its colour currently uses a lightweight green fallback.
 - Seeded wind-shaped dunes, static terrain lighting, mipmapped sand ripples, wet shore sand, and animated shallow water.
 - A coarse continuation of the sand outside the playable square hides the world edge.
 - Only terrain, water, sky, and movement. No props, vegetation, buildings, survival systems, objectives, or audio.
@@ -37,4 +38,4 @@ Terrain uses 62.5 m chunks with four distance-based geometry levels and skirts t
 
 VR requests a 72 Hz refresh rate when supported, a framebuffer scale of 1, and fixed foveation of 0.65. Actual headset frame rate still needs verification on Quest 3; desktop/browser checks cannot certify hardware performance.
 
-`src/world.js` owns dimensions, deterministic height generation, water placement, and collision. `src/terrain.js` builds the terrain. `src/materials.js` owns the sand, sky, and water shaders. `src/main.js` handles input and rendering. Development-only `?view=shore` and `?view=wide` camera fixtures support visual QA and are removed by the production build.
+`src/world.js` owns dimensions, deterministic height generation, water placement, and collision. `src/terrain.js` builds the terrain. `src/materials.js` owns the sand, sky, and water shaders. `src/grass-texture.js` configures the optional grass texture and its repeat size. `src/main.js` handles input and rendering. Development-only `?view=shore`, `?view=oasis` (elevated overview), and `?view=wide` camera fixtures support visual QA and are removed by the production build.

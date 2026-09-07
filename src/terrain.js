@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { HALF_WORLD, GRID_STEP, clamp, noise, terrainHeight } from './world.js';
+import { HALF_WORLD, GRID_STEP, WATER, clamp, noise, terrainHeight, grassCover } from './world.js';
 import { createPickupRocks } from './rocks.js';
 
 const CHUNK_SIZE = 62.5;
@@ -23,8 +23,8 @@ export function createTerrain(field, material) {
       pos.push(x, h - drop, z);
       normals.push(nx / len, ny / len, nz / len);
       // R is intentionally 1: a moving sun cannot use the old fixed-direction shadow mask.
-      // G remains broad colour variation for the sand shader.
-      colors.push(1, noise(x * 0.019 + 9, z * 0.019), 1);
+      // G = broad colour variation; B = grass coverage.
+      colors.push(1, noise(x * 0.019 + 9, z * 0.019), grassCover(x, z));
     }
     for (let z = 0; z <= segments; z++) for (let x = 0; x <= segments; x++) add(cx + x * step, cz + z * step);
     for (let z = 0; z < segments; z++) for (let x = 0; x < segments; x++) {
@@ -73,7 +73,7 @@ export function createTerrain(field, material) {
     const nx = terrainHeight(x - 2, z) - terrainHeight(x + 2, z);
     const nz = terrainHeight(x, z - 2) - terrainHeight(x, z + 2);
     const len = Math.hypot(nx, 4, nz);
-    outerPos.push(x, h, z); outerNormal.push(nx / len, 4 / len, nz / len); outerColor.push(1, 0.5, 1);
+    outerPos.push(x, h, z); outerNormal.push(nx / len, 4 / len, nz / len); outerColor.push(1, 0.5, 0);
   }
   for (let r = 0; r < rings.length - 1; r++) for (let i = 0; i < 512; i++) {
     const a = r * 512 + i, b = r * 512 + (i + 1) % 512, c = a + 512, d = b + 512;
@@ -97,6 +97,10 @@ export function createTerrain(field, material) {
       let level = distance < 140 ? 0 : distance < 280 ? 1 : distance < 470 ? 2 : 3;
       // Hysteresis prevents geometry flickering near a distance threshold.
       if (level > chunk.level && distance < [154, 298, 490][chunk.level]) level = chunk.level;
+      // Keep the shore on the same grid as water depth samples at all distances.
+      // Otherwise a coarse terrain LOD can cut through the enlarged water surface.
+      if (Math.abs(chunk.x - WATER.x) < WATER.radiusX * 1.12 + CHUNK_SIZE / 2
+        && Math.abs(chunk.z - WATER.z) < WATER.radiusZ * 1.12 + CHUNK_SIZE / 2) level = 0;
       if (level !== chunk.level) { chunk.mesh.geometry = chunk.geometries[level]; chunk.level = level; }
     }
     pickupRocks.update(x, z);
