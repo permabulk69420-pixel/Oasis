@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#c8a77a" />
+    <meta name="description" content="A kilometre of open desert. Explore on foot or in VR." />
+    <title>Oasis</title>
+  </head>
+  <body>
+    <canvas id="world" aria-label="Desert landscape"></canvas>
+    <section id="welcome" aria-label="Start exploring">
+      <h1>Oasis</h1>
+      <div class="actions">
+        <button id="enter-vr" disabled>Checking VR…</button>
+        <button id="explore" class="secondary">Explore</button>
+      </div>
+      <p id="controls">WASD to move · Mouse to look · Shift to move faster</p>
+      <p class="vr-help">In VR: left stick to move · right stick to turn</p>
+      <p id="status" role="status">Shaping the sand…</p>
+    </section>
+    <button id="menu" aria-label="Open controls" hidden>Controls</button>
+    <div id="touch-controls" hidden>
+      <div id="move-pad" aria-label="Drag to move"><span></span></div>
+      <p>Drag right side to look</p>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
