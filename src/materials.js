@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { SUN, WATER } from './world.js';
+import { SUN, WATER, GRID_STEP, HALF_WORLD } from './world.js';
 import { attachSandPBR } from './sand-pbr.js';
+import { attachGrassTexture, GRASS_TILE_METRES } from './grass-texture.js';
 
 const CLOUD_TEXTURE_SIZE = 256;
 
@@ -173,6 +174,10 @@ export function createMaterials(renderer, field) {
     uniforms: {
       ...shared,
       uWater: { value: new THREE.Vector3(WATER.x, WATER.y, WATER.z) },
+      uWaterRadii: { value: new THREE.Vector2(WATER.radiusX, WATER.radiusZ) },
+      uGrassBase: { value: solidTexture(255, 255, 255) },
+      uHasGrassBase: { value: 0 },
+      uGrassTileMetres: { value: GRASS_TILE_METRES },
       uPbrBase: { value: solidTexture(255, 255, 255) },
       uPbrNormal: { value: solidTexture(128, 128, 255) },
       uPbrRoughness: { value: solidTexture(255, 255, 255) },
@@ -204,6 +209,10 @@ export function createMaterials(renderer, field) {
       uniform float uHasPbrRoughness;
       uniform float uHasPbrHeight;
       uniform vec3 uWater;
+      uniform vec2 uWaterRadii;
+      uniform sampler2D uGrassBase;
+      uniform float uHasGrassBase;
+      uniform float uGrassTileMetres;
       varying vec3 vWorld;
       varying vec3 vNormal;
       varying vec3 vData;
@@ -215,6 +224,7 @@ export function createMaterials(renderer, field) {
         vec2 rotatedXZ = vec2(dot(vWorld.xz, vec2(0.84, 0.54)), dot(vWorld.xz, vec2(-0.54, 0.84)));
         vec2 pbrUv = rotatedXZ / 2.5;
         vec3 baseNormal = normalize(vNormal);
+        float grass = clamp(vData.b, 0.0, 1.0);
 
         // World-projected tangent basis keeps the texture aligned across all terrain LODs.
         vec3 tangentSeed = vec3(0.84, 0.0, 0.54);
@@ -235,17 +245,23 @@ export function createMaterials(renderer, field) {
         vec3 mapNormal = texture2D(uPbrNormal, pbrUv).xyz * 2.0 - 1.0;
         vec3 mappedNormal = normalize(tangent * mapNormal.x + bitangent * mapNormal.y + baseNormal * max(mapNormal.z, 0.05));
         float normalFade = 1.0 - smoothstep(20.0, 70.0, distance);
-        vec3 n = normalize(mix(baseNormal, mappedNormal, uHasPbrNormal * normalFade));
+        vec3 n = normalize(mix(baseNormal, mappedNormal, uHasPbrNormal * normalFade * (1.0 - grass)));
 
         float cloudLight = cloudShadow(vWorld);
         float sun = max(dot(n, uSun), 0.0) * mix(0.10, 1.0, vData.r) * cloudLight;
         vec3 proceduralBase = mix(vec3(0.61, 0.375, 0.165), vec3(0.77, 0.545, 0.285), vData.g);
         vec3 textureBase = texture2D(uPbrBase, pbrUv).rgb * mix(0.94, 1.06, vData.g);
         vec3 base = mix(proceduralBase, textureBase, uHasPbrBase);
+        if (grass > 0.001) {
+          vec3 grassBase = mix(vec3(0.10, 0.15, 0.028), vec3(0.19, 0.25, 0.065), vData.g);
+          if (uHasGrassBase > 0.5) grassBase = texture2D(uGrassBase, vWorld.xz / uGrassTileMetres).rgb;
+          base = mix(base, grassBase, grass);
+        }
 
         float roughnessMap = texture2D(uPbrRoughness, pbrUv).r;
         float roughness = mix(0.88, roughnessMap, uHasPbrRoughness);
-        float poolDistance = length((vWorld.xz - uWater.xz) / vec2(28.0, 21.0));
+        roughness = mix(roughness, 0.95, grass);
+        float poolDistance = length((vWorld.xz - uWater.xz) / uWaterRadii);
         float wet = (1.0 - smoothstep(uWater.y + 0.05, uWater.y + 0.60, vWorld.y)) * (1.0 - smoothstep(1.1, 1.6, poolDistance));
         base = mix(base, base * vec3(0.49, 0.48, 0.43), wet * 0.80);
         roughness = mix(roughness, 0.30, wet * 0.70);
@@ -265,6 +281,7 @@ export function createMaterials(renderer, field) {
     `,
   });
   attachSandPBR(renderer, sand.uniforms);
+  attachGrassTexture(renderer, sand.uniforms);
 
   const sky = new THREE.ShaderMaterial({
     uniforms: shared, side: THREE.BackSide, depthWrite: false,
@@ -381,9 +398,17 @@ export function createMaterials(renderer, field) {
 }
 
 export function createWater(field, material) {
-  const geometry = new THREE.PlaneGeometry(58, 44, 64, 48);
+  // Align to the terrain grid, including triangle diagonals, so the shoreline
+  // depth interpolation agrees with the ground without needing a denser mesh.
+  const step = GRID_STEP;
+  const minX = Math.floor((WATER.x - WATER.radiusX * 1.2 + HALF_WORLD) / step) * step - HALF_WORLD;
+  const maxX = Math.ceil((WATER.x + WATER.radiusX * 1.2 + HALF_WORLD) / step) * step - HALF_WORLD;
+  const minZ = Math.floor((WATER.z - WATER.radiusZ * 1.2 + HALF_WORLD) / step) * step - HALF_WORLD;
+  const maxZ = Math.ceil((WATER.z + WATER.radiusZ * 1.2 + HALF_WORLD) / step) * step - HALF_WORLD;
+  const geometry = new THREE.PlaneGeometry(maxX - minX, maxZ - minZ,
+    Math.round((maxX - minX) / step), Math.round((maxZ - minZ) / step));
   geometry.rotateX(-Math.PI / 2);
-  geometry.translate(WATER.x, WATER.y, WATER.z);
+  geometry.translate((minX + maxX) / 2, WATER.y, (minZ + maxZ) / 2);
   const pos = geometry.attributes.position;
   const depth = new Float32Array(pos.count);
   for (let i = 0; i < pos.count; i++) depth[i] = WATER.y - field.sample(pos.getX(i), pos.getZ(i));

@@ -3,7 +3,7 @@ export const WORLD_SIZE = 1000;
 export const HALF_WORLD = WORLD_SIZE / 2;
 export const GRID_SEGMENTS = 512;
 export const GRID_STEP = WORLD_SIZE / GRID_SEGMENTS;
-export const WATER = Object.freeze({ x: 300, z: -400, y: 3.1, radiusX: 24, radiusZ: 17 });
+export const WATER = Object.freeze({ x: 300, z: -400, y: 3.1, radiusX: 40, radiusZ: 34 });
 export const SPAWN = Object.freeze({ x: 0, z: 0 });
 export const SUN = Object.freeze({ x: -0.728, y: 0.469, z: -0.499 });
 export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -38,6 +38,15 @@ export function basinRadius(x, z) {
   return Math.hypot(dx, dz) / edge;
 }
 
+// Ground cover follows the irregular shoreline, leaving a bare sandy bank.
+// Stored in vertex colours: no grass meshes or extra draw calls.
+export function grassCover(x, z) {
+  const r = basinRadius(x, z);
+  const edgeNoise = (noise(x * 0.18, z * 0.18) - 0.5) * 0.10;
+  return smooth(1.12, 1.25, r + edgeNoise * 0.3)
+    * (1 - smooth(1.50, 1.73, r + edgeNoise));
+}
+
 export function terrainHeight(x, z) {
   const wind = x * 0.84 + z * 0.54;
   const across = -x * 0.54 + z * 0.84;
@@ -52,11 +61,12 @@ export function terrainHeight(x, z) {
     + 1.0 * noise(x * 0.014 + 7, z * 0.014);
   let height = 5 + mainDunes + secondary + rolls;
   const r = basinRadius(x, z);
-  if (r < 4.8) {
+  if (r < 3.2) {
     const bowl = WATER.y - 0.88 + 0.88 * Math.pow(r, 2.2);
-    const apron = WATER.y + 1.1 + (r - 1.4) * 0.85;
-    const basin = mix(bowl, apron, smooth(1.05, 1.7, r));
-    height = mix(basin, height, smooth(1.6, 4.8, r));
+    const apron = WATER.y + 0.55 + (r - 1.4) * 0.65;
+    const basin = mix(bowl, apron, smooth(1.05, 1.5, r));
+    // Keep the sandy bank and grass shelf gently sloped before blending into dunes.
+    height = mix(basin, height, smooth(1.85, 3.2, r));
   }
   return height;
 }

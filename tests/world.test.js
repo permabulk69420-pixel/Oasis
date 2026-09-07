@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { WORLD_SIZE, WATER, SPAWN, GRID_STEP, GRID_SEGMENTS, createHeightField, terrainHeight, stickVector, stickAxis, pivotRig } from '../src/world.js';
+import { WORLD_SIZE, WATER, SPAWN, GRID_STEP, GRID_SEGMENTS, createHeightField, terrainHeight, grassCover, stickVector, stickAxis, pivotRig } from '../src/world.js';
 
 const field = createHeightField();
 test('the world is one kilometre square and water is 500 metres from the central spawn', () => {
@@ -13,7 +13,23 @@ test('the pool is a shallow basin with dry banks on every side', () => {
   assert.ok(depth > 0.75 && depth < 1);
   for (let i = 0; i < 64; i++) {
     const a = i / 64 * Math.PI * 2;
-    assert.ok(field.sample(WATER.x + Math.cos(a) * 29, WATER.z + Math.sin(a) * 22) > WATER.y);
+    assert.ok(field.sample(WATER.x + Math.cos(a) * WATER.radiusX * 1.2, WATER.z + Math.sin(a) * WATER.radiusZ * 1.2) > WATER.y);
+  }
+});
+test('the enlarged pool retains dry sandy banks and a low grass shelf all around', () => {
+  assert.equal(WATER.radiusX * 2, 80);
+  for (let i = 0; i < 128; i++) {
+    const a = i / 128 * Math.PI * 2;
+    const edge = 1 + 0.065 * Math.sin(a * 3 + 0.4) + 0.045 * Math.sin(a * 5 - 0.8);
+    const point = r => [WATER.x + Math.cos(a) * WATER.radiusX * edge * r,
+      WATER.z + Math.sin(a) * WATER.radiusZ * edge * r];
+    assert.ok(field.sample(...point(0.9)) < WATER.y, 'water inside every shoreline direction');
+    assert.ok(field.sample(...point(1.08)) > WATER.y, 'continuous dry bank');
+    assert.equal(grassCover(...point(1.08)), 0, 'sandy bank stays bare');
+    assert.equal(grassCover(...point(1.4)), 1, 'grass wraps the whole pool');
+    assert.equal(grassCover(...point(1.85)), 0, 'grass ends before surrounding dunes');
+    const h = field.sample(...point(1.4));
+    assert.ok(h > WATER.y && h < WATER.y + 0.8, 'grass shelf stays low and dry');
   }
 });
 test('collision exactly follows all mesh vertices and both triangle interiors', () => {
