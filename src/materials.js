@@ -28,8 +28,8 @@ function periodicValueNoise(u, v, frequency, seed) {
 }
 
 function cloudTexture() {
-  // A tiny, deterministic, tileable two-channel FBM field. The GPU only samples this once
-  // per cloud/shadow lookup; generating it at startup avoids expensive procedural noise per pixel.
+  // A tiny, deterministic, tileable two-channel FBM field. Multiple differently transformed
+  // samples in the shaders break up its tile without needing a large cloud texture.
   const data = new Uint8Array(CLOUD_TEXTURE_SIZE * CLOUD_TEXTURE_SIZE * 4);
   for (let y = 0; y < CLOUD_TEXTURE_SIZE; y++) {
     const v = y / CLOUD_TEXTURE_SIZE;
@@ -67,23 +67,43 @@ const atmosphere = /* glsl */`
   uniform sampler2D uCloudMap;
   uniform float uCloudTime;
   const float CLOUD_HEIGHT = 1250.0;
-  const float CLOUD_SCALE = 1050.0;
 
   vec2 cloudWind() {
     // About 1.3 m/s across the cloud plane: visible movement without time-lapse speed.
     return vec2(0.00118, 0.00039) * uCloudTime;
   }
-  float cloudNoise(vec2 worldXZ) {
-    vec2 rg = texture2D(uCloudMap, worldXZ / CLOUD_SCALE + cloudWind()).rg;
-    return rg.x * 0.78 + rg.y * 0.22;
+
+  float skyCloudNoise(vec2 worldXZ) {
+    // Three incommensurate projections of the same tiny texture. The scales, rotations,
+    // offsets and drift rates are deliberately unrelated so no tile can stamp across the sky.
+    vec2 wind = cloudWind();
+
+    vec2 uvA = worldXZ / 2180.0 + wind * 0.91 + vec2(0.173, 0.617);
+
+    vec2 rotatedB = vec2(
+      dot(worldXZ, vec2(0.7986, -0.6018)),
+      dot(worldXZ, vec2(0.6018, 0.7986))
+    );
+    vec2 uvB = rotatedB / 3719.0 + vec2(-wind.y, wind.x) * 0.57 + vec2(0.731, 0.284);
+
+    vec2 rotatedC = vec2(
+      dot(worldXZ, vec2(0.9272, 0.3746)),
+      dot(worldXZ, vec2(-0.3746, 0.9272))
+    );
+    vec2 uvC = rotatedC / 6173.0 + wind * vec2(-0.31, 0.24) + vec2(0.413, 0.892);
+
+    vec2 a = texture2D(uCloudMap, uvA).rg;
+    vec2 b = texture2D(uCloudMap, uvB).rg;
+    vec2 c = texture2D(uCloudMap, uvC).rg;
+
+    float broad = a.r * 0.50 + b.r * 0.31 + c.r * 0.19;
+    float detail = a.g * 0.49 + b.g * 0.32 + c.g * 0.19;
+    return broad * 0.84 + detail * 0.16;
   }
-  float cloudDensity(vec2 worldXZ) {
-    return smoothstep(0.47, 0.66, cloudNoise(worldXZ));
-  }
+
   float cloudShadowDensity(vec2 worldXZ) {
-    // The visible sky can get away with one tile because perspective hides the repetition.
-    // Ground shadows cannot. Two differently scaled/rotated projections make the combined
-    // repeat distance enormous while costing only one additional tiny texture lookup.
+    // Ground shadows also need anti-tiling, but only two projections are used here to keep
+    // the terrain fragment shader cheap on Quest.
     vec2 wind = cloudWind();
     vec2 uvA = worldXZ / 1680.0 + wind * 0.74 + vec2(0.137, 0.619);
     vec2 rotated = vec2(
@@ -97,6 +117,7 @@ const atmosphere = /* glsl */`
     float edge = a.g * 0.55 + b.g * 0.45;
     return smoothstep(0.475, 0.625, broad * 0.88 + edge * 0.12);
   }
+
   float cloudShadow(vec3 worldPosition) {
     // Sample where a ray toward the sun intersects the cloud plane. The anti-tiled shadow
     // field stays broad and soft instead of stamping the same cloud cell across the desert.
@@ -105,6 +126,7 @@ const atmosphere = /* glsl */`
     vec2 cloudPoint = worldPosition.xz + uSun.xz * (CLOUD_HEIGHT - worldPosition.y) * invSunHeight;
     return 1.0 - cloudShadowDensity(cloudPoint) * 0.24 * daylight;
   }
+
   vec3 skyColor(vec3 ray) {
     float altitude = max(ray.y, 0.0);
     vec3 horizon = vec3(0.56, 0.65, 0.69);
@@ -115,6 +137,7 @@ const atmosphere = /* glsl */`
     sky += vec3(0.46, 0.32, 0.13) * pow(facingSun, 140.0);
     return sky;
   }
+
   vec3 air(vec3 color, vec3 ray, float distance) {
     float haze = 1.0 - exp(-distance * 0.00078);
     return mix(color, skyColor(ray), haze);
@@ -262,15 +285,15 @@ export function createMaterials(renderer, field) {
         float sun = smoothstep(0.99996, 0.999989, dot(ray, uSun));
         color += vec3(7.0, 5.9, 4.0) * sun;
 
-        // Intersect the view ray with a single high cloud plane. This is visually much richer
-        // than a painted sky dome but costs just one tiny texture sample per sky pixel.
+        // Intersect the view ray with a high cloud plane. The visible density field is built
+        // from three unrelated projections, so the old obvious repeating cloud stamp is gone.
         float horizonFade = smoothstep(0.045, 0.19, ray.y);
         if (horizonFade > 0.001) {
           float planeDistance = max(CLOUD_HEIGHT - cameraPosition.y, 1.0) / max(ray.y, 0.06);
           vec2 cloudPoint = cameraPosition.xz + ray.xz * planeDistance;
-          float rawCloud = cloudNoise(cloudPoint);
-          float cloud = smoothstep(0.43, 0.66, rawCloud) * horizonFade;
-          float dense = smoothstep(0.58, 0.76, rawCloud);
+          float rawCloud = skyCloudNoise(cloudPoint);
+          float cloud = smoothstep(0.45, 0.62, rawCloud) * horizonFade;
+          float dense = smoothstep(0.56, 0.70, rawCloud);
           float daylight = smoothstep(-0.07, 0.16, uSun.y);
           float twilight = 1.0 - smoothstep(0.0, 0.30, abs(uSun.y));
           vec3 cloudColor = mix(vec3(0.075, 0.09, 0.13), vec3(0.90, 0.91, 0.89), daylight);
