@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { HALF_WORLD, GRID_STEP, SUN, clamp, smooth, noise, terrainHeight } from './world.js';
+import { HALF_WORLD, GRID_STEP, clamp, noise, terrainHeight } from './world.js';
 
 const CHUNK_SIZE = 62.5;
 const LEVELS = [32, 16, 8, 4];
@@ -8,20 +8,6 @@ export function createTerrain(field, material) {
   const group = new THREE.Group();
   group.name = 'Desert — 1000 m × 1000 m';
   const chunks = [];
-  // Static illumination is shared by every LOD; no shadow maps or extra render passes.
-  const side = 513;
-  const shade = new Float32Array(side * side);
-  for (let z = 0; z < side; z++) for (let x = 0; x < side; x++) {
-    const px = x * GRID_STEP - HALF_WORLD, pz = z * GRID_STEP - HALF_WORLD;
-    const h = field.vertex(x, z);
-    let horizon = -10;
-    for (let d = 4; d <= 72; d += 4) {
-      const sx = px + SUN.x * d, sz = pz + SUN.z * d;
-      const sh = Math.abs(sx) <= 500 && Math.abs(sz) <= 500 ? field.sample(sx, sz) : terrainHeight(sx, sz);
-      horizon = Math.max(horizon, (sh - h - 0.2) / d);
-    }
-    shade[z * side + x] = 1 - smooth(SUN.y - 0.06, SUN.y + 0.05, horizon);
-  }
 
   function geometry(cx, cz, segments) {
     const pos = [], normals = [], colors = [], indices = [];
@@ -35,8 +21,9 @@ export function createTerrain(field, material) {
       const ny = 2 * GRID_STEP, len = Math.hypot(nx, ny, nz);
       pos.push(x, h - drop, z);
       normals.push(nx / len, ny / len, nz / len);
-      // R = static sunlight visibility; G = broad colour variation.
-      colors.push(shade[clamp(iz, 0, 512) * side + clamp(ix, 0, 512)], noise(x * 0.019 + 9, z * 0.019), 1);
+      // R is intentionally 1: a moving sun cannot use the old fixed-direction shadow mask.
+      // G remains broad colour variation for the sand shader.
+      colors.push(1, noise(x * 0.019 + 9, z * 0.019), 1);
     }
     for (let z = 0; z <= segments; z++) for (let x = 0; x <= segments; x++) add(cx + x * step, cz + z * step);
     for (let z = 0; z < segments; z++) for (let x = 0; x < segments; x++) {
