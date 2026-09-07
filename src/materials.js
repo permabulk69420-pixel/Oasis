@@ -26,29 +26,6 @@ function solidTexture(r, g, b, a = 255) {
   return texture;
 }
 
-function sandDetail(renderer) {
-  const size = 512, data = new Uint8Array(size * size * 4);
-  let seed = 85741;
-  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-    const u = x / size * Math.PI * 2, v = y / size * Math.PI * 2;
-    const phase = u * 39 + 1.5 * Math.sin(v * 3) + 0.8 * Math.sin(v * 7 + u * 2);
-    const ripple = Math.cos(phase) + 0.2 * Math.cos(phase * 2);
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    const grain = seed / 4294967295;
-    const i = (y * size + x) * 4;
-    data[i] = Math.round(128 + ripple * 74);
-    data[i + 1] = Math.round(128 + Math.sin(phase) * Math.cos(v * 3) * 12);
-    data[i + 2] = Math.round(grain * 255);
-    data[i + 3] = 255;
-  }
-  const map = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
-  map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  map.magFilter = THREE.LinearFilter; map.minFilter = THREE.LinearMipmapLinearFilter;
-  map.generateMipmaps = true; map.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
-  map.needsUpdate = true;
-  return map;
-}
-
 export function createMaterials(renderer, field) {
   // Packed 16-bit height samples support cheap dune reflections in the small pool.
   // RGBA8 keeps filtering portable on mobile GPUs; no float-texture extension is required.
@@ -66,14 +43,15 @@ export function createMaterials(renderer, field) {
   const sand = new THREE.ShaderMaterial({
     uniforms: {
       ...shared,
-      uDetail: { value: sandDetail(renderer) },
       uWater: { value: new THREE.Vector3(WATER.x, WATER.y, WATER.z) },
       uPbrBase: { value: solidTexture(255, 255, 255) },
       uPbrNormal: { value: solidTexture(128, 128, 255) },
       uPbrRoughness: { value: solidTexture(255, 255, 255) },
+      uPbrHeight: { value: solidTexture(128, 128, 128) },
       uHasPbrBase: { value: 0 },
       uHasPbrNormal: { value: 0 },
       uHasPbrRoughness: { value: 0 },
+      uHasPbrHeight: { value: 0 },
     },
     vertexColors: true,
     vertexShader: /* glsl */`
@@ -88,13 +66,14 @@ export function createMaterials(renderer, field) {
       }
     `,
     fragmentShader: /* glsl */`
-      uniform sampler2D uDetail;
       uniform sampler2D uPbrBase;
       uniform sampler2D uPbrNormal;
       uniform sampler2D uPbrRoughness;
+      uniform sampler2D uPbrHeight;
       uniform float uHasPbrBase;
       uniform float uHasPbrNormal;
       uniform float uHasPbrRoughness;
+      uniform float uHasPbrHeight;
       uniform vec3 uWater;
       varying vec3 vWorld;
       varying vec3 vNormal;
@@ -103,20 +82,27 @@ export function createMaterials(renderer, field) {
       void main() {
         vec3 toEye = cameraPosition - vWorld;
         float distance = length(toEye);
+        vec3 view = toEye / max(distance, 0.001);
         vec2 rotatedXZ = vec2(dot(vWorld.xz, vec2(0.84, 0.54)), dot(vWorld.xz, vec2(-0.54, 0.84)));
-        vec2 detailUv = rotatedXZ / 8.0;
         vec2 pbrUv = rotatedXZ / 2.5;
-        vec3 detail = texture2D(uDetail, detailUv).rgb;
-        float nearDetail = 1.0 - smoothstep(9.0, 32.0, distance);
-        vec2 micro = (detail.rg * 2.0 - 1.0) * 0.14 * nearDetail;
-        vec3 baseNormal = normalize(vNormal + vec3(micro.x * 0.84 - micro.y * 0.54, 0.0, micro.x * 0.54 + micro.y * 0.84));
+        vec3 baseNormal = normalize(vNormal);
 
-        // The Park Sand map is OpenGL tangent-space. Build a cheap tangent basis from
-        // the same world projection used for the tiled texture so no tangent attribute
-        // or extra terrain vertex data is required.
+        // World-projected tangent basis keeps the texture aligned across all terrain LODs.
         vec3 tangentSeed = vec3(0.84, 0.0, 0.54);
         vec3 tangent = normalize(tangentSeed - baseNormal * dot(tangentSeed, baseNormal));
         vec3 bitangent = normalize(cross(tangent, baseNormal));
+
+        // One-sample parallax from the height map gives close sand ripples visible depth
+        // without tessellating/displacing the Quest terrain. It fades out quickly to avoid
+        // stereo shimmer and unnecessary far-field texture work.
+        float heightFade = 1.0 - smoothstep(7.0, 26.0, distance);
+        if (uHasPbrHeight > 0.5 && heightFade > 0.001) {
+          float height = texture2D(uPbrHeight, pbrUv).r - 0.5;
+          vec3 viewTangent = vec3(dot(view, tangent), dot(view, bitangent), dot(view, baseNormal));
+          float grazing = max(abs(viewTangent.z), 0.32);
+          pbrUv -= (viewTangent.xy / grazing) * height * 0.022 * heightFade;
+        }
+
         vec3 mapNormal = texture2D(uPbrNormal, pbrUv).xyz * 2.0 - 1.0;
         vec3 mappedNormal = normalize(tangent * mapNormal.x + bitangent * mapNormal.y + baseNormal * max(mapNormal.z, 0.05));
         float normalFade = 1.0 - smoothstep(20.0, 70.0, distance);
@@ -124,10 +110,8 @@ export function createMaterials(renderer, field) {
 
         float sun = max(dot(n, uSun), 0.0) * mix(0.10, 1.0, vData.r);
         vec3 proceduralBase = mix(vec3(0.61, 0.375, 0.165), vec3(0.77, 0.545, 0.285), vData.g);
-        vec3 textureBase = texture2D(uPbrBase, pbrUv).rgb * mix(0.90, 1.10, vData.g);
+        vec3 textureBase = texture2D(uPbrBase, pbrUv).rgb * mix(0.94, 1.06, vData.g);
         vec3 base = mix(proceduralBase, textureBase, uHasPbrBase);
-        float fineGrain = (detail.b - 0.5) * 0.07 * (1.0 - smoothstep(1.5, 7.0, distance));
-        base *= 1.0 + fineGrain;
 
         float roughnessMap = texture2D(uPbrRoughness, pbrUv).r;
         float roughness = mix(0.88, roughnessMap, uHasPbrRoughness);
@@ -138,13 +122,12 @@ export function createMaterials(renderer, field) {
 
         vec3 ambient = mix(vec3(0.20, 0.23, 0.29), vec3(0.28, 0.35, 0.43), max(n.y, 0.0));
         vec3 light = ambient + vec3(1.23, 1.09, 0.86) * sun;
-        vec3 view = normalize(toEye);
         vec3 halfVector = normalize(view + uSun);
         float specPower = mix(82.0, 7.0, roughness);
         float specStrength = mix(0.24, 0.018, roughness);
         float specular = pow(max(dot(n, halfVector), 0.0), specPower) * specStrength * mix(0.25, 1.0, vData.r);
         vec3 color = base * light + vec3(1.0, 0.88, 0.70) * specular;
-        color = air(color, -toEye / distance, distance);
+        color = air(color, -view, distance);
         gl_FragColor = vec4(color, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
