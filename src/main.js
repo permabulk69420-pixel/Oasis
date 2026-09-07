@@ -73,7 +73,7 @@ if (import.meta.env.DEV) {
   }
 }
 
-let playing = false, xrAlign = false, xrHeadingReady = false, xrAnchor = new THREE.Vector3();
+let playing = false;
 let lastTime = 0, lodTime = -1, telemetryTime = -1;
 let mouseDragging = false, touchLookId = null, touchMoveId = null;
 let previousPointer = { x: 0, y: 0 };
@@ -180,19 +180,25 @@ enterVR.addEventListener('click', async () => {
 });
 renderer.xr.addEventListener('sessionstart', () => {
   document.exitPointerLock?.(); clearInput();
-  camera.getWorldPosition(xrAnchor); xrAlign = true; xrHeadingReady = false;
+
+  // Match dumbgame's XR start state: no hidden world yaw or desktop camera transform.
+  rig.position.set(SPAWN.x, field.sample(SPAWN.x, SPAWN.z), SPAWN.z);
+  rig.rotation.set(0, 0, 0);
+  rig.scale.set(1, 1, 1);
+  camera.position.set(0, 0, 0);
+  camera.quaternion.identity();
+
   setPlaying(true); menu.hidden = true; touchControls.hidden = true;
   const session = renderer.xr.getSession();
   session.addEventListener('visibilitychange', clearInput);
 });
 renderer.xr.addEventListener('sessionend', () => {
   rig.position.set(head.x, field.sample(head.x, head.z), head.z);
-  rig.rotation.y = -Math.atan2(lastDirection.x, -lastDirection.z);
+  rig.rotation.y = -Math.atan2(WATER.x, -WATER.z);
   camera.position.set(0, 1.68, 0); camera.rotation.set(-0.045, 0, 0);
   camera.scale.set(1, 1, 1);
   camera.fov = 72; camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
-  xrHeadingReady = false;
   clearInput(); setPlaying(false); lastTime = 0;
 });
 
@@ -203,14 +209,15 @@ function readInput() {
     let x = 0, z = 0, turn = 0, fast = false;
     for (const source of session.inputSources) {
       const pad = source.gamepad;
-      if (!pad) continue;
-      // xr-standard reserves axes 0/1 for the touchpad; Quest sticks are 2/3.
-      const axis = pad.axes.length >= 4 ? 2 : 0;
+      if (!pad?.axes?.length) continue;
+      // Same thumbstick selection and per-axis deadzone used by dumbgame.
+      const axis = pad.axes.length >= 4 ? pad.axes.length - 2 : 0;
       if (source.handedness === 'left') {
-        const move = stickVector(pad.axes[axis] || 0, pad.axes[axis + 1] || 0);
-        x = move.x; z = move.z; fast = !!pad.buttons[3]?.pressed;
+        x = stickAxis(pad.axes[axis] || 0, 0.15);
+        z = stickAxis(pad.axes[axis + 1] || 0, 0.15);
+        fast = !!pad.buttons[3]?.pressed;
       }
-      if (source.handedness === 'right') turn = stickAxis(pad.axes[axis] || 0);
+      if (source.handedness === 'right') turn = stickAxis(pad.axes[axis] || 0, 0.15);
     }
     return { x, z, turn, fast };
   }
@@ -230,30 +237,20 @@ function frame(time) {
   if (renderer.xr.isPresenting) renderer.xr.updateCamera(camera);
   const activeCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
   activeCamera.getWorldPosition(head);
-  if (xrAlign) {
-    rig.position.x += xrAnchor.x - head.x; rig.position.z += xrAnchor.z - head.z;
-    head.x = xrAnchor.x; head.z = xrAnchor.z; xrAlign = false;
-  }
-  if (renderer.xr.isPresenting && !xrHeadingReady) {
-    activeCamera.getWorldDirection(lastDirection);
-    lastDirection.y = 0;
-    if (lastDirection.lengthSq() < 0.001) lastDirection.set(0, 0, -1);
-    lastDirection.normalize();
-    xrHeadingReady = true;
-  }
+
   if (playing) {
     const input = readInput();
     const turn = -input.turn * TURN_SPEED * dt;
     if (turn) {
-      // Turn around the headset, preserving room-scale offsets instead of orbiting the rig origin.
+      // Same smooth-turn model as dumbgame: rotate the rig around the physical head.
       const rotated = pivotRig(rig.position.x, rig.position.z, head.x, head.z, turn);
       rig.position.x = rotated.x; rig.position.z = rotated.z; rig.rotation.y += turn;
     }
 
     if (renderer.xr.isPresenting) {
-      // Capture forward once on VR entry; only smooth turning changes locomotion heading after that.
-      if (turn) lastDirection.applyAxisAngle(up, turn).normalize();
-      movementForward.copy(lastDirection);
+      // Movement follows the virtual body/turn yaw only. Head looking never steers locomotion.
+      movementForward.set(-Math.sin(rig.rotation.y), 0, -Math.cos(rig.rotation.y));
+      lastDirection.copy(movementForward);
     } else {
       activeCamera.getWorldDirection(direction);
       direction.y = 0;
@@ -263,8 +260,9 @@ function frame(time) {
       lastDirection.copy(direction);
     }
 
-    right.crossVectors(movementForward, up);
+    right.crossVectors(movementForward, up).normalize();
     target.copy(right).multiplyScalar(input.x).addScaledVector(movementForward, -input.z);
+    if (target.lengthSq() > 1) target.normalize();
     target.multiplyScalar(input.fast ? FAST_SPEED : WALK_SPEED);
     velocity.lerp(target, 1 - Math.exp(-dt * (target.lengthSq() ? 18 : 28)));
     const dx = velocity.x * dt, dz = velocity.z * dt;
