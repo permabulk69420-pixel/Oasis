@@ -84,10 +84,17 @@ export function stickAxis(v, deadzone = 0.16) {
 }
 
 export function stickVector(x, z, deadzone = 0.16) {
-  const length = Math.hypot(x, z);
-  if (length <= deadzone) return { x: 0, z: 0 };
-  const magnitude = Math.min(1, (length - deadzone) / (1 - deadzone));
-  return { x: x / length * magnitude, z: z / length * magnitude };
+  // Deadzone each axis independently. A radial deadzone lets small sideways stick
+  // noise leak through whenever the other axis is pushed hard, which makes a nominally
+  // straight forward push drift diagonally on real VR controllers.
+  let sx = stickAxis(x, deadzone);
+  let sz = stickAxis(z, deadzone);
+  const length = Math.hypot(sx, sz);
+  if (length > 1) {
+    sx /= length;
+    sz /= length;
+  }
+  return { x: sx, z: sz };
 }
 
 export function pivotRig(x, z, pivotX, pivotZ, radians) {
