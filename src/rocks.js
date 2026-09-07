@@ -56,7 +56,7 @@ function makePlacements(field) {
   const random = seededRandom();
   const placements = [];
 
-  function add(x, z, nearSpawn = false) {
+  function add(x, z) {
     const baseScale = 0.72 + random() * 0.62;
     placements.push({
       x,
@@ -68,7 +68,6 @@ function makePlacements(field) {
       sx: baseScale * (0.86 + random() * 0.26),
       sy: baseScale * (0.88 + random() * 0.22),
       sz: baseScale * (0.86 + random() * 0.26),
-      nearSpawn,
     });
   }
 
@@ -77,7 +76,7 @@ function makePlacements(field) {
   for (let i = 0; i < 14; i++) {
     const angle = random() * Math.PI * 2;
     const radius = 7 + Math.sqrt(random()) * 42;
-    add(Math.cos(angle) * radius, Math.sin(angle) * radius, true);
+    add(Math.cos(angle) * radius, Math.sin(angle) * radius);
   }
 
   // The rest are genuinely sparse across the kilometre-square desert.
@@ -91,7 +90,7 @@ function makePlacements(field) {
   return placements;
 }
 
-export function createPickupRocks({ field, renderer }) {
+export function createPickupRocks({ field, renderer = null }) {
   const geometry = makeRockGeometry();
   const material = new THREE.MeshStandardMaterial({
     color: 0x745f4b,
@@ -105,7 +104,7 @@ export function createPickupRocks({ field, renderer }) {
     texture => {
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-      texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+      if (renderer) texture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
       material.map = texture;
       material.color.set(0xffffff);
       material.needsUpdate = true;
