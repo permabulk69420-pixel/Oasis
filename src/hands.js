@@ -1,0 +1,233 @@
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// Exact hand assets from dumbgame, pinned to the source commit so Oasis always
+// receives the same meshes/rig/animations even if dumbgame changes later.
+const HAND_ASSETS = Object.freeze({
+  left: 'https://raw.githubusercontent.com/permabulk69420-pixel/dumbgame/be12b76764264438e33879b3a05406f16d37c194/assets/models/hands/LeftHand.glb',
+  right: 'https://raw.githubusercontent.com/permabulk69420-pixel/dumbgame/be12b76764264438e33879b3a05406f16d37c194/assets/models/hands/RightHand.glb'
+});
+
+// The meshes are authored with fingers along -Z and palms along -Y. These are
+// the same mirrored grip-space offsets used in dumbgame.
+const HAND_GRIP_OFFSETS = Object.freeze({
+  left: Object.freeze({ position: Object.freeze([0, 0, 0]), rotation: Object.freeze([0, 0, Math.PI / 2]) }),
+  right: Object.freeze({ position: Object.freeze([0, 0, 0]), rotation: Object.freeze([0, 0, -Math.PI / 2]) })
+});
+
+const PRIMARY_FACE_BUTTON = 4; // Quest A / X in xr-standard.
+const loader = new GLTFLoader();
+const gripMatrix = new THREE.Matrix4();
+
+function prepareModel(root) {
+  root.traverse((child) => {
+    if (!child.isMesh) return;
+    child.castShadow = false;
+    child.receiveShadow = false;
+  });
+  return root;
+}
+
+function createActions(root, clips) {
+  const mixer = new THREE.AnimationMixer(root);
+  const actions = new Map();
+  for (const clip of clips) {
+    const action = mixer.clipAction(clip);
+    action.play();
+    action.paused = true;
+    action.weight = 0;
+    actions.set(clip.name, action);
+  }
+  return { mixer, actions, current: null };
+}
+
+function setPose(state, name, amount) {
+  const action = state.actions.get(name);
+  if (!action) return;
+  if (state.current && state.current !== action) state.current.weight = 0;
+  state.current = action;
+  action.weight = 1;
+  action.time = THREE.MathUtils.clamp(amount, 0, 1);
+}
+
+export function createVRHands({ renderer, scene, onError = console.warn }) {
+  const controllers = [renderer.xr.getController(0), renderer.xr.getController(1)];
+  const grips = [renderer.xr.getControllerGrip(0), renderer.xr.getControllerGrip(1)];
+  for (let i = 0; i < controllers.length; i += 1) {
+    scene.add(controllers[i]);
+    scene.add(grips[i]);
+  }
+
+  const models = { left: null, right: null };
+  let visible = true;
+
+  const states = controllers.map((controller, index) => {
+    const objectGrip = new THREE.Group();
+    objectGrip.name = `controller-${index}-held-object-anchor`;
+    grips[index].add(objectGrip);
+    return {
+      controller,
+      grip: grips[index],
+      objectGrip,
+      inputSource: null,
+      handedness: '',
+      pointing: false,
+      primaryDown: false,
+      handAnchor: null,
+      handRoot: null,
+      gripSocket: null,
+      indexTip: null,
+      mixerState: null
+    };
+  });
+
+  function resetObjectGrip(state) {
+    state.grip.add(state.objectGrip);
+    state.objectGrip.position.set(0, 0, 0);
+    state.objectGrip.quaternion.identity();
+    state.objectGrip.scale.set(1, 1, 1);
+  }
+
+  function syncObjectGrip(state) {
+    if (!state.gripSocket) return;
+    if (state.objectGrip.parent !== state.grip) state.grip.add(state.objectGrip);
+    state.grip.updateWorldMatrix(true, false);
+    state.gripSocket.updateWorldMatrix(true, false);
+    gripMatrix
+      .copy(state.grip.matrixWorld)
+      .invert()
+      .multiply(state.gripSocket.matrixWorld)
+      .decompose(state.objectGrip.position, state.objectGrip.quaternion, state.objectGrip.scale);
+    state.objectGrip.updateMatrixWorld(true);
+  }
+
+  function detach(state) {
+    resetObjectGrip(state);
+    if (state.handAnchor) state.grip.remove(state.handAnchor);
+    state.handAnchor = null;
+    state.handRoot = null;
+    state.gripSocket = null;
+    state.indexTip = null;
+    state.mixerState = null;
+  }
+
+  function attach(state) {
+    const handedness = state.handedness;
+    const gltf = models[handedness];
+    if (!gltf || (handedness !== 'left' && handedness !== 'right')) return;
+
+    detach(state);
+    const root = prepareModel(gltf.scene.clone(true));
+    root.name = `${handedness}-vr-hand`;
+
+    const offset = HAND_GRIP_OFFSETS[handedness];
+    const anchor = new THREE.Group();
+    anchor.name = `${handedness}-hand-grip-offset`;
+    anchor.position.fromArray(offset.position);
+    anchor.rotation.set(...offset.rotation);
+    anchor.visible = visible;
+    anchor.add(root);
+    state.grip.add(anchor);
+
+    const side = handedness === 'left' ? 'l' : 'r';
+    const socketName = `b_${side}_grip`;
+    const indexTipName = `b_${side}_index_ignore`;
+    const gripSocket = root.getObjectByName(socketName);
+    const indexTip = root.getObjectByName(indexTipName);
+    if (!gripSocket) onError(`Missing ${socketName}; held objects will use the controller wrist origin.`);
+    if (!indexTip) onError(`Missing ${indexTipName}; fingertip interactions are unavailable.`);
+
+    state.handAnchor = anchor;
+    state.handRoot = root;
+    state.gripSocket = gripSocket || null;
+    state.indexTip = indexTip || null;
+    state.mixerState = createActions(root, gltf.animations);
+    setPose(state.mixerState, 'Open', 0);
+    syncObjectGrip(state);
+  }
+
+  for (const state of states) {
+    state.controller.addEventListener('connected', (event) => {
+      state.inputSource = event.data;
+      state.handedness = event.data.handedness || '';
+      state.objectGrip.name = `${state.handedness || 'unknown'}-held-object-anchor`;
+      state.pointing = false;
+      state.primaryDown = false;
+      attach(state);
+    });
+
+    state.controller.addEventListener('disconnected', () => {
+      state.inputSource = null;
+      state.handedness = '';
+      state.pointing = false;
+      state.primaryDown = false;
+      detach(state);
+    });
+  }
+
+  Promise.allSettled([
+    loader.loadAsync(HAND_ASSETS.left),
+    loader.loadAsync(HAND_ASSETS.right)
+  ]).then(([left, right]) => {
+    if (left.status === 'fulfilled') models.left = left.value;
+    else onError(`Left VR hand failed to load: ${left.reason?.message || left.reason}`);
+    if (right.status === 'fulfilled') models.right = right.value;
+    else onError(`Right VR hand failed to load: ${right.reason?.message || right.reason}`);
+    for (const state of states) attach(state);
+  });
+
+  function update(dt) {
+    for (const state of states) {
+      const buttons = state.inputSource?.gamepad?.buttons || [];
+      const primary = Boolean(buttons[PRIMARY_FACE_BUTTON]?.pressed);
+      if (primary && !state.primaryDown && state.handedness) state.pointing = !state.pointing;
+      state.primaryDown = primary;
+
+      if (!state.mixerState) continue;
+      const trigger = buttons[0]?.value ?? 0;
+      const squeeze = buttons[1]?.value ?? 0;
+
+      if (squeeze > 0.08 && trigger > 0.08) {
+        setPose(state.mixerState, 'Fist', Math.max(trigger, squeeze));
+      } else if (squeeze > 0.08) {
+        setPose(state.mixerState, 'Grip', squeeze);
+      } else if (state.pointing && trigger <= 0.08) {
+        setPose(state.mixerState, 'Point', 1);
+      } else if (trigger > 0.08) {
+        setPose(state.mixerState, 'Pinch', trigger);
+      } else {
+        setPose(state.mixerState, 'Open', 0);
+      }
+
+      state.mixerState.mixer.update(dt);
+      syncObjectGrip(state);
+    }
+  }
+
+  function setVisible(value) {
+    visible = Boolean(value);
+    for (const state of states) {
+      if (state.handAnchor) state.handAnchor.visible = visible;
+    }
+    return visible;
+  }
+
+  function getIndexTipWorldPosition(handedness, target) {
+    const state = states.find((item) => item.handedness === handedness);
+    if (!state?.indexTip || !target?.isVector3) return false;
+    state.indexTip.updateWorldMatrix(true, false);
+    state.indexTip.getWorldPosition(target);
+    return true;
+  }
+
+  return {
+    update,
+    states,
+    controllers,
+    grips,
+    objectGrips: states.map((state) => state.objectGrip),
+    setVisible,
+    isVisible: () => visible,
+    getIndexTipWorldPosition
+  };
+}
