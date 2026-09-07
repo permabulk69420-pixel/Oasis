@@ -11,6 +11,7 @@ const welcome = document.querySelector('#welcome');
 const status = document.querySelector('#status');
 const explore = document.querySelector('#explore');
 const enterVR = document.querySelector('#enter-vr');
+const seatedMode = document.querySelector('#seated-mode');
 const menu = document.querySelector('#menu');
 const touchControls = document.querySelector('#touch-controls');
 const movePad = document.querySelector('#move-pad');
@@ -86,10 +87,14 @@ const direction = new THREE.Vector3(0, 0, -1), movementForward = new THREE.Vecto
 const target = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
 const lastDirection = new THREE.Vector3(0, 0, -1);
 const WALK_SPEED = 2.6, FAST_SPEED = 5.2, TURN_SPEED = 1.4;
+const STANDING_EYE_HEIGHT = 1.68, JUMP_SPEED = 4.4, GRAVITY = 12.0;
+let groundY = rig.position.y;
+let seatedOffset = 0, seatedCalibrationPending = false;
+let jumpHeight = 0, jumpVelocity = 0, jumpHeld = false;
 
 function clearInput() {
   keys.clear(); touchMove = { x: 0, z: 0 }; touchMoveId = null; touchLookId = null; mouseDragging = false;
-  velocity.set(0, 0, 0); movePad.firstElementChild.style.transform = '';
+  velocity.set(0, 0, 0); jumpHeld = false; movePad.firstElementChild.style.transform = '';
 }
 function setPlaying(value) {
   playing = value; welcome.hidden = value; menu.hidden = !value;
@@ -115,7 +120,7 @@ document.addEventListener('pointerlockchange', () => {
 window.addEventListener('keydown', e => {
   if (e.code === 'Escape' && !renderer.xr.isPresenting) setPlaying(false);
   if (!playing || renderer.xr.isPresenting) return;
-  if (['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight'].includes(e.code)) {
+  if (['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight','Space'].includes(e.code)) {
     e.preventDefault(); keys.add(e.code);
   }
 });
@@ -184,51 +189,68 @@ renderer.xr.addEventListener('sessionstart', () => {
   document.exitPointerLock?.(); clearInput();
 
   // Match dumbgame's XR start state: no hidden world yaw or desktop camera transform.
-  rig.position.set(SPAWN.x, field.sample(SPAWN.x, SPAWN.z), SPAWN.z);
+  groundY = field.sample(SPAWN.x, SPAWN.z);
+  rig.position.set(SPAWN.x, groundY, SPAWN.z);
   rig.rotation.set(0, 0, 0);
   rig.scale.set(1, 1, 1);
   camera.position.set(0, 0, 0);
   camera.quaternion.identity();
+
+  jumpHeight = 0; jumpVelocity = 0; jumpHeld = false;
+  seatedOffset = 0;
+  seatedCalibrationPending = Boolean(seatedMode.checked);
 
   setPlaying(true); menu.hidden = true; touchControls.hidden = true;
   const session = renderer.xr.getSession();
   session.addEventListener('visibilitychange', clearInput);
 });
 renderer.xr.addEventListener('sessionend', () => {
-  rig.position.set(head.x, field.sample(head.x, head.z), head.z);
+  groundY = field.sample(head.x, head.z);
+  rig.position.set(head.x, groundY, head.z);
   rig.rotation.y = -Math.atan2(WATER.x, -WATER.z);
   camera.position.set(0, 1.68, 0); camera.rotation.set(-0.045, 0, 0);
   camera.scale.set(1, 1, 1);
   camera.fov = 72; camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  seatedOffset = 0; seatedCalibrationPending = false;
+  jumpHeight = 0; jumpVelocity = 0; jumpHeld = false;
   clearInput(); setPlaying(false); lastTime = 0;
 });
 
 function readInput() {
   if (renderer.xr.isPresenting) {
     const session = renderer.xr.getSession();
-    if (session.visibilityState !== 'visible') return { x: 0, z: 0, turn: 0, fast: false };
-    let x = 0, z = 0, turn = 0, fast = false;
+    if (session.visibilityState !== 'visible') return { x: 0, z: 0, turn: 0, fast: false, jump: false };
+    let x = 0, z = 0, turn = 0, fast = false, jump = false;
     for (const source of session.inputSources) {
       const pad = source.gamepad;
-      if (!pad?.axes?.length) continue;
+      if (!pad) continue;
+      const axes = pad.axes || [];
       // Same thumbstick selection and per-axis deadzone used by dumbgame.
-      const axis = pad.axes.length >= 4 ? pad.axes.length - 2 : 0;
+      const axis = axes.length >= 4 ? axes.length - 2 : 0;
       if (source.handedness === 'left') {
-        x = stickAxis(pad.axes[axis] || 0, 0.15);
-        z = stickAxis(pad.axes[axis + 1] || 0, 0.15);
-        fast = !!pad.buttons[3]?.pressed;
+        if (axes.length >= 2) {
+          x = stickAxis(axes[axis] || 0, 0.15);
+          z = stickAxis(axes[axis + 1] || 0, 0.15);
+        }
+        // xr-standard button 1 is the squeeze/grip control on Quest Touch controllers.
+        fast = Boolean(pad.buttons[1]?.pressed);
       }
-      if (source.handedness === 'right') turn = stickAxis(pad.axes[axis] || 0, 0.15);
+      if (source.handedness === 'right') {
+        if (axes.length >= 2) turn = stickAxis(axes[axis] || 0, 0.15);
+        // xr-standard button 4 is A on the right Quest Touch controller.
+        jump = Boolean(pad.buttons[4]?.pressed);
+      }
     }
-    return { x, z, turn, fast };
+    return { x, z, turn, fast, jump };
   }
   const x = Number(keys.has('KeyD')) - Number(keys.has('KeyA')) + touchMove.x;
   const z = Number(keys.has('KeyS') || keys.has('ArrowDown')) - Number(keys.has('KeyW') || keys.has('ArrowUp')) + touchMove.z;
   const length = Math.max(1, Math.hypot(x, z));
   return { x: x / length, z: z / length,
     turn: Number(keys.has('ArrowRight') || keys.has('KeyE')) - Number(keys.has('ArrowLeft') || keys.has('KeyQ')),
-    fast: keys.has('ShiftLeft') || keys.has('ShiftRight') };
+    fast: keys.has('ShiftLeft') || keys.has('ShiftRight'),
+    jump: keys.has('Space') };
 }
 
 function frame(time) {
@@ -241,8 +263,30 @@ function frame(time) {
   const activeCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
   activeCamera.getWorldPosition(head);
 
+  // local-floor still reports the real headset height while sitting. In seated mode,
+  // measure it once at VR start and raise the entire player rig to a normal eye height.
+  if (renderer.xr.isPresenting && seatedCalibrationPending) {
+    const physicalEyeHeight = head.y - rig.position.y;
+    if (physicalEyeHeight > 0.65 && physicalEyeHeight < 2.2) {
+      seatedOffset = clamp(STANDING_EYE_HEIGHT - physicalEyeHeight, 0, 0.9);
+      seatedCalibrationPending = false;
+      rig.position.y += seatedOffset;
+      head.y += seatedOffset;
+    }
+  }
+
   if (playing) {
     const input = readInput();
+
+    // Jump is edge-triggered so holding A cannot bunny-hop on every landing.
+    if (input.jump && !jumpHeld && jumpHeight <= 0.001) jumpVelocity = JUMP_SPEED;
+    jumpHeld = input.jump;
+    if (jumpVelocity !== 0 || jumpHeight > 0) {
+      jumpVelocity -= GRAVITY * dt;
+      jumpHeight += jumpVelocity * dt;
+      if (jumpHeight <= 0) { jumpHeight = 0; jumpVelocity = 0; }
+    }
+
     const turn = -input.turn * TURN_SPEED * dt;
     if (turn) {
       // Same smooth-turn model as dumbgame: rotate the rig around the physical head.
@@ -272,9 +316,11 @@ function frame(time) {
     const nextX = clamp(head.x + dx, -498, 498), nextZ = clamp(head.z + dz, -498, 498);
     rig.position.x += nextX - head.x; rig.position.z += nextZ - head.z;
     head.x = nextX; head.z = nextZ;
-    // Only the floor height changes. The camera never banks, bobs, or pitches with a dune.
+
+    // Smooth the terrain-following base separately from seated height and jump height.
     const ground = field.sample(head.x, head.z);
-    rig.position.y += (ground - rig.position.y) * (1 - Math.exp(-dt * 24));
+    groundY += (ground - groundY) * (1 - Math.exp(-dt * 24));
+    rig.position.y = groundY + seatedOffset + jumpHeight;
   }
   if (time - lodTime > 350) { terrain.update(head.x, head.z); lodTime = time; }
   materials.water.uniforms.uTime.value = time * 0.001;
