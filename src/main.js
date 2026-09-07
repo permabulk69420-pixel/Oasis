@@ -73,7 +73,7 @@ if (import.meta.env.DEV) {
   }
 }
 
-let playing = false, xrAlign = false, xrAnchor = new THREE.Vector3();
+let playing = false, xrAlign = false, xrHeadingReady = false, xrAnchor = new THREE.Vector3();
 let lastTime = 0, lodTime = -1, telemetryTime = -1;
 let mouseDragging = false, touchLookId = null, touchMoveId = null;
 let previousPointer = { x: 0, y: 0 };
@@ -82,7 +82,7 @@ const keys = new Set();
 const velocity = new THREE.Vector3();
 const direction = new THREE.Vector3(0, 0, -1), movementForward = new THREE.Vector3(), right = new THREE.Vector3(), head = new THREE.Vector3();
 const target = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-const lastDirection = new THREE.Vector3(0.6, 0, -0.8);
+const lastDirection = new THREE.Vector3(0, 0, -1);
 const WALK_SPEED = 2.6, FAST_SPEED = 5.2, TURN_SPEED = 1.4;
 
 function clearInput() {
@@ -180,7 +180,7 @@ enterVR.addEventListener('click', async () => {
 });
 renderer.xr.addEventListener('sessionstart', () => {
   document.exitPointerLock?.(); clearInput();
-  camera.getWorldPosition(xrAnchor); xrAlign = true;
+  camera.getWorldPosition(xrAnchor); xrAlign = true; xrHeadingReady = false;
   setPlaying(true); menu.hidden = true; touchControls.hidden = true;
   const session = renderer.xr.getSession();
   session.addEventListener('visibilitychange', clearInput);
@@ -192,6 +192,7 @@ renderer.xr.addEventListener('sessionend', () => {
   camera.scale.set(1, 1, 1);
   camera.fov = 72; camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  xrHeadingReady = false;
   clearInput(); setPlaying(false); lastTime = 0;
 });
 
@@ -233,6 +234,13 @@ function frame(time) {
     rig.position.x += xrAnchor.x - head.x; rig.position.z += xrAnchor.z - head.z;
     head.x = xrAnchor.x; head.z = xrAnchor.z; xrAlign = false;
   }
+  if (renderer.xr.isPresenting && !xrHeadingReady) {
+    activeCamera.getWorldDirection(lastDirection);
+    lastDirection.y = 0;
+    if (lastDirection.lengthSq() < 0.001) lastDirection.set(0, 0, -1);
+    lastDirection.normalize();
+    xrHeadingReady = true;
+  }
   if (playing) {
     const input = readInput();
     const turn = -input.turn * TURN_SPEED * dt;
@@ -243,12 +251,9 @@ function frame(time) {
     }
 
     if (renderer.xr.isPresenting) {
-      // VR locomotion is body/rig-relative. Headset gaze and controller aim never steer movement.
-      movementForward.set(0, 0, -1).applyQuaternion(rig.quaternion);
-      movementForward.y = 0;
-      if (movementForward.lengthSq() < 0.001) movementForward.set(0, 0, -1);
-      movementForward.normalize();
-      lastDirection.copy(movementForward);
+      // Capture forward once on VR entry; only smooth turning changes locomotion heading after that.
+      if (turn) lastDirection.applyAxisAngle(up, turn).normalize();
+      movementForward.copy(lastDirection);
     } else {
       activeCamera.getWorldDirection(direction);
       direction.y = 0;
