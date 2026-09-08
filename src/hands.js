@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
+import { createHeldTorch } from './torch.js';
 
 // Exact hand assets from dumbgame, pinned to the source commit so Oasis always
 // receives the same meshes/rig/animations even if dumbgame changes later.
@@ -184,6 +185,8 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
     for (const state of states) attach(state);
   });
 
+  const torch = createHeldTorch({ scene, states, onError });
+
   function update(dt) {
     for (const state of states) {
       const buttons = state.inputSource?.gamepad?.buttons || [];
@@ -211,6 +214,7 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
       state.mixerState.mixer.update(dt);
       syncObjectGrip(state);
     }
+    torch.update(dt);
   }
 
   function setVisible(value) {
@@ -235,6 +239,7 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
     controllers,
     grips,
     objectGrips: states.map((state) => state.objectGrip),
+    torch,
     setVisible,
     isVisible: () => visible,
     getIndexTipWorldPosition
