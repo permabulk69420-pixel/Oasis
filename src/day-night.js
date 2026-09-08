@@ -36,6 +36,102 @@ function elapsedFromPhase(phase) {
   return DAY_SECONDS + (wrapped - 0.5) * 2 * NIGHT_SECONDS;
 }
 
+function createNightStars(sunUniform) {
+  // One tiny points draw call: enough stars to make the desert night read clearly in VR,
+  // without a sky texture or thousands of individual meshes.
+  const STAR_COUNT = 1100;
+  const STAR_RADIUS = 5000;
+  const positions = new Float32Array(STAR_COUNT * 3);
+  const sizes = new Float32Array(STAR_COUNT);
+  const brightness = new Float32Array(STAR_COUNT);
+  const colors = new Float32Array(STAR_COUNT * 3);
+
+  let seed = 0x6d2b79f5;
+  const random = () => {
+    seed = Math.imul(seed ^ (seed >>> 15), seed | 1);
+    seed ^= seed + Math.imul(seed ^ (seed >>> 7), seed | 61);
+    return ((seed ^ (seed >>> 14)) >>> 0) / 4294967296;
+  };
+
+  for (let i = 0; i < STAR_COUNT; i++) {
+    const y = random() * 2 - 1;
+    const angle = random() * TAU;
+    const horizontal = Math.sqrt(Math.max(0, 1 - y * y));
+    const p = i * 3;
+    positions[p] = Math.cos(angle) * horizontal * STAR_RADIUS;
+    positions[p + 1] = y * STAR_RADIUS;
+    positions[p + 2] = Math.sin(angle) * horizontal * STAR_RADIUS;
+
+    const sparkle = random();
+    sizes[i] = sparkle > 0.965 ? 3.0 + random() * 1.8 : 1.25 + random() * 1.15;
+    brightness[i] = 0.42 + Math.pow(random(), 2.2) * 0.58;
+
+    const tint = random();
+    if (tint < 0.12) {
+      colors[p] = 0.76; colors[p + 1] = 0.86; colors[p + 2] = 1.0;
+    } else if (tint > 0.90) {
+      colors[p] = 1.0; colors[p + 1] = 0.88; colors[p + 2] = 0.72;
+    } else {
+      colors[p] = 0.95; colors[p + 1] = 0.97; colors[p + 2] = 1.0;
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('starSize', new THREE.BufferAttribute(sizes, 1));
+  geometry.setAttribute('starBrightness', new THREE.BufferAttribute(brightness, 1));
+  geometry.setAttribute('starColor', new THREE.BufferAttribute(colors, 3));
+  geometry.computeBoundingSphere();
+
+  const material = new THREE.ShaderMaterial({
+    uniforms: { uSun: sunUniform },
+    transparent: true,
+    depthTest: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+    vertexShader: /* glsl */`
+      attribute float starSize;
+      attribute float starBrightness;
+      attribute vec3 starColor;
+      varying float vBrightness;
+      varying vec3 vColor;
+      void main() {
+        vBrightness = starBrightness;
+        vColor = starColor;
+        // Keep the stars infinitely distant: head rotation changes the view, translation does not.
+        vec4 p = projectionMatrix * mat4(mat3(viewMatrix)) * vec4(position, 1.0);
+        gl_Position = p;
+        gl_PointSize = starSize;
+      }
+    `,
+    fragmentShader: /* glsl */`
+      uniform vec3 uSun;
+      varying float vBrightness;
+      varying vec3 vColor;
+      void main() {
+        vec2 point = gl_PointCoord - vec2(0.5);
+        float radius = length(point);
+        if (radius > 0.5) discard;
+        float softDot = 1.0 - smoothstep(0.12, 0.50, radius);
+        // Start revealing stars around sunset and reach full strength once twilight is gone.
+        float night = 1.0 - smoothstep(-0.22, 0.025, uSun.y);
+        float alpha = softDot * vBrightness * night;
+        if (alpha < 0.004) discard;
+        gl_FragColor = vec4(vColor * alpha, alpha);
+        #include <colorspace_fragment>
+      }
+    `,
+  });
+  material.name = 'Night starfield material';
+
+  const stars = new THREE.Points(geometry, material);
+  stars.name = 'Night starfield';
+  stars.frustumCulled = false;
+  stars.renderOrder = -9;
+  return stars;
+}
+
 export function createDayNightCycle({ scene, renderer, materials }) {
   if (!scene || !renderer || !materials?.sand?.uniforms?.uSun) {
     throw new Error('Day/night cycle requires the scene, renderer, and Oasis environment materials.');
@@ -43,6 +139,12 @@ export function createDayNightCycle({ scene, renderer, materials }) {
 
   installOasisWater(materials.water, (message) => console.warn(message));
   const fireflies = createWaterFireflies({ scene });
+
+  // createMaterials shares the same uSun/uCloudTime uniform objects across sand, sky and water.
+  const sunDirection = materials.sand.uniforms.uSun.value;
+  const cloudTime = materials.sand.uniforms.uCloudTime || null;
+  const stars = createNightStars(materials.sand.uniforms.uSun);
+  scene.add(stars);
 
   // Standard PBR assets (hands now; props/buildings later) use real scene lights.
   // The terrain/water/sky remain on their lightweight custom shaders.
@@ -61,9 +163,6 @@ export function createDayNightCycle({ scene, renderer, materials }) {
 
   scene.add(hemisphere, sunlight, sunlight.target, moonlight, moonlight.target);
 
-  // createMaterials shares the same uSun/uCloudTime uniform objects across sand, sky and water.
-  const sunDirection = materials.sand.uniforms.uSun.value;
-  const cloudTime = materials.sand.uniforms.uCloudTime || null;
   const moonDirection = new THREE.Vector3();
   const tempSky = new THREE.Color();
   const tempGround = new THREE.Color();
@@ -157,6 +256,7 @@ export function createDayNightCycle({ scene, renderer, materials }) {
     isPaused: () => paused,
     getState: () => ({ ...state }),
     lights: { hemisphere, sunlight, moonlight },
-    fireflies
+    fireflies,
+    stars
   };
 }
