@@ -5,6 +5,7 @@ import { createTerrain } from './terrain.js';
 import { createMaterials, createWater } from './materials.js';
 import { createVRHands } from './hands.js';
 import { createDayNightCycle } from './day-night.js';
+import { createSandFootsteps } from './footsteps.js';
 
 const canvas = document.querySelector('#world');
 const welcome = document.querySelector('#welcome');
@@ -45,6 +46,9 @@ const hands = createVRHands({
   renderer,
   scene,
   onError: (message) => console.warn('[Oasis hands]', message)
+});
+const footsteps = createSandFootsteps({
+  onError: (message) => console.warn(message)
 });
 camera.position.set(0, 1.68, 0);
 camera.rotation.order = 'YXZ';
@@ -99,7 +103,7 @@ let jumpHeight = 0, jumpVelocity = 0, jumpHeld = false;
 
 function clearInput() {
   keys.clear(); touchMove = { x: 0, z: 0 }; touchMoveId = null; touchLookId = null; mouseDragging = false;
-  velocity.set(0, 0, 0); jumpHeld = false; movePad.firstElementChild.style.transform = '';
+  velocity.set(0, 0, 0); jumpHeld = false; footsteps.reset(); movePad.firstElementChild.style.transform = '';
 }
 function setPlaying(value) {
   playing = value; welcome.hidden = value; menu.hidden = !value;
@@ -319,13 +323,21 @@ function frame(time) {
     velocity.lerp(target, 1 - Math.exp(-dt * (target.lengthSq() ? 18 : 28)));
     const dx = velocity.x * dt, dz = velocity.z * dt;
     const nextX = clamp(head.x + dx, -498, 498), nextZ = clamp(head.z + dz, -498, 498);
-    rig.position.x += nextX - head.x; rig.position.z += nextZ - head.z;
+    const movedX = nextX - head.x, movedZ = nextZ - head.z;
+    rig.position.x += movedX; rig.position.z += movedZ;
     head.x = nextX; head.z = nextZ;
 
     // Smooth the terrain-following base separately from seated height and jump height.
     const ground = field.sample(head.x, head.z);
     groundY += (ground - groundY) * (1 - Math.exp(-dt * 24));
     rig.position.y = groundY + seatedOffset + jumpHeight;
+
+    footsteps.update({
+      distance: Math.hypot(movedX, movedZ),
+      speed: Math.hypot(velocity.x, velocity.z),
+      grounded: jumpHeight <= 0.001,
+      active: true
+    });
   }
   if (time - lodTime > 350) { terrain.update(head.x, head.z); lodTime = time; }
   materials.water.uniforms.uTime.value = time * 0.001;
