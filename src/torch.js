@@ -3,6 +3,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SPAWN, terrainHeight } from './world.js';
 
 const TORCH_URL = `${import.meta.env.BASE_URL}models/torch/handheld_fire_torch.glb`;
+const TORCH_AUDIO_URL = `${import.meta.env.BASE_URL}audio/fire/torch_fire_crackle_loop.mp3`;
+const TORCH_AUDIO_VOLUME = 0.65;
 const RIGHT_HAND = 'right';
 const GRIP_BUTTON = 1;
 const B_BUTTON = 5;
@@ -140,6 +142,12 @@ export function createHeldTorch({ scene, states, onError = console.warn }) {
 
   const terrainTorchPosition = { value: new THREE.Vector3(0, -1000, 0) };
   const terrainTorchStrength = { value: 0 };
+  const fireAudio = new Audio(TORCH_AUDIO_URL);
+  fireAudio.loop = true;
+  fireAudio.preload = 'auto';
+  fireAudio.volume = TORCH_AUDIO_VOLUME;
+  fireAudio.playsInline = true;
+
   let terrainLightingReady = false;
   let waterLightingReady = false;
 
@@ -177,10 +185,27 @@ export function createHeldTorch({ scene, states, onError = console.warn }) {
     }
   }
 
+  function startFireAudio() {
+    if (!fireAudio.paused) return;
+    fireAudio.play().catch((error) => {
+      if (error?.name !== 'NotAllowedError') {
+        onError(`[Oasis torch] Could not play fire audio: ${error?.message || error}`);
+      }
+    });
+  }
+
+  function stopFireAudio() {
+    if (!fireAudio.paused) fireAudio.pause();
+    fireAudio.currentTime = 0;
+  }
+
   function setLit(value) {
     lit = Boolean(value);
     if (flame) flame.group.visible = lit;
-    if (!lit) {
+    if (lit) {
+      startFireAudio();
+    } else {
+      stopFireAudio();
       if (flame) flame.light.intensity = 0;
       terrainTorchStrength.value = 0;
     }
