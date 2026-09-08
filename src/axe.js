@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SPAWN, terrainHeight } from './world.js';
+import { pulseHaptics } from './haptics.js';
 
 const AXE_URL = `${import.meta.env.BASE_URL}models/axe/stone_survival_axe.glb`;
 const CHOP_AUDIO_URLS = [1, 2, 3].map(index => `${import.meta.env.BASE_URL}audio/chopping/axe_chop_0${index}.mp3`);
@@ -19,6 +20,10 @@ const FALL_DELAY = 0.10;
 const FALL_DURATION = 1.25;
 const FALL_ANGLE = Math.PI * 0.485;
 const CHOP_VOLUME = 0.90;
+const CHOP_HAPTIC_STRENGTH = 0.62;
+const CHOP_HAPTIC_MS = 55;
+const FELL_HAPTIC_STRENGTH = 0.90;
+const FELL_HAPTIC_MS = 95;
 
 // The GLB origin is already in the lower handle grip area. Its lowest point is
 // about 13 cm below that pivot, so this keeps the upright test spawn on the sand.
@@ -194,9 +199,15 @@ export function createHeldAxe({ scene, states, onError = console.warn }) {
     state.shakeAxis.copy(shakeAxis);
     state.shakeTime = HIT_SHAKE_TIME;
     state.hits += 1;
+    const isFellingHit = state.hits >= TREE_HITS_TO_FELL;
     playChopSound();
+    pulseHaptics(
+      heldBy,
+      isFellingHit ? FELL_HAPTIC_STRENGTH : CHOP_HAPTIC_STRENGTH,
+      isFellingHit ? FELL_HAPTIC_MS : CHOP_HAPTIC_MS,
+    );
 
-    if (state.hits >= TREE_HITS_TO_FELL) {
+    if (isFellingHit) {
       state.falling = true;
       state.fallDelay = FALL_DELAY;
       state.fallTime = 0;
