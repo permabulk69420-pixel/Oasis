@@ -8,14 +8,14 @@ const TREE_DRAW_DISTANCE = 240;
 const TREE_LOAD_DISTANCE = 275;
 
 // Hand-placed in normalized shoreline space so the food plants feel discovered rather
-// than evenly distributed. Values around 1.3-1.5 sit in the grass shelf outside the bank.
+// than evenly distributed. Keep all berry bushes at the model's original scale.
 const BUSH_LAYOUT = [
-  { angle: 0.28, radius: 1.34, scale: 1.02, yaw: 0.4 },
-  { angle: 1.17, radius: 1.46, scale: 0.91, yaw: 2.1 },
-  { angle: 2.06, radius: 1.38, scale: 1.08, yaw: 4.7 },
-  { angle: 3.02, radius: 1.51, scale: 0.96, yaw: 1.2 },
-  { angle: 4.12, radius: 1.41, scale: 1.04, yaw: 5.4 },
-  { angle: 5.22, radius: 1.47, scale: 0.94, yaw: 3.3 },
+  { angle: 0.28, radius: 1.34, scale: 1.00, yaw: 0.4 },
+  { angle: 1.17, radius: 1.46, scale: 1.00, yaw: 2.1 },
+  { angle: 2.06, radius: 1.38, scale: 1.00, yaw: 4.7 },
+  { angle: 3.02, radius: 1.51, scale: 1.00, yaw: 1.2 },
+  { angle: 4.12, radius: 1.41, scale: 1.00, yaw: 5.4 },
+  { angle: 5.22, radius: 1.47, scale: 1.00, yaw: 3.3 },
 ];
 
 // Sparse taller anchors kept safely inside the grass shelf. Scale/yaw variation keeps repeated
