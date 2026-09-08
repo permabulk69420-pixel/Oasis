@@ -73,7 +73,8 @@ function createFlameEffect() {
   });
 
   const geometry = new THREE.PlaneGeometry(0.125, 0.24, 1, 1);
-  geometry.translate(0, 0.105, 0);
+  // Keep the entire additive flame above the authored anchor so it cannot wash over the shaft.
+  geometry.translate(0, 0.14, 0);
   for (const yaw of [0, Math.PI / 3, Math.PI * 2 / 3]) {
     const flame = new THREE.Mesh(geometry, material);
     flame.rotation.y = yaw;
@@ -82,10 +83,11 @@ function createFlameEffect() {
     group.add(flame);
   }
 
-  const light = new THREE.PointLight(0xff6f24, 0, 9.0, 2.0);
+  const light = new THREE.PointLight(0xffa04a, 0, 8.0, 2.0);
   light.name = 'Torch warm light';
   light.castShadow = false;
-  light.position.y = 0.07;
+  // Raise the light into the flame rather than lighting the shaft from inside the wrapped head.
+  light.position.y = 0.16;
   group.add(light);
 
   return { group, material, light };
@@ -151,7 +153,7 @@ function createGroundGlow() {
       void main() {
         float alpha = vIntensity * uGlow;
         if (alpha < 0.004) discard;
-        gl_FragColor = vec4(1.0, 0.23, 0.035, alpha);
+        gl_FragColor = vec4(1.0, 0.38, 0.08, alpha);
       }
     `,
   });
@@ -219,7 +221,9 @@ export function createHeldTorch({ scene, states, onError = console.warn }) {
     if (!root || !state?.objectGrip) return false;
     state.objectGrip.add(root);
     root.position.set(0, 0, 0);
-    root.quaternion.identity();
+    // The authored +Y torch axis points opposite the Quest hand socket's held-up direction.
+    // Flip only while held; the world spawn remains authored upright.
+    root.rotation.set(Math.PI, 0, 0);
     root.scale.set(1, 1, 1);
     heldBy = state;
     return true;
@@ -291,8 +295,9 @@ export function createHeldTorch({ scene, states, onError = console.warn }) {
       + Math.sin(elapsed * 21.7 + 0.8) * 0.035
       + Math.sin(elapsed * 7.3 + 2.1) * 0.025;
     flame.material.uniforms.uStrength.value = THREE.MathUtils.clamp(flicker, 0.78, 1.08);
-    flame.light.intensity = 72 * THREE.MathUtils.clamp(flicker, 0.82, 1.08);
-    groundGlow.material.uniforms.uGlow.value = 0.20 * THREE.MathUtils.clamp(flicker, 0.80, 1.05);
+    // The terrain shader gets its own cheap glow; this light only needs to illuminate nearby PBR props/hands.
+    flame.light.intensity = 18 * THREE.MathUtils.clamp(flicker, 0.82, 1.08);
+    groundGlow.material.uniforms.uGlow.value = 0.17 * THREE.MathUtils.clamp(flicker, 0.80, 1.05);
     updateGroundGlow(groundGlow, flamePosition);
   }
 
