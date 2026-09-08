@@ -7,6 +7,13 @@ const BUSH_LOAD_DISTANCE = 230;
 const TREE_DRAW_DISTANCE = 240;
 const TREE_LOAD_DISTANCE = 275;
 
+// Keep the full tree nearby, then step down aggressively once individual leaves are small in VR.
+const TREE_LODS = [
+  { file: 'blue_alien_tree.glb', distance: 0 },
+  { file: 'blue_alien_tree_optimized_code.glb', distance: 18 },
+  { file: 'blue_alien_tree_lod3_ultra.glb', distance: 45 },
+];
+
 // Hand-placed in normalized shoreline space so the food plants feel discovered rather
 // than evenly distributed. Keep all berry bushes at the model's original scale.
 const BUSH_LAYOUT = [
@@ -19,7 +26,7 @@ const BUSH_LAYOUT = [
 ];
 
 // Sparse taller anchors kept safely inside the grass shelf. Scale/yaw variation keeps repeated
-// copies from reading like a ring of clones while still sharing the same GLB geometry/materials.
+// copies from reading like a ring of clones while still sharing each LOD's geometry/materials.
 const TREE_LAYOUT = [
   { angle: 0.54, radius: 1.55, scale: 1.16, yaw: 0.25 },
   { angle: 1.34, radius: 1.48, scale: 1.32, yaw: 2.65 },
@@ -96,24 +103,35 @@ export function createOasisVegetation({ field }) {
     if (treeLoadStarted) return;
     treeLoadStarted = true;
     const loader = new GLTFLoader();
-    const url = `${import.meta.env.BASE_URL}models/berry-bush/alien_desert_plant.glb`;
-    loader.load(url, gltf => {
+    const base = `${import.meta.env.BASE_URL}models/vegetation/alien-tree/`;
+
+    Promise.all(TREE_LODS.map(async level => {
+      const gltf = await loader.loadAsync(`${base}${level.file}`);
       const source = gltf.scene;
       source.updateMatrixWorld(true);
+      disableModelShadows(source);
+      return { ...level, source };
+    })).then(levels => {
       for (let i = 0; i < trees.length; i++) {
         const item = trees[i];
-        const tree = source.clone(true);
-        tree.name = `Alien desert tree ${i + 1}`;
-        tree.position.set(item.x, field.sample(item.x, item.z) - 0.02, item.z);
-        tree.rotation.y = item.yaw;
-        tree.scale.setScalar(item.scale);
-        tree.userData.oasisTree = true;
-        disableModelShadows(tree);
-        treeGroup.add(tree);
+        const lod = new THREE.LOD();
+        lod.name = `Alien desert tree ${i + 1}`;
+        lod.position.set(item.x, field.sample(item.x, item.z) - 0.02, item.z);
+        lod.rotation.y = item.yaw;
+        lod.scale.setScalar(item.scale);
+        lod.userData.oasisTree = true;
+
+        for (const level of levels) {
+          const model = level.source.clone(true);
+          model.userData.oasisTree = true;
+          lod.addLevel(model, level.distance);
+        }
+
+        treeGroup.add(lod);
       }
       treesReady = true;
-    }, undefined, error => {
-      console.warn('[Oasis vegetation] Alien desert tree model unavailable.', error);
+    }).catch(error => {
+      console.warn('[Oasis vegetation] Alien desert tree LOD models unavailable.', error);
     });
   }
 
