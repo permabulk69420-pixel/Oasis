@@ -188,13 +188,20 @@ export function createHeldSticks({ scene, states, onError = console.warn }) {
 
     stick.updateWorldMatrix(true, false);
     stick.getWorldPosition(stickPosition);
-    scene.attach(stick);
+
+    // Return dropped sticks to the same registered group that pickup searches.
+    // group.attach preserves the current world transform while re-parenting.
+    const group = getStickGroup();
+    if (group?.parent) group.attach(stick);
+    else scene.attach(stick);
 
     const x = stickPosition.x;
     const z = stickPosition.z;
     const scale = Math.max(stick.scale.x, 0.001);
     const sourceBottom = Number.isFinite(stick.userData.sourceBottom) ? stick.userData.sourceBottom : -0.057;
-    stick.position.set(x, terrainHeight(x, z) - sourceBottom * scale + 0.004, z);
+    stickPosition.set(x, terrainHeight(x, z) - sourceBottom * scale + 0.004, z);
+    if (stick.parent === group) group.worldToLocal(stickPosition);
+    stick.position.copy(stickPosition);
     stick.rotation.set(0, stick.userData.groundYaw || 0, 0);
     stick.userData.held = false;
     heldByState.delete(state);
