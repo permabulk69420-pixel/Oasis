@@ -1,5 +1,5 @@
 const AMBIENT_URL = `${import.meta.env.BASE_URL}audio/ambient/desert_ambient_end_loop_60s.mp3`;
-const AMBIENT_VOLUME = 0.22;
+const AMBIENT_VOLUME = 0.5;
 
 const ambient = new Audio(AMBIENT_URL);
 ambient.loop = true;
