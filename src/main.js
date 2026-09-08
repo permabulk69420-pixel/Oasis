@@ -109,16 +109,18 @@ const target = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
 const lastDirection = new THREE.Vector3(0, 0, -1);
 const WALK_SPEED = 2.6, FAST_SPEED = 5.2, TURN_SPEED = 1.4;
 const STANDING_EYE_HEIGHT = 1.68, JUMP_SPEED = 4.4, GRAVITY = 12.0;
-const CROUCH_DEPTH = 0.58, CROUCH_RESPONSE = 12.0, RIGHT_STICK_BUTTON = 3;
+const CROUCH_DEPTH = 0.58, CROUCH_RESPONSE = 12.0, LEFT_STICK_BUTTON = 3, RIGHT_STICK_BUTTON = 3;
 let groundY = rig.position.y;
 let seatedOffset = 0, seatedCalibrationPending = false;
 let jumpHeight = 0, jumpVelocity = 0, jumpHeld = false;
 let crouchOffset = 0, crouchActive = false, crouchButtonDown = false;
+let sprintActive = false, sprintButtonDown = false;
 
 function clearInput() {
   keys.clear(); touchMove = { x: 0, z: 0 }; touchMoveId = null; touchLookId = null; mouseDragging = false;
   velocity.set(0, 0, 0); jumpHeld = false;
   crouchOffset = 0; crouchActive = false; crouchButtonDown = false;
+  sprintActive = false; sprintButtonDown = false;
   footsteps.reset(); movePad.firstElementChild.style.transform = '';
 }
 function setPlaying(value) {
@@ -223,6 +225,7 @@ renderer.xr.addEventListener('sessionstart', () => {
 
   jumpHeight = 0; jumpVelocity = 0; jumpHeld = false;
   crouchOffset = 0; crouchActive = false; crouchButtonDown = false;
+  sprintActive = false; sprintButtonDown = false;
   seatedOffset = 0;
   seatedCalibrationPending = Boolean(seatedMode.checked);
 
@@ -241,14 +244,15 @@ renderer.xr.addEventListener('sessionend', () => {
   seatedOffset = 0; seatedCalibrationPending = false;
   jumpHeight = 0; jumpVelocity = 0; jumpHeld = false;
   crouchOffset = 0; crouchActive = false; crouchButtonDown = false;
+  sprintActive = false; sprintButtonDown = false;
   clearInput(); setPlaying(false); lastTime = 0;
 });
 
 function readInput() {
   if (renderer.xr.isPresenting) {
     const session = renderer.xr.getSession();
-    if (session.visibilityState !== 'visible') return { x: 0, z: 0, turn: 0, fast: false, jump: false, crouchPressed: false };
-    let x = 0, z = 0, turn = 0, fast = false, jump = false, crouchPressed = false;
+    if (session.visibilityState !== 'visible') return { x: 0, z: 0, turn: 0, fast: false, sprintPressed: false, jump: false, crouchPressed: false };
+    let x = 0, z = 0, turn = 0, jump = false, crouchPressed = false, sprintPressed = false;
     for (const source of session.inputSources) {
       const pad = source.gamepad;
       if (!pad) continue;
@@ -260,8 +264,8 @@ function readInput() {
           x = stickAxis(axes[axis] || 0, 0.15);
           z = stickAxis(axes[axis + 1] || 0, 0.15);
         }
-        // xr-standard button 1 is the squeeze/grip control on Quest Touch controllers.
-        fast = Boolean(pad.buttons[1]?.pressed);
+        // L3 toggles sprint; squeeze/grip is reserved for physical grabbing.
+        sprintPressed = Boolean(pad.buttons[LEFT_STICK_BUTTON]?.pressed);
       }
       if (source.handedness === 'right') {
         if (axes.length >= 2) turn = stickAxis(axes[axis] || 0, 0.15);
@@ -271,14 +275,14 @@ function readInput() {
         jump = Boolean(pad.buttons[4]?.pressed);
       }
     }
-    return { x, z, turn, fast, jump, crouchPressed };
+    return { x, z, turn, fast: false, sprintPressed, jump, crouchPressed };
   }
   const x = Number(keys.has('KeyD')) - Number(keys.has('KeyA')) + touchMove.x;
   const z = Number(keys.has('KeyS') || keys.has('ArrowDown')) - Number(keys.has('KeyW') || keys.has('ArrowUp')) + touchMove.z;
   const length = Math.max(1, Math.hypot(x, z));
   return { x: x / length, z: z / length,
     turn: Number(keys.has('ArrowRight') || keys.has('KeyE')) - Number(keys.has('ArrowLeft') || keys.has('KeyQ')),
-    fast: keys.has('ShiftLeft') || keys.has('ShiftRight'),
+    fast: keys.has('ShiftLeft') || keys.has('ShiftRight'), sprintPressed: false,
     jump: keys.has('Space'), crouchPressed: false };
 }
 
@@ -306,6 +310,13 @@ function frame(time) {
 
   if (playing) {
     const input = readInput();
+
+    if (renderer.xr.isPresenting) {
+      if (input.sprintPressed && !sprintButtonDown) sprintActive = !sprintActive;
+      sprintButtonDown = input.sprintPressed;
+    } else {
+      sprintButtonDown = false;
+    }
 
     // Right thumbstick click toggles artificial crouch; horizontal stick motion still smooth-turns.
     if (input.crouchPressed && !crouchButtonDown) crouchActive = !crouchActive;
@@ -346,7 +357,8 @@ function frame(time) {
     target.copy(right).multiplyScalar(input.x).addScaledVector(movementForward, -input.z);
     if (target.lengthSq() > 1) target.normalize();
     const carrySpeedMultiplier = getCarrySpeedMultiplier();
-    target.multiplyScalar((input.fast ? FAST_SPEED : WALK_SPEED) * carrySpeedMultiplier);
+    const sprinting = renderer.xr.isPresenting ? sprintActive : input.fast;
+    target.multiplyScalar((sprinting ? FAST_SPEED : WALK_SPEED) * carrySpeedMultiplier);
     velocity.lerp(target, 1 - Math.exp(-dt * (target.lengthSq() ? 18 : 28)));
     const dx = velocity.x * dt, dz = velocity.z * dt;
     const nextX = clamp(head.x + dx, -498, 498), nextZ = clamp(head.z + dz, -498, 498);
