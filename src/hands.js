@@ -4,6 +4,7 @@ import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { createHeldTorch } from './torch.js';
 import { createHeldAxe } from './axe.js';
 import { createHeldSticks } from './sticks.js';
+import { createHeldStones } from './stones.js';
 import { getHeldGripPose } from './grip-poses.js';
 import { pulseHaptics } from './haptics.js';
 
@@ -200,6 +201,7 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
   const torch = createHeldTorch({ scene, states, onError });
   const axe = createHeldAxe({ scene, states, onError });
   const sticks = createHeldSticks({ scene, states, renderer, onError });
+  const stones = createHeldStones({ scene, states, renderer, onError });
 
   function update(dt) {
     for (const state of states) {
@@ -239,24 +241,31 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
     // can stay generic rather than each collectible having to implement its own rumble.
     const heldCountsBefore = new Map(states.map((state) => [state, state.objectGrip.children.length]));
     const heldStickBefore = new Map(states.map((state) => [state, sticks.isHolding(state.handedness)]));
+    const heldStoneBefore = new Map(states.map((state) => [state, stones.isHolding(state.handedness)]));
     const storedSticksBefore = sticks.getStoredCount();
+    const storedStonesBefore = stones.getStoredCount();
 
     torch.update(dt);
     axe.update(dt);
     sticks.update(dt);
+    stones.update(dt);
 
     const storedSticksAfter = sticks.getStoredCount();
+    const storedStonesAfter = stones.getStoredCount();
     for (const state of states) {
       const before = heldCountsBefore.get(state) || 0;
       const after = state.objectGrip.children.length;
       if (before === 0 && after > 0) {
         pulseHaptics(state, PICKUP_HAPTIC_STRENGTH, PICKUP_HAPTIC_MS);
       }
-      if (
-        storedSticksAfter > storedSticksBefore
+
+      const storedStick = storedSticksAfter > storedSticksBefore
         && heldStickBefore.get(state)
-        && !sticks.isHolding(state.handedness)
-      ) {
+        && !sticks.isHolding(state.handedness);
+      const storedStone = storedStonesAfter > storedStonesBefore
+        && heldStoneBefore.get(state)
+        && !stones.isHolding(state.handedness);
+      if (storedStick || storedStone) {
         pulseHaptics(state, STORE_HAPTIC_STRENGTH, STORE_HAPTIC_MS);
       }
     }
@@ -287,6 +296,7 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
     torch,
     axe,
     sticks,
+    stones,
     setVisible,
     isVisible: () => visible,
     getIndexTipWorldPosition
