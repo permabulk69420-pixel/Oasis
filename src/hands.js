@@ -194,7 +194,7 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
 
   const torch = createHeldTorch({ scene, states, onError });
   const axe = createHeldAxe({ scene, states, onError });
-  const sticks = createHeldSticks({ scene, states, onError });
+  const sticks = createHeldSticks({ scene, states, renderer, onError });
 
   function update(dt) {
     for (const state of states) {
