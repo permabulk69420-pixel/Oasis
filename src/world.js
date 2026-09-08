@@ -4,7 +4,8 @@ export const HALF_WORLD = WORLD_SIZE / 2;
 export const GRID_SEGMENTS = 512;
 export const GRID_STEP = WORLD_SIZE / GRID_SEGMENTS;
 export const WATER = Object.freeze({ x: 300, z: -400, y: 3.1, radiusX: 40, radiusZ: 34 });
-export const SPAWN = Object.freeze({ x: 0, z: 0 });
+// Start on a nearby dune crest so iteration happens around the oasis instead of a 500 m walk away.
+export const SPAWN = Object.freeze({ x: 319, z: -292 });
 export const SUN = Object.freeze({ x: -0.728, y: 0.469, z: -0.499 });
 export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const mix = (a, b, t) => a + (b - a) * t;
