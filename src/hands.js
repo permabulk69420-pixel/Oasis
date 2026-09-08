@@ -4,6 +4,7 @@ import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { createHeldTorch } from './torch.js';
 import { createHeldAxe } from './axe.js';
 import { createHeldSticks } from './sticks.js';
+import { getHeldGripPose } from './grip-poses.js';
 
 // Exact hand assets from dumbgame, pinned to the source commit so Oasis always
 // receives the same meshes/rig/animations even if dumbgame changes later.
@@ -84,6 +85,7 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
       handedness: '',
       pointing: false,
       primaryDown: false,
+      heldGripProfile: null,
       handAnchor: null,
       handRoot: null,
       gripSocket: null,
@@ -114,6 +116,7 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
 
   function detach(state) {
     resetObjectGrip(state);
+    state.heldGripProfile = null;
     if (state.handAnchor) state.grip.remove(state.handAnchor);
     state.handAnchor = null;
     state.handRoot = null;
@@ -164,6 +167,7 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
       state.objectGrip.name = `${state.handedness || 'unknown'}-held-object-anchor`;
       state.pointing = false;
       state.primaryDown = false;
+      state.heldGripProfile = null;
       attach(state);
     });
 
@@ -172,6 +176,7 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
       state.handedness = '';
       state.pointing = false;
       state.primaryDown = false;
+      state.heldGripProfile = null;
       detach(state);
     });
   }
@@ -202,8 +207,14 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
       if (!state.mixerState) continue;
       const trigger = buttons[0]?.value ?? 0;
       const squeeze = buttons[1]?.value ?? 0;
+      const heldGripPose = getHeldGripPose(state);
 
-      if (squeeze > 0.08 && trigger > 0.08) {
+      // Conventional game-style authored grip: while an object is held, its chosen
+      // hand pose wins over the generic squeeze/fist animation so fingers do not keep
+      // closing through the handle just because the controller is squeezed harder.
+      if (heldGripPose && squeeze > 0.08) {
+        setPose(state.mixerState, heldGripPose.animation, heldGripPose.amount);
+      } else if (squeeze > 0.08 && trigger > 0.08) {
         setPose(state.mixerState, 'Fist', Math.max(trigger, squeeze));
       } else if (squeeze > 0.08) {
         setPose(state.mixerState, 'Grip', squeeze);
