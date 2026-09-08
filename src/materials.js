@@ -69,6 +69,14 @@ const atmosphere = /* glsl */`
   uniform float uCloudTime;
   const float CLOUD_HEIGHT = 1250.0;
 
+  float daylightLevel() {
+    return smoothstep(-0.07, 0.16, uSun.y);
+  }
+
+  float twilightLevel() {
+    return 1.0 - smoothstep(0.0, 0.30, abs(uSun.y));
+  }
+
   vec2 cloudWind() {
     // About 1.3 m/s across the cloud plane: visible movement without time-lapse speed.
     return vec2(0.00118, 0.00039) * uCloudTime;
@@ -130,12 +138,17 @@ const atmosphere = /* glsl */`
 
   vec3 skyColor(vec3 ray) {
     float altitude = max(ray.y, 0.0);
-    vec3 horizon = vec3(0.56, 0.65, 0.69);
-    vec3 zenith = vec3(0.035, 0.19, 0.40);
+    float daylight = daylightLevel();
+    vec3 dayHorizon = vec3(0.56, 0.65, 0.69);
+    vec3 dayZenith = vec3(0.035, 0.19, 0.40);
+    vec3 nightHorizon = vec3(0.006, 0.008, 0.014);
+    vec3 nightZenith = vec3(0.003, 0.006, 0.015);
+    vec3 horizon = mix(nightHorizon, dayHorizon, daylight);
+    vec3 zenith = mix(nightZenith, dayZenith, daylight);
     vec3 sky = mix(horizon, zenith, pow(altitude, 0.42));
     float facingSun = max(dot(ray, uSun), 0.0);
-    sky += vec3(0.24, 0.19, 0.115) * pow(facingSun, 9.0);
-    sky += vec3(0.46, 0.32, 0.13) * pow(facingSun, 140.0);
+    sky += vec3(0.24, 0.19, 0.115) * pow(facingSun, 9.0) * daylight;
+    sky += vec3(0.46, 0.32, 0.13) * pow(facingSun, 140.0) * daylight;
     return sky;
   }
 
@@ -247,8 +260,9 @@ export function createMaterials(renderer, field) {
         float normalFade = 1.0 - smoothstep(20.0, 70.0, distance);
         vec3 n = normalize(mix(baseNormal, mappedNormal, uHasPbrNormal * normalFade * (1.0 - grass)));
 
+        float environmentDay = daylightLevel();
         float cloudLight = cloudShadow(vWorld);
-        float sun = max(dot(n, uSun), 0.0) * mix(0.10, 1.0, vData.r) * cloudLight;
+        float sun = max(dot(n, uSun), 0.0) * mix(0.10, 1.0, vData.r) * cloudLight * environmentDay;
         vec3 proceduralBase = mix(vec3(0.61, 0.375, 0.165), vec3(0.77, 0.545, 0.285), vData.g);
         vec3 textureBase = texture2D(uPbrBase, pbrUv).rgb * mix(0.94, 1.06, vData.g);
         vec3 base = mix(proceduralBase, textureBase, uHasPbrBase);
@@ -266,12 +280,14 @@ export function createMaterials(renderer, field) {
         base = mix(base, base * vec3(0.49, 0.48, 0.43), wet * 0.80);
         roughness = mix(roughness, 0.30, wet * 0.70);
 
-        vec3 ambient = mix(vec3(0.20, 0.23, 0.29), vec3(0.28, 0.35, 0.43), max(n.y, 0.0));
+        vec3 dayAmbient = mix(vec3(0.20, 0.23, 0.29), vec3(0.28, 0.35, 0.43), max(n.y, 0.0));
+        vec3 nightAmbient = mix(vec3(0.006, 0.009, 0.015), vec3(0.012, 0.018, 0.029), max(n.y, 0.0));
+        vec3 ambient = mix(nightAmbient, dayAmbient, environmentDay);
         vec3 light = ambient + vec3(1.23, 1.09, 0.86) * sun;
         vec3 halfVector = normalize(view + uSun);
         float specPower = mix(82.0, 7.0, roughness);
         float specStrength = mix(0.24, 0.018, roughness);
-        float specular = pow(max(dot(n, halfVector), 0.0), specPower) * specStrength * mix(0.25, 1.0, vData.r) * cloudLight;
+        float specular = pow(max(dot(n, halfVector), 0.0), specPower) * specStrength * mix(0.25, 1.0, vData.r) * cloudLight * environmentDay;
         vec3 color = base * light + vec3(1.0, 0.88, 0.70) * specular;
         color = air(color, -view, distance);
         gl_FragColor = vec4(color, 1.0);
@@ -298,9 +314,10 @@ export function createMaterials(renderer, field) {
       ${atmosphere}
       void main() {
         vec3 ray = normalize(vRay);
+        float daylight = daylightLevel();
         vec3 color = skyColor(ray);
         float sun = smoothstep(0.99996, 0.999989, dot(ray, uSun));
-        color += vec3(7.0, 5.9, 4.0) * sun;
+        color += vec3(7.0, 5.9, 4.0) * sun * daylight;
 
         // Intersect the view ray with a high cloud plane. The visible density field is built
         // from three unrelated projections, so the old obvious repeating cloud stamp is gone.
@@ -309,16 +326,15 @@ export function createMaterials(renderer, field) {
           float planeDistance = max(CLOUD_HEIGHT - cameraPosition.y, 1.0) / max(ray.y, 0.06);
           vec2 cloudPoint = cameraPosition.xz + ray.xz * planeDistance;
           float rawCloud = skyCloudNoise(cloudPoint);
-          // Keep the same cloud shapes and motion but expose substantially more blue sky.
+          // Keep the same cloud shapes and motion but let them disappear into near-black at night.
           float cloud = smoothstep(0.49, 0.65, rawCloud) * horizonFade * 0.86;
           float dense = smoothstep(0.60, 0.74, rawCloud);
-          float daylight = smoothstep(-0.07, 0.16, uSun.y);
-          float twilight = 1.0 - smoothstep(0.0, 0.30, abs(uSun.y));
-          vec3 cloudColor = mix(vec3(0.075, 0.09, 0.13), vec3(0.90, 0.91, 0.89), daylight);
+          float twilight = twilightLevel();
+          vec3 cloudColor = mix(vec3(0.005, 0.007, 0.012), vec3(0.90, 0.91, 0.89), daylight);
           cloudColor *= 1.0 - dense * 0.17;
           float sunFacing = pow(max(dot(ray, uSun), 0.0), 7.0);
-          cloudColor += vec3(0.48, 0.25, 0.10) * twilight * sunFacing * 0.65;
-          color = mix(color, cloudColor, cloud * (0.56 + daylight * 0.22));
+          cloudColor += vec3(0.48, 0.25, 0.10) * twilight * sunFacing * 0.65 * daylight;
+          color = mix(color, cloudColor, cloud * (0.32 + daylight * 0.46));
         }
 
         gl_FragColor = vec4(color, 1.0);
@@ -350,6 +366,7 @@ export function createMaterials(renderer, field) {
         return dot(rg, vec2(256.0, 1.0)) * (255.0 * 64.0 / 65535.0);
       }
       vec3 reflectionColor(vec3 ray) {
+        float environmentDay = daylightLevel();
         float d = 3.0;
         for (int i = 0; i < 6; i++) {
           vec3 point = vWorld + ray * d;
@@ -358,7 +375,11 @@ export function createMaterials(renderer, field) {
             float dx = groundAt(point.xz + vec2(2.0, 0.0)) - groundAt(point.xz - vec2(2.0, 0.0));
             float dz = groundAt(point.xz + vec2(0.0, 2.0)) - groundAt(point.xz - vec2(0.0, 2.0));
             vec3 n = normalize(vec3(-dx, 4.0, -dz));
-            vec3 sand = vec3(0.68, 0.46, 0.23) * (vec3(0.28, 0.35, 0.43) + vec3(1.23, 1.09, 0.86) * max(dot(n, uSun), 0.0));
+            vec3 dayAmbient = vec3(0.28, 0.35, 0.43);
+            vec3 nightAmbient = vec3(0.008, 0.012, 0.020);
+            vec3 reflectedLight = mix(nightAmbient, dayAmbient, environmentDay);
+            reflectedLight += vec3(1.23, 1.09, 0.86) * max(dot(n, uSun), 0.0) * environmentDay;
+            vec3 sand = vec3(0.68, 0.46, 0.23) * reflectedLight;
             return air(sand, ray, d);
           }
           d *= 2.35;
@@ -367,6 +388,7 @@ export function createMaterials(renderer, field) {
       }
       void main() {
         if (vDepth <= 0.008) discard;
+        float environmentDay = daylightLevel();
         vec3 toEye = cameraPosition - vWorld;
         float distance = length(toEye);
         vec3 view = toEye / distance;
@@ -379,14 +401,16 @@ export function createMaterials(renderer, field) {
         float fresnel = 0.025 + 0.975 * pow(1.0 - max(dot(normal, view), 0.0), 5.0);
         vec3 bottom = vec3(0.42, 0.355, 0.22);
         float caustic = sin(p.x * 4.0 + wx * 0.75 + uTime * 0.5) * sin(p.y * 3.8 + wz * 0.8 - uTime * 0.4);
-        bottom *= 1.0 + caustic * 0.045 * attenuation;
+        bottom *= 1.0 + caustic * 0.045 * attenuation * environmentDay;
         vec3 transmission = mix(bottom, vec3(0.085, 0.235, 0.20), 1.0 - exp(-vDepth * 1.2));
+        transmission *= mix(0.055, 1.0, environmentDay);
         vec3 reflectedColor = reflectionColor(reflected);
         float glint = pow(max(dot(reflected, uSun), 0.0), 380.0);
-        reflectedColor += vec3(2.0, 1.7, 1.15) * glint;
+        reflectedColor += vec3(2.0, 1.7, 1.15) * glint * environmentDay;
         vec3 color = mix(transmission, reflectedColor, fresnel);
         float shore = smoothstep(0.008, 0.09, vDepth);
-        color = mix(vec3(0.32, 0.255, 0.15), color, shore);
+        vec3 shoreColor = mix(vec3(0.010, 0.009, 0.007), vec3(0.32, 0.255, 0.15), environmentDay);
+        color = mix(shoreColor, color, shore);
         color = air(color, -view, distance);
         gl_FragColor = vec4(color, 1.0);
         #include <tonemapping_fragment>
