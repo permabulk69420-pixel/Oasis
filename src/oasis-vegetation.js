@@ -6,12 +6,22 @@ const BUSH_DRAW_DISTANCE = 180;
 const BUSH_LOAD_DISTANCE = 230;
 const TREE_DRAW_DISTANCE = 240;
 const TREE_LOAD_DISTANCE = 275;
+const FERN_DRAW_DISTANCE = 170;
+const FERN_LOAD_DISTANCE = 210;
 
 // Keep the full tree nearby, then step down aggressively once individual leaves are small in VR.
 const TREE_LODS = [
   { file: 'blue_alien_tree.glb', distance: 0 },
   { file: 'blue_alien_tree_optimized_code.glb', distance: 18 },
   { file: 'blue_alien_tree_lod3_ultra.glb', distance: 45 },
+];
+
+// Large ground foliage can step down sooner than the taller trees because the frond detail
+// becomes difficult to resolve quickly at Quest resolution.
+const FERN_LODS = [
+  { file: 'large_purple_alien_fern_v2.glb', distance: 0 },
+  { file: 'large_purple_alien_fern_v2_LOD1.glb', distance: 12 },
+  { file: 'large_purple_alien_fern_v2_LOD2.glb', distance: 30 },
 ];
 
 // Hand-placed in normalized shoreline space so the food plants feel discovered rather
@@ -37,6 +47,20 @@ const TREE_LAYOUT = [
   { angle: 5.57, radius: 1.60, scale: 1.10, yaw: 0.85 },
 ];
 
+// Ferns form a few loose pockets around the oasis instead of an artificial-looking ring.
+// Keep them at authored scale; rotation and spacing provide the variation.
+const FERN_LAYOUT = [
+  { angle: 0.18, radius: 1.24, scale: 1.00, yaw: 0.35 },
+  { angle: 0.52, radius: 1.42, scale: 1.00, yaw: 2.15 },
+  { angle: 0.78, radius: 1.31, scale: 1.00, yaw: 4.50 },
+  { angle: 2.18, radius: 1.29, scale: 1.00, yaw: 1.05 },
+  { angle: 2.48, radius: 1.51, scale: 1.00, yaw: 3.80 },
+  { angle: 3.78, radius: 1.33, scale: 1.00, yaw: 5.55 },
+  { angle: 4.08, radius: 1.57, scale: 1.00, yaw: 2.65 },
+  { angle: 5.22, radius: 1.27, scale: 1.00, yaw: 4.10 },
+  { angle: 5.54, radius: 1.48, scale: 1.00, yaw: 0.90 },
+];
+
 function radialPositions(layout) {
   return layout.map(item => ({
     ...item,
@@ -59,6 +83,7 @@ export function createOasisVegetation({ field }) {
 
   const bushes = radialPositions(BUSH_LAYOUT);
   const trees = radialPositions(TREE_LAYOUT);
+  const ferns = radialPositions(FERN_LAYOUT);
 
   const bushGroup = new THREE.Group();
   bushGroup.name = 'Berry bushes';
@@ -68,10 +93,16 @@ export function createOasisVegetation({ field }) {
   treeGroup.name = 'Alien desert trees';
   group.add(treeGroup);
 
+  const fernGroup = new THREE.Group();
+  fernGroup.name = 'Purple alien ferns';
+  group.add(fernGroup);
+
   let bushLoadStarted = false;
   let treeLoadStarted = false;
+  let fernLoadStarted = false;
   let bushesReady = false;
   let treesReady = false;
+  let fernsReady = false;
 
   function ensureBushes() {
     if (bushLoadStarted) return;
@@ -135,12 +166,50 @@ export function createOasisVegetation({ field }) {
     });
   }
 
+  function ensureFerns() {
+    if (fernLoadStarted) return;
+    fernLoadStarted = true;
+    const loader = new GLTFLoader();
+    const base = `${import.meta.env.BASE_URL}models/vegetation/purple-alien-fern/`;
+
+    Promise.all(FERN_LODS.map(async level => {
+      const gltf = await loader.loadAsync(`${base}${level.file}`);
+      const source = gltf.scene;
+      source.updateMatrixWorld(true);
+      disableModelShadows(source);
+      return { ...level, source };
+    })).then(levels => {
+      for (let i = 0; i < ferns.length; i++) {
+        const item = ferns[i];
+        const lod = new THREE.LOD();
+        lod.name = `Purple alien fern ${i + 1}`;
+        lod.position.set(item.x, field.sample(item.x, item.z) - 0.015, item.z);
+        lod.rotation.y = item.yaw;
+        lod.scale.setScalar(item.scale);
+        lod.userData.oasisFern = true;
+
+        for (const level of levels) {
+          const model = level.source.clone(true);
+          model.userData.oasisFern = true;
+          lod.addLevel(model, level.distance);
+        }
+
+        fernGroup.add(lod);
+      }
+      fernsReady = true;
+    }).catch(error => {
+      console.warn('[Oasis vegetation] Purple alien fern LOD models unavailable.', error);
+    });
+  }
+
   function update(x, z) {
     const distance = Math.hypot(x - WATER.x, z - WATER.z);
     bushGroup.visible = distance < BUSH_DRAW_DISTANCE;
     treeGroup.visible = distance < TREE_DRAW_DISTANCE;
+    fernGroup.visible = distance < FERN_DRAW_DISTANCE;
     if (distance < BUSH_LOAD_DISTANCE) ensureBushes();
     if (distance < TREE_LOAD_DISTANCE) ensureTrees();
+    if (distance < FERN_LOAD_DISTANCE) ensureFerns();
   }
 
   update(0, 0);
@@ -149,7 +218,9 @@ export function createOasisVegetation({ field }) {
     update,
     bushGroup,
     treeGroup,
+    fernGroup,
     get bushesReady() { return bushesReady; },
     get treesReady() { return treesReady; },
+    get fernsReady() { return fernsReady; },
   };
 }
