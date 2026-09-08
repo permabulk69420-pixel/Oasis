@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SPAWN, terrainHeight } from './world.js';
+import { pulseHaptics } from './haptics.js';
 
 const TORCH_URL = `${import.meta.env.BASE_URL}models/torch/handheld_fire_torch.glb`;
 const TORCH_AUDIO_URL = `${import.meta.env.BASE_URL}audio/fire/torch_fire_crackle_loop.mp3`;
@@ -282,7 +283,11 @@ export function createHeldTorch({ scene, states, onError = console.warn }) {
     }
     if (heldBy && !grip) drop();
 
-    if (heldBy === right && b && !bDown) setLit(!lit);
+    if (heldBy === right && b && !bDown) {
+      const turningOn = !lit;
+      setLit(turningOn);
+      pulseHaptics(right, turningOn ? 0.40 : 0.22, turningOn ? 55 : 28);
+    }
     gripDown = grip;
     bDown = b;
 
