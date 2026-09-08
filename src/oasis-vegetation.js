@@ -24,6 +24,9 @@ const FERN_LODS = [
   { file: 'large_purple_alien_fern_v2_LOD2.glb', distance: 30 },
 ];
 
+// The fern GLBs are authored Z-up; Three.js is Y-up.
+const FERN_MODEL_X_ROTATION = -Math.PI / 2;
+
 // Hand-placed in normalized shoreline space so the food plants feel discovered rather
 // than evenly distributed. Keep all berry bushes at the model's original scale.
 const BUSH_LAYOUT = [
@@ -190,6 +193,7 @@ export function createOasisVegetation({ field }) {
 
         for (const level of levels) {
           const model = level.source.clone(true);
+          model.rotation.x = FERN_MODEL_X_ROTATION;
           model.userData.oasisFern = true;
           lod.addLevel(model, level.distance);
         }
