@@ -93,7 +93,8 @@ export function createTerrain(field, material) {
   group.add(pickupRocks.mesh);
 
   // Ground vegetation remains a terrain texture; oasis plants are lazy-loaded nearby.
-  const vegetation = createOasisVegetation({ field });
+  // Reuse the terrain shader's live sun vector so cheap projected tree shadows follow the day cycle.
+  const vegetation = createOasisVegetation({ field, sunDirection: material.uniforms?.uSun?.value });
   group.add(vegetation.group);
 
   function update(x, z) {
