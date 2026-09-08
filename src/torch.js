@@ -119,7 +119,7 @@ function installWaterTorchLight(material, positionUniform, strengthUniform) {
   if (material.userData.torchLightInstalled) return true;
 
   const uniformMarker = 'uniform sampler2D uElevation;';
-  const colorMarker = 'color = air(color, -view, distance);';
+  const colorMarker = 'vec3 color = mix(transmission, reflectedColor, fresnel);';
   if (!material.fragmentShader.includes(uniformMarker) || !material.fragmentShader.includes(colorMarker)) return false;
 
   material.uniforms.uTorchPosition = positionUniform;
@@ -130,7 +130,7 @@ function installWaterTorchLight(material, positionUniform, strengthUniform) {
   );
   material.fragmentShader = material.fragmentShader.replace(
     colorMarker,
-    `if (uTorchStrength > 0.001) {\n          vec3 torchVector = uTorchPosition - vWorld;\n          float torchDistance = length(torchVector);\n          vec3 torchDirection = torchVector / max(torchDistance, 0.001);\n          float torchFade = 1.0 - smoothstep(0.8, 9.0, torchDistance);\n          torchFade *= 0.55 + 0.45 * torchFade;\n          float torchFacing = max(dot(normal, torchDirection), 0.0);\n          color += vec3(5.0, 2.0, 0.55) * uTorchStrength * torchFade * (0.35 + 0.65 * torchFacing);\n        }\n        ${colorMarker}`
+    `if (uTorchStrength > 0.001) {\n          vec3 torchVector = uTorchPosition - vWorld;\n          float torchDistance = length(torchVector);\n          vec3 torchDirection = torchVector / max(torchDistance, 0.001);\n          float torchFade = 1.0 - smoothstep(0.35, 8.0, torchDistance);\n          torchFade *= torchFade;\n          float torchFacing = max(dot(normal, torchDirection), 0.0);\n          vec3 torchReflection = reflect(-torchDirection, normal);\n          float torchGlint = pow(max(dot(torchReflection, view), 0.0), 92.0);\n          float shallowScatter = exp(-vDepth * 1.55) * (1.0 - fresnel);\n          vec3 torchColor = vec3(1.0, 0.31, 0.065);\n          transmission += torchColor * uTorchStrength * torchFade * shallowScatter * (0.045 + 0.11 * torchFacing);\n          reflectedColor += torchColor * uTorchStrength * torchFade * (0.025 * torchFacing + 2.25 * torchGlint);\n        }\n        ${colorMarker}`
   );
   material.userData.torchLightInstalled = true;
   material.needsUpdate = true;
