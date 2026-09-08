@@ -102,15 +102,17 @@ const target = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
 const lastDirection = new THREE.Vector3(0, 0, -1);
 const WALK_SPEED = 2.6, FAST_SPEED = 5.2, TURN_SPEED = 1.4;
 const STANDING_EYE_HEIGHT = 1.68, JUMP_SPEED = 4.4, GRAVITY = 12.0;
-const CROUCH_DEPTH = 0.58, CROUCH_RESPONSE = 12.0;
+const CROUCH_DEPTH = 0.58, CROUCH_RESPONSE = 12.0, RIGHT_STICK_BUTTON = 3;
 let groundY = rig.position.y;
 let seatedOffset = 0, seatedCalibrationPending = false;
 let jumpHeight = 0, jumpVelocity = 0, jumpHeld = false;
-let crouchOffset = 0;
+let crouchOffset = 0, crouchActive = false, crouchButtonDown = false;
 
 function clearInput() {
   keys.clear(); touchMove = { x: 0, z: 0 }; touchMoveId = null; touchLookId = null; mouseDragging = false;
-  velocity.set(0, 0, 0); jumpHeld = false; crouchOffset = 0; footsteps.reset(); movePad.firstElementChild.style.transform = '';
+  velocity.set(0, 0, 0); jumpHeld = false;
+  crouchOffset = 0; crouchActive = false; crouchButtonDown = false;
+  footsteps.reset(); movePad.firstElementChild.style.transform = '';
 }
 function setPlaying(value) {
   playing = value; welcome.hidden = value; menu.hidden = !value;
@@ -213,7 +215,7 @@ renderer.xr.addEventListener('sessionstart', () => {
   camera.quaternion.identity();
 
   jumpHeight = 0; jumpVelocity = 0; jumpHeld = false;
-  crouchOffset = 0;
+  crouchOffset = 0; crouchActive = false; crouchButtonDown = false;
   seatedOffset = 0;
   seatedCalibrationPending = Boolean(seatedMode.checked);
 
@@ -230,15 +232,16 @@ renderer.xr.addEventListener('sessionend', () => {
   camera.fov = 72; camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
   seatedOffset = 0; seatedCalibrationPending = false;
-  jumpHeight = 0; jumpVelocity = 0; jumpHeld = false; crouchOffset = 0;
+  jumpHeight = 0; jumpVelocity = 0; jumpHeld = false;
+  crouchOffset = 0; crouchActive = false; crouchButtonDown = false;
   clearInput(); setPlaying(false); lastTime = 0;
 });
 
 function readInput() {
   if (renderer.xr.isPresenting) {
     const session = renderer.xr.getSession();
-    if (session.visibilityState !== 'visible') return { x: 0, z: 0, turn: 0, fast: false, jump: false, crouch: 0 };
-    let x = 0, z = 0, turn = 0, fast = false, jump = false, crouch = 0;
+    if (session.visibilityState !== 'visible') return { x: 0, z: 0, turn: 0, fast: false, jump: false, crouchPressed: false };
+    let x = 0, z = 0, turn = 0, fast = false, jump = false, crouchPressed = false;
     for (const source of session.inputSources) {
       const pad = source.gamepad;
       if (!pad) continue;
@@ -254,15 +257,14 @@ function readInput() {
         fast = Boolean(pad.buttons[1]?.pressed);
       }
       if (source.handedness === 'right') {
-        if (axes.length >= 2) {
-          turn = stickAxis(axes[axis] || 0, 0.15);
-          crouch = Math.max(0, stickAxis(axes[axis + 1] || 0, 0.15));
-        }
+        if (axes.length >= 2) turn = stickAxis(axes[axis] || 0, 0.15);
+        // xr-standard button 3 is the right thumbstick click on Quest Touch controllers.
+        crouchPressed = Boolean(pad.buttons[RIGHT_STICK_BUTTON]?.pressed);
         // xr-standard button 4 is A on the right Quest Touch controller.
         jump = Boolean(pad.buttons[4]?.pressed);
       }
     }
-    return { x, z, turn, fast, jump, crouch };
+    return { x, z, turn, fast, jump, crouchPressed };
   }
   const x = Number(keys.has('KeyD')) - Number(keys.has('KeyA')) + touchMove.x;
   const z = Number(keys.has('KeyS') || keys.has('ArrowDown')) - Number(keys.has('KeyW') || keys.has('ArrowUp')) + touchMove.z;
@@ -270,7 +272,7 @@ function readInput() {
   return { x: x / length, z: z / length,
     turn: Number(keys.has('ArrowRight') || keys.has('KeyE')) - Number(keys.has('ArrowLeft') || keys.has('KeyQ')),
     fast: keys.has('ShiftLeft') || keys.has('ShiftRight'),
-    jump: keys.has('Space'), crouch: 0 };
+    jump: keys.has('Space'), crouchPressed: false };
 }
 
 function frame(time) {
@@ -298,7 +300,10 @@ function frame(time) {
   if (playing) {
     const input = readInput();
 
-    const desiredCrouchOffset = renderer.xr.isPresenting ? -CROUCH_DEPTH * input.crouch : 0;
+    // Right thumbstick click toggles artificial crouch; horizontal stick motion still smooth-turns.
+    if (input.crouchPressed && !crouchButtonDown) crouchActive = !crouchActive;
+    crouchButtonDown = input.crouchPressed;
+    const desiredCrouchOffset = renderer.xr.isPresenting && crouchActive ? -CROUCH_DEPTH : 0;
     crouchOffset += (desiredCrouchOffset - crouchOffset) * (1 - Math.exp(-dt * CROUCH_RESPONSE));
 
     // Jump is edge-triggered so holding A cannot bunny-hop on every landing.
