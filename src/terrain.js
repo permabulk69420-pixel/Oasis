@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { HALF_WORLD, GRID_STEP, WATER, SPAWN, clamp, noise, terrainHeight, grassCover } from './world.js';
 import { createPickupRocks } from './rocks.js';
 import { createOasisVegetation } from './oasis-vegetation.js';
+import { createWaterReeds } from './water-reeds.js';
 
 const CHUNK_SIZE = 62.5;
 const LEVELS = [32, 16, 8, 4];
@@ -97,6 +98,11 @@ export function createTerrain(field, material) {
   const vegetation = createOasisVegetation({ field, sunDirection: material.uniforms?.uSun?.value });
   group.add(vegetation.group);
 
+  // A small near-shore clump of four reed patches. The reeds use their own two-level LOD and
+  // vertex-shader sway so the motion stays cheap on Quest.
+  const waterReeds = createWaterReeds({ field });
+  group.add(waterReeds.group);
+
   function update(x, z) {
     for (const chunk of chunks) {
       const distance = Math.hypot(x - chunk.x, z - chunk.z);
@@ -111,8 +117,9 @@ export function createTerrain(field, material) {
     }
     pickupRocks.update(x, z);
     vegetation.update(x, z);
+    waterReeds.update(x, z);
   }
   // Initialise LOD and nearby assets around the real player start, not the old world origin.
   update(SPAWN.x, SPAWN.z);
-  return { group, update, chunks, pickupRocks, vegetation };
+  return { group, update, chunks, pickupRocks, vegetation, waterReeds };
 }
