@@ -22,5 +22,19 @@ export function clearHeldGripProfile(state) {
 }
 
 export function getHeldGripPose(state) {
-  return state?.heldGripProfile ? GRIP_POSES[state.heldGripProfile] || null : null;
+  if (!state) return null;
+
+  // Explicit per-item profile wins when a future asset needs one.
+  if (state.heldGripProfile && GRIP_POSES[state.heldGripProfile]) {
+    return GRIP_POSES[state.heldGripProfile];
+  }
+
+  // Generic game-style fallback: anything actually attached to the hand receives a
+  // sensible authored pose automatically. Thin loose sticks use the slimmer pose;
+  // ordinary tools such as the axe and torch use the medium handle pose by default.
+  const heldObject = state.objectGrip?.children?.[0] || null;
+  if (!heldObject) return null;
+  const profile = heldObject.userData?.gripProfile
+    || (heldObject.userData?.collectibleResource === 'stick' ? GRIP_PROFILE.THIN : GRIP_PROFILE.MEDIUM);
+  return GRIP_POSES[profile] || GRIP_POSES[GRIP_PROFILE.MEDIUM];
 }
