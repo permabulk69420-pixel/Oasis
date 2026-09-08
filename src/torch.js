@@ -82,7 +82,7 @@ function createFlameEffect() {
     group.add(flame);
   }
 
-  const light = new THREE.PointLight(0xffa04a, 0, 8.0, 2.0);
+  const light = new THREE.PointLight(0xffa04a, 0, 12.0, 2.0);
   light.name = 'Torch warm light';
   light.castShadow = false;
   light.position.y = 0.16;
@@ -107,7 +107,7 @@ function installTerrainTorchLight(material, positionUniform, strengthUniform) {
   );
   material.fragmentShader = material.fragmentShader.replace(
     lightMarker,
-    `${lightMarker}\n        if (uTorchStrength > 0.001) {\n          vec3 torchVector = uTorchPosition - vWorld;\n          float torchDistance = length(torchVector);\n          vec3 torchDirection = torchVector / max(torchDistance, 0.001);\n          float torchFade = 1.0 - smoothstep(0.8, 9.0, torchDistance);\n          torchFade *= 0.55 + 0.45 * torchFade;\n          float torchDiffuse = max(dot(n, torchDirection), 0.0);\n          float torchAmount = uTorchStrength * torchFade * (0.35 + 0.65 * torchDiffuse);\n          light += vec3(11.0, 4.6, 1.3) * torchAmount;\n        }`
+    `${lightMarker}\n        if (uTorchStrength > 0.001) {\n          vec3 torchVector = uTorchPosition - vWorld;\n          float torchDistance = length(torchVector);\n          vec3 torchDirection = torchVector / max(torchDistance, 0.001);\n          float torchFade = 1.0 - smoothstep(0.8, 13.5, torchDistance);\n          torchFade *= 0.55 + 0.45 * torchFade;\n          float torchDiffuse = max(dot(n, torchDirection), 0.0);\n          float torchAmount = uTorchStrength * torchFade * (0.35 + 0.65 * torchDiffuse);\n          light += vec3(11.0, 4.6, 1.3) * torchAmount;\n        }`
   );
   material.userData.torchLightInstalled = true;
   material.needsUpdate = true;
@@ -130,7 +130,7 @@ function installWaterTorchLight(material, positionUniform, strengthUniform) {
   );
   material.fragmentShader = material.fragmentShader.replace(
     colorMarker,
-    `if (uTorchStrength > 0.001) {\n          vec3 torchVector = uTorchPosition - vWorld;\n          float torchDistance = length(torchVector);\n          vec3 torchDirection = torchVector / max(torchDistance, 0.001);\n          float torchFade = 1.0 - smoothstep(0.35, 8.0, torchDistance);\n          torchFade *= torchFade;\n          float torchFacing = max(dot(normal, torchDirection), 0.0);\n          vec3 torchReflection = reflect(-torchDirection, normal);\n          float torchGlint = pow(max(dot(torchReflection, view), 0.0), 92.0);\n          float shallowScatter = exp(-vDepth * 1.55) * (1.0 - fresnel);\n          vec3 torchColor = vec3(1.0, 0.31, 0.065);\n          transmission += torchColor * uTorchStrength * torchFade * shallowScatter * (0.045 + 0.11 * torchFacing);\n          reflectedColor += torchColor * uTorchStrength * torchFade * (0.025 * torchFacing + 2.25 * torchGlint);\n        }\n        ${colorMarker}`
+    `if (uTorchStrength > 0.001) {\n          vec3 torchVector = uTorchPosition - vWorld;\n          float torchDistance = length(torchVector);\n          vec3 torchDirection = torchVector / max(torchDistance, 0.001);\n          float torchFade = 1.0 - smoothstep(0.35, 12.0, torchDistance);\n          torchFade *= torchFade;\n          float torchFacing = max(dot(normal, torchDirection), 0.0);\n          vec3 torchReflection = reflect(-torchDirection, normal);\n          float torchGlint = pow(max(dot(torchReflection, view), 0.0), 92.0);\n          float shallowScatter = exp(-vDepth * 1.55) * (1.0 - fresnel);\n          vec3 torchColor = vec3(1.0, 0.31, 0.065);\n          transmission += torchColor * uTorchStrength * torchFade * shallowScatter * (0.045 + 0.11 * torchFacing);\n          reflectedColor += torchColor * uTorchStrength * torchFade * (0.025 * torchFacing + 2.25 * torchGlint);\n        }\n        ${colorMarker}`
   );
   material.userData.torchLightInstalled = true;
   material.needsUpdate = true;
