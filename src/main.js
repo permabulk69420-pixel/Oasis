@@ -7,6 +7,8 @@ import { createVRHands } from './hands.js';
 import { createDayNightCycle } from './day-night.js';
 import { createSandFootsteps } from './footsteps.js';
 import { createGroundSticks } from './sticks.js';
+import { createGroundStones } from './stones.js';
+import { getInventoryWeight, getCarrySpeedMultiplier } from './inventory.js';
 
 const canvas = document.querySelector('#world');
 const welcome = document.querySelector('#welcome');
@@ -65,6 +67,11 @@ scene.add(terrain.group);
 scene.add(createWater(field, materials.water));
 scene.add(createGroundSticks({
   field,
+  onError: (message) => console.warn(message)
+}));
+scene.add(createGroundStones({
+  field,
+  renderer,
   onError: (message) => console.warn(message)
 }));
 const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), materials.sky);
@@ -338,7 +345,8 @@ function frame(time) {
     right.crossVectors(movementForward, up).normalize();
     target.copy(right).multiplyScalar(input.x).addScaledVector(movementForward, -input.z);
     if (target.lengthSq() > 1) target.normalize();
-    target.multiplyScalar(input.fast ? FAST_SPEED : WALK_SPEED);
+    const carrySpeedMultiplier = getCarrySpeedMultiplier();
+    target.multiplyScalar((input.fast ? FAST_SPEED : WALK_SPEED) * carrySpeedMultiplier);
     velocity.lerp(target, 1 - Math.exp(-dt * (target.lengthSq() ? 18 : 28)));
     const dx = velocity.x * dt, dz = velocity.z * dt;
     const nextX = clamp(head.x + dx, -498, 498), nextZ = clamp(head.z + dz, -498, 498);
@@ -364,6 +372,7 @@ function frame(time) {
   if (import.meta.env.DEV && time - telemetryTime > 1000) {
     canvas.dataset.position = JSON.stringify({ x: +head.x.toFixed(2), z: +head.z.toFixed(2), ground: +field.sample(head.x, head.z).toFixed(2), yaw: +rig.rotation.y.toFixed(3) });
     canvas.dataset.render = JSON.stringify({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures });
+    canvas.dataset.inventory = JSON.stringify({ weight: getInventoryWeight(), speedMultiplier: getCarrySpeedMultiplier() });
     telemetryTime = time;
   }
 }
