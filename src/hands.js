@@ -5,6 +5,7 @@ import { createHeldTorch } from './torch.js';
 import { createHeldAxe } from './axe.js';
 import { createHeldSticks } from './sticks.js';
 import { getHeldGripPose } from './grip-poses.js';
+import { pulseHaptics } from './haptics.js';
 
 // Exact hand assets from dumbgame, pinned to the source commit so Oasis always
 // receives the same meshes/rig/animations even if dumbgame changes later.
@@ -21,6 +22,10 @@ const HAND_GRIP_OFFSETS = Object.freeze({
 });
 
 const PRIMARY_FACE_BUTTON = 4; // Quest X on left; right A is reserved for jump.
+const PICKUP_HAPTIC_STRENGTH = 0.18;
+const PICKUP_HAPTIC_MS = 28;
+const STORE_HAPTIC_STRENGTH = 0.34;
+const STORE_HAPTIC_MS = 45;
 const loader = new GLTFLoader();
 const gripMatrix = new THREE.Matrix4();
 
@@ -229,9 +234,32 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
       state.mixerState.mixer.update(dt);
       syncObjectGrip(state);
     }
+
+    // Capture interaction state before the object systems run so pickup/storage feedback
+    // can stay generic rather than each collectible having to implement its own rumble.
+    const heldCountsBefore = new Map(states.map((state) => [state, state.objectGrip.children.length]));
+    const heldStickBefore = new Map(states.map((state) => [state, sticks.isHolding(state.handedness)]));
+    const storedSticksBefore = sticks.getStoredCount();
+
     torch.update(dt);
     axe.update(dt);
     sticks.update(dt);
+
+    const storedSticksAfter = sticks.getStoredCount();
+    for (const state of states) {
+      const before = heldCountsBefore.get(state) || 0;
+      const after = state.objectGrip.children.length;
+      if (before === 0 && after > 0) {
+        pulseHaptics(state, PICKUP_HAPTIC_STRENGTH, PICKUP_HAPTIC_MS);
+      }
+      if (
+        storedSticksAfter > storedSticksBefore
+        && heldStickBefore.get(state)
+        && !sticks.isHolding(state.handedness)
+      ) {
+        pulseHaptics(state, STORE_HAPTIC_STRENGTH, STORE_HAPTIC_MS);
+      }
+    }
   }
 
   function setVisible(value) {
