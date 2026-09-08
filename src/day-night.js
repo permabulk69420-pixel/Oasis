@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { SUN } from './world.js';
-import { installDynamicWaterShoreline } from './water-shoreline.js';
+import { installRealBottomWater } from './water-real-bottom.js';
 
 export const DAY_SECONDS = 5 * 60;
 export const NIGHT_SECONDS = 5 * 60;
@@ -40,7 +40,7 @@ export function createDayNightCycle({ scene, renderer, materials }) {
     throw new Error('Day/night cycle requires the scene, renderer, and Oasis environment materials.');
   }
 
-  installDynamicWaterShoreline(materials.water, (message) => console.warn(message));
+  installRealBottomWater(materials.water, (message) => console.warn(message));
 
   // Standard PBR assets (hands now; props/buildings later) use real scene lights.
   // The terrain/water/sky remain on their lightweight custom shaders.
