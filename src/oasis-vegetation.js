@@ -18,16 +18,16 @@ const BUSH_LAYOUT = [
   { angle: 5.22, radius: 1.47, scale: 0.94, yaw: 3.3 },
 ];
 
-// Sparse taller anchors across the expanded grass shelf. Scale/yaw variation keeps repeated
+// Sparse taller anchors kept safely inside the grass shelf. Scale/yaw variation keeps repeated
 // copies from reading like a ring of clones while still sharing the same GLB geometry/materials.
 const TREE_LAYOUT = [
-  { angle: 0.54, radius: 1.70, scale: 1.16, yaw: 0.25 },
-  { angle: 1.34, radius: 1.58, scale: 1.32, yaw: 2.65 },
-  { angle: 2.16, radius: 1.84, scale: 1.03, yaw: 4.35 },
-  { angle: 3.04, radius: 1.62, scale: 1.24, yaw: 1.15 },
-  { angle: 3.91, radius: 1.91, scale: 0.96, yaw: 5.20 },
-  { angle: 4.76, radius: 1.56, scale: 1.36, yaw: 3.45 },
-  { angle: 5.57, radius: 1.78, scale: 1.10, yaw: 0.85 },
+  { angle: 0.54, radius: 1.55, scale: 1.16, yaw: 0.25 },
+  { angle: 1.34, radius: 1.48, scale: 1.32, yaw: 2.65 },
+  { angle: 2.16, radius: 1.63, scale: 1.03, yaw: 4.35 },
+  { angle: 3.04, radius: 1.52, scale: 1.24, yaw: 1.15 },
+  { angle: 3.91, radius: 1.66, scale: 0.96, yaw: 5.20 },
+  { angle: 4.76, radius: 1.46, scale: 1.36, yaw: 3.45 },
+  { angle: 5.57, radius: 1.60, scale: 1.10, yaw: 0.85 },
 ];
 
 function radialPositions(layout) {
