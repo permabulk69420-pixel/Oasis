@@ -1,9 +1,8 @@
 import * as THREE from 'three';
 
-// Drop your seamless grass image in public/textures/grass/ and set its filename here.
-// Example: export const GRASS_TEXTURE = 'grass_albedo.png';
-export const GRASS_TEXTURE = null;
-export const GRASS_TILE_METRES = 2.5;
+// Seamless oasis grass/soil base. The vertical grass tufts are generated separately.
+export const GRASS_TEXTURE = 'grass1.png';
+export const GRASS_TILE_METRES = 3.2;
 
 export function attachGrassTexture(renderer, uniforms) {
   if (!GRASS_TEXTURE) return;
