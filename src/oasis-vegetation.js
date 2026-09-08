@@ -8,6 +8,18 @@ const TREE_DRAW_DISTANCE = 240;
 const TREE_LOAD_DISTANCE = 275;
 const FERN_DRAW_DISTANCE = 170;
 const FERN_LOAD_DISTANCE = 210;
+const HERO_DRAW_DISTANCE = 420;
+const HERO_LOAD_DISTANCE = 480;
+
+// One 60 m landmark tree on the east-southeast side of the oasis. Its clearing is deliberately
+// broad so the regular bushes, trees and ferns cannot spawn through the hero canopy/trunk area.
+const HERO_TREE = Object.freeze({
+  x: 372,
+  z: -414,
+  yaw: 0.55,
+  groundInset: 0.55,
+  clearRadius: 40,
+});
 
 // Keep the full tree nearby, then step down aggressively once individual leaves are small in VR.
 const TREE_LODS = [
@@ -72,6 +84,15 @@ function radialPositions(layout) {
   }));
 }
 
+function clearOfHero(items) {
+  const minDistanceSq = HERO_TREE.clearRadius * HERO_TREE.clearRadius;
+  return items.filter(item => {
+    const dx = item.x - HERO_TREE.x;
+    const dz = item.z - HERO_TREE.z;
+    return dx * dx + dz * dz >= minDistanceSq;
+  });
+}
+
 function disableModelShadows(root) {
   root.traverse(object => {
     if (!object.isMesh) return;
@@ -84,9 +105,9 @@ export function createOasisVegetation({ field }) {
   const group = new THREE.Group();
   group.name = 'Oasis vegetation';
 
-  const bushes = radialPositions(BUSH_LAYOUT);
-  const trees = radialPositions(TREE_LAYOUT);
-  const ferns = radialPositions(FERN_LAYOUT);
+  const bushes = clearOfHero(radialPositions(BUSH_LAYOUT));
+  const trees = clearOfHero(radialPositions(TREE_LAYOUT));
+  const ferns = clearOfHero(radialPositions(FERN_LAYOUT));
 
   const bushGroup = new THREE.Group();
   bushGroup.name = 'Berry bushes';
@@ -100,12 +121,18 @@ export function createOasisVegetation({ field }) {
   fernGroup.name = 'Purple alien ferns';
   group.add(fernGroup);
 
+  const heroGroup = new THREE.Group();
+  heroGroup.name = 'Crimson hero tree';
+  group.add(heroGroup);
+
   let bushLoadStarted = false;
   let treeLoadStarted = false;
   let fernLoadStarted = false;
+  let heroLoadStarted = false;
   let bushesReady = false;
   let treesReady = false;
   let fernsReady = false;
+  let heroReady = false;
 
   function ensureBushes() {
     if (bushLoadStarted) return;
@@ -206,14 +233,41 @@ export function createOasisVegetation({ field }) {
     });
   }
 
+  function ensureHeroTree() {
+    if (heroLoadStarted) return;
+    heroLoadStarted = true;
+    const loader = new GLTFLoader();
+    const url = `${import.meta.env.BASE_URL}models/vegetation/crimson-hero-tree/crimson_hero_tree_60m_optimized.glb`;
+    loader.load(url, gltf => {
+      const hero = gltf.scene;
+      hero.name = 'Crimson hero tree — 60 m';
+      hero.position.set(
+        HERO_TREE.x,
+        field.sample(HERO_TREE.x, HERO_TREE.z) - HERO_TREE.groundInset,
+        HERO_TREE.z,
+      );
+      hero.rotation.y = HERO_TREE.yaw;
+      hero.userData.oasisHeroTree = true;
+      hero.updateMatrixWorld(true);
+      disableModelShadows(hero);
+      heroGroup.add(hero);
+      heroReady = true;
+    }, undefined, error => {
+      console.warn('[Oasis vegetation] Crimson hero tree model unavailable.', error);
+    });
+  }
+
   function update(x, z) {
     const distance = Math.hypot(x - WATER.x, z - WATER.z);
+    const heroDistance = Math.hypot(x - HERO_TREE.x, z - HERO_TREE.z);
     bushGroup.visible = distance < BUSH_DRAW_DISTANCE;
     treeGroup.visible = distance < TREE_DRAW_DISTANCE;
     fernGroup.visible = distance < FERN_DRAW_DISTANCE;
+    heroGroup.visible = heroDistance < HERO_DRAW_DISTANCE;
     if (distance < BUSH_LOAD_DISTANCE) ensureBushes();
     if (distance < TREE_LOAD_DISTANCE) ensureTrees();
     if (distance < FERN_LOAD_DISTANCE) ensureFerns();
+    if (heroDistance < HERO_LOAD_DISTANCE) ensureHeroTree();
   }
 
   update(0, 0);
@@ -223,8 +277,10 @@ export function createOasisVegetation({ field }) {
     bushGroup,
     treeGroup,
     fernGroup,
+    heroGroup,
     get bushesReady() { return bushesReady; },
     get treesReady() { return treesReady; },
     get fernsReady() { return fernsReady; },
+    get heroReady() { return heroReady; },
   };
 }
