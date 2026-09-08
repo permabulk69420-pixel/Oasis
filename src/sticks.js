@@ -6,13 +6,15 @@ const STICK_URL = `${import.meta.env.BASE_URL}models/stick/dead_ground_stick_vr_
 const GRIP_BUTTON = 1;
 const PICKUP_RADIUS = 0.48;
 
-// The stick is authored lengthwise on local X. Rotate it onto the same handle axis used
-// by the axe so it sits naturally through the player's palm while held.
+// The stick is authored lengthwise on local X. Match the axe's proven handle axis,
+// but anchor the hand to a thin section of the actual stick rather than the GLB origin.
 const heldFlip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
 const stickToHandle = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
 const heldRotation = heldFlip.clone().multiply(stickToHandle);
 const handPosition = new THREE.Vector3();
 const stickPosition = new THREE.Vector3();
+const localVertex = new THREE.Vector3();
+const gripOffset = new THREE.Vector3();
 
 // Sparse placements around the grassy oasis shelf. Radius is in normalized shoreline space,
 // matching the vegetation layout and keeping every stick safely outside the water.
@@ -24,6 +26,78 @@ const STICK_LAYOUT = [
   { angle: 4.45, radius: 1.63, yaw: 5.35, scale: 1.00 },
   { angle: 5.58, radius: 1.46, yaw: 3.65, scale: 0.96 },
 ];
+
+function findNaturalGripPoint(source, bounds) {
+  // Sample the authored mesh into bins along the stick's main X axis. We deliberately
+  // search near either end (but not at the fragile tip) and choose the thinnest useful
+  // section. This keeps the fist around a straight shaft even if the model origin sits
+  // on a branch junction.
+  const BIN_COUNT = 16;
+  const bins = Array.from({ length: BIN_COUNT }, () => ({
+    count: 0,
+    sumX: 0,
+    sumY: 0,
+    sumZ: 0,
+    minY: Infinity,
+    maxY: -Infinity,
+    minZ: Infinity,
+    maxZ: -Infinity,
+  }));
+  const length = Math.max(bounds.max.x - bounds.min.x, 0.001);
+
+  source.updateWorldMatrix(true, true);
+  source.traverse(object => {
+    if (!object.isMesh) return;
+    const positions = object.geometry?.getAttribute?.('position');
+    if (!positions) return;
+    object.updateWorldMatrix(true, false);
+
+    for (let i = 0; i < positions.count; i++) {
+      localVertex.fromBufferAttribute(positions, i).applyMatrix4(object.matrixWorld);
+      source.worldToLocal(localVertex);
+      const t = THREE.MathUtils.clamp((localVertex.x - bounds.min.x) / length, 0, 0.999999);
+      const bin = bins[Math.floor(t * BIN_COUNT)];
+      bin.count += 1;
+      bin.sumX += localVertex.x;
+      bin.sumY += localVertex.y;
+      bin.sumZ += localVertex.z;
+      bin.minY = Math.min(bin.minY, localVertex.y);
+      bin.maxY = Math.max(bin.maxY, localVertex.y);
+      bin.minZ = Math.min(bin.minZ, localVertex.z);
+      bin.maxZ = Math.max(bin.maxZ, localVertex.z);
+    }
+  });
+
+  let best = null;
+  let bestScore = Infinity;
+  for (let i = 0; i < BIN_COUNT; i++) {
+    const bin = bins[i];
+    if (bin.count < 4) continue;
+    const t = (i + 0.5) / BIN_COUNT;
+    const nearLeftEnd = t >= 0.10 && t <= 0.32;
+    const nearRightEnd = t >= 0.68 && t <= 0.90;
+    if (!nearLeftEnd && !nearRightEnd) continue;
+
+    const spanY = bin.maxY - bin.minY;
+    const spanZ = bin.maxZ - bin.minZ;
+    const thickness = Math.hypot(spanY, spanZ);
+    const endDistance = Math.min(t, 1 - t);
+    // Prefer a thin shaft, with a slight bias toward ~20% in from an end so the hand
+    // is not balanced at the centre or hanging off the very tip.
+    const score = thickness + Math.abs(endDistance - 0.20) * length * 0.12;
+    if (score < bestScore) {
+      bestScore = score;
+      best = bin;
+    }
+  }
+
+  if (!best) return bounds.getCenter(new THREE.Vector3());
+  return new THREE.Vector3(
+    best.sumX / best.count,
+    best.sumY / best.count,
+    best.sumZ / best.count,
+  );
+}
 
 export function createGroundSticks({ field, onError = console.warn }) {
   if (!field?.sample) throw new Error('Ground sticks require the Oasis height field.');
@@ -45,6 +119,7 @@ export function createGroundSticks({ field, onError = console.warn }) {
 
     const bounds = new THREE.Box3().setFromObject(source);
     const sourceBottom = bounds.min.y;
+    const naturalGripPoint = findNaturalGripPoint(source, bounds);
 
     for (let i = 0; i < STICK_LAYOUT.length; i++) {
       const item = STICK_LAYOUT[i];
@@ -63,6 +138,7 @@ export function createGroundSticks({ field, onError = console.warn }) {
       stick.userData.looseStick = true;
       stick.userData.groundYaw = item.yaw;
       stick.userData.sourceBottom = sourceBottom;
+      stick.userData.gripPoint = naturalGripPoint.toArray();
       stick.userData.held = false;
       group.add(stick);
     }
@@ -90,8 +166,17 @@ export function createHeldSticks({ scene, states, onError = console.warn }) {
     if (state.objectGrip.children.length > 0) return false;
 
     state.objectGrip.add(stick);
-    stick.position.set(0, 0, 0);
     stick.quaternion.copy(heldRotation);
+
+    // Put the chosen shaft centre directly in the fist. Applying the model's held
+    // rotation to the authored grip point and negating it gives the root translation
+    // needed to make that local point coincide with the hand anchor.
+    const point = Array.isArray(stick.userData.gripPoint)
+      ? gripOffset.fromArray(stick.userData.gripPoint)
+      : gripOffset.set(0, 0, 0);
+    point.applyQuaternion(stick.quaternion).multiplyScalar(-1);
+    stick.position.copy(point);
+
     stick.userData.held = true;
     heldByState.set(state, stick);
     return true;
