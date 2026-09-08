@@ -4,6 +4,10 @@ const ROCK_TEXTURE = `${import.meta.env.BASE_URL}textures/rocks/pickup-rock/rock
 const TOTAL_ROCKS = 128;
 const DRAW_DISTANCE = 150;
 
+// Keep procedural pickup rocks out of the giant hero tree's footprint.
+// These coordinates intentionally match the hero placement in oasis-vegetation.js.
+const HERO_TREE_CLEARING = Object.freeze({ x: 372, z: -414, radius: 40 });
+
 function makeRockGeometry() {
   // 320 triangles: intentionally small enough that a separate LOD is not useful yet.
   const geometry = new THREE.IcosahedronGeometry(1, 2);
@@ -55,6 +59,13 @@ function seededRandom(seed = 0x51a3d9) {
 function makePlacements(field) {
   const random = seededRandom();
   const placements = [];
+  const heroClearRadiusSq = HERO_TREE_CLEARING.radius * HERO_TREE_CLEARING.radius;
+
+  function insideHeroClearing(x, z) {
+    const dx = x - HERO_TREE_CLEARING.x;
+    const dz = z - HERO_TREE_CLEARING.z;
+    return dx * dx + dz * dz < heroClearRadiusSq;
+  }
 
   function add(x, z) {
     const baseScale = 0.72 + random() * 0.62;
@@ -76,7 +87,10 @@ function makePlacements(field) {
   for (let i = 0; i < 14; i++) {
     const angle = random() * Math.PI * 2;
     const radius = 7 + Math.sqrt(random()) * 42;
-    add(Math.cos(angle) * radius, Math.sin(angle) * radius);
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+    if (insideHeroClearing(x, z)) { i--; continue; }
+    add(x, z);
   }
 
   // The rest are genuinely sparse across the kilometre-square desert.
@@ -84,6 +98,7 @@ function makePlacements(field) {
     const x = (random() * 2 - 1) * 480;
     const z = (random() * 2 - 1) * 480;
     if (Math.hypot(x, z) < 55) continue;
+    if (insideHeroClearing(x, z)) continue;
     add(x, z);
   }
 
