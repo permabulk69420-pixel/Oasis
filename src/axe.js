@@ -14,6 +14,8 @@ const AXE_BOTTOM_BELOW_GRIP = 0.131;
 const loader = new GLTFLoader();
 const handPosition = new THREE.Vector3();
 const axePosition = new THREE.Vector3();
+const heldFlip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
+const bladeForwardTwist = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2);
 
 function prepareAxe(root) {
   root.traverse((object) => {
@@ -44,9 +46,9 @@ export function createHeldAxe({ scene, states, onError = console.warn }) {
     state.objectGrip.add(root);
     root.position.set(0, 0, 0);
 
-    // Like the torch, the axe is authored +Y from the grip toward the head.
-    // The Quest hand socket needs that axis flipped to put the head above the hand.
-    root.rotation.set(Math.PI, 0, 0);
+    // Keep the proven vertical flip, then twist 90 degrees around the axe's own handle
+    // so the blade faces forward instead of left when the controller points forward.
+    root.quaternion.copy(heldFlip).multiply(bladeForwardTwist);
     root.scale.set(1, 1, 1);
     heldBy = state;
     return true;
