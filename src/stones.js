@@ -114,7 +114,15 @@ export function createHeldStones({ scene, states, renderer = null, onError = con
 
   const heldByState = new Map();
   const gripDown = new Map();
-  let stoneGroup = null;
+  let stoneGroup = scene.getObjectByName('Loose oasis stones');
+  if (!stoneGroup) {
+    stoneGroup = createGroundStones({
+      field: { sample: terrainHeight },
+      renderer,
+      onError,
+    });
+    scene.add(stoneGroup);
+  }
 
   function getStoneGroup() {
     if (!stoneGroup || !stoneGroup.parent) stoneGroup = scene.getObjectByName('Loose oasis stones');
