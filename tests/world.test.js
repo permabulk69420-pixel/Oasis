@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import { WORLD_SIZE, WATER, SPAWN, GRID_STEP, GRID_SEGMENTS, createHeightField, terrainHeight, grassCover, stickVector, stickAxis, pivotRig } from '../src/world.js';
 
 const field = createHeightField();
-test('the world is one kilometre square and water is 500 metres from the central spawn', () => {
+test('the world is one kilometre square and the player starts on a hill near the oasis', () => {
   assert.equal(WORLD_SIZE, 1000);
-  assert.equal(SPAWN.x, 0); assert.equal(SPAWN.z, 0);
-  assert.equal(Math.hypot(WATER.x - SPAWN.x, WATER.z - SPAWN.z), 500);
+  const distance = Math.hypot(WATER.x - SPAWN.x, WATER.z - SPAWN.z);
+  assert.ok(distance > 80 && distance < 140, 'spawn stays close enough for fast oasis iteration');
+  assert.ok(terrainHeight(SPAWN.x, SPAWN.z) > WATER.y + 15, 'spawn sits well above the oasis on a dune crest');
 });
 test('the pool is a shallow basin with dry banks on every side', () => {
   const depth = WATER.y - field.sample(WATER.x, WATER.z);
@@ -16,7 +17,7 @@ test('the pool is a shallow basin with dry banks on every side', () => {
     assert.ok(field.sample(WATER.x + Math.cos(a) * WATER.radiusX * 1.2, WATER.z + Math.sin(a) * WATER.radiusZ * 1.2) > WATER.y);
   }
 });
-test('the enlarged pool retains dry sandy banks and a low grass shelf all around', () => {
+test('the enlarged pool retains dry sandy banks and an expanded grass shelf all around', () => {
   assert.equal(WATER.radiusX * 2, 80);
   for (let i = 0; i < 128; i++) {
     const a = i / 128 * Math.PI * 2;
@@ -27,7 +28,8 @@ test('the enlarged pool retains dry sandy banks and a low grass shelf all around
     assert.ok(field.sample(...point(1.08)) > WATER.y, 'continuous dry bank');
     assert.equal(grassCover(...point(1.08)), 0, 'sandy bank stays bare');
     assert.equal(grassCover(...point(1.4)), 1, 'grass wraps the whole pool');
-    assert.equal(grassCover(...point(1.85)), 0, 'grass ends before surrounding dunes');
+    assert.equal(grassCover(...point(1.7)), 1, 'expanded grass band remains solid before its outer fade');
+    assert.equal(grassCover(...point(2.15)), 0, 'grass still fades completely before surrounding dunes');
     const h = field.sample(...point(1.4));
     assert.ok(h > WATER.y && h < WATER.y + 0.8, 'grass shelf stays low and dry');
   }
