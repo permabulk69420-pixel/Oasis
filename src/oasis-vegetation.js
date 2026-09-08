@@ -84,6 +84,17 @@ const SHADOW_SURFACE_OFFSET = 0.045;
 // trees enormous on the ground and still too faint to read. Low plants get their own compact
 // profile instead of borrowing tree dimensions.
 const SHADOW_STYLES = Object.freeze({
+  bush: Object.freeze({
+    materialName: 'Berry bush projected shadows',
+    meshName: 'Berry bush shadows',
+    opacity: 0.44,
+    height: 1.35,
+    footprintLength: 1.35,
+    projectionScale: 0.18,
+    maxLength: 3.0,
+    width: 2.1,
+    seedBase: 0.35,
+  }),
   tree: Object.freeze({
     materialName: 'Alien tree projected shadows',
     meshName: 'Alien tree shadows',
@@ -302,6 +313,12 @@ export function createOasisVegetation({ field, sunDirection = null }) {
   heroGroup.name = 'Crimson hero tree';
   group.add(heroGroup);
 
+  const bushShadow = createProjectedVegetationShadow({
+    field,
+    items: bushes,
+    sunDirection: liveSun,
+    style: SHADOW_STYLES.bush,
+  });
   const regularTreeShadow = createProjectedVegetationShadow({
     field,
     items: trees,
@@ -320,7 +337,7 @@ export function createOasisVegetation({ field, sunDirection = null }) {
     sunDirection: liveSun,
     style: SHADOW_STYLES.hero,
   });
-  group.add(regularTreeShadow.mesh, fernShadow.mesh, heroTreeShadow.mesh);
+  group.add(bushShadow.mesh, regularTreeShadow.mesh, fernShadow.mesh, heroTreeShadow.mesh);
 
   let bushLoadStarted = false;
   let treeLoadStarted = false;
@@ -462,9 +479,11 @@ export function createOasisVegetation({ field, sunDirection = null }) {
     treeGroup.visible = distance < TREE_DRAW_DISTANCE;
     fernGroup.visible = distance < FERN_DRAW_DISTANCE;
     heroGroup.visible = heroDistance < HERO_DRAW_DISTANCE;
+    bushShadow.mesh.visible = bushesReady && bushGroup.visible && shadowDaylight;
     regularTreeShadow.mesh.visible = treesReady && treeGroup.visible && shadowDaylight;
     fernShadow.mesh.visible = fernsReady && fernGroup.visible && shadowDaylight;
     heroTreeShadow.mesh.visible = heroReady && heroGroup.visible && shadowDaylight;
+    if (bushShadow.mesh.visible) bushShadow.rebuild();
     if (regularTreeShadow.mesh.visible) regularTreeShadow.rebuild();
     if (fernShadow.mesh.visible) fernShadow.rebuild();
     if (heroTreeShadow.mesh.visible) heroTreeShadow.rebuild();
@@ -482,6 +501,7 @@ export function createOasisVegetation({ field, sunDirection = null }) {
     treeGroup,
     fernGroup,
     heroGroup,
+    bushShadow: bushShadow.mesh,
     regularTreeShadow: regularTreeShadow.mesh,
     fernShadow: fernShadow.mesh,
     heroTreeShadow: heroTreeShadow.mesh,
