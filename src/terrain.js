@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { HALF_WORLD, GRID_STEP, WATER, clamp, noise, terrainHeight, grassCover } from './world.js';
+import { HALF_WORLD, GRID_STEP, WATER, SPAWN, clamp, noise, terrainHeight, grassCover } from './world.js';
 import { createPickupRocks } from './rocks.js';
 import { createOasisVegetation } from './oasis-vegetation.js';
 
@@ -92,7 +92,7 @@ export function createTerrain(field, material) {
   const pickupRocks = createPickupRocks({ field });
   group.add(pickupRocks.mesh);
 
-  // Ground vegetation remains a terrain texture; berry bushes are lazy-loaded nearby.
+  // Ground vegetation remains a terrain texture; oasis plants are lazy-loaded nearby.
   const vegetation = createOasisVegetation({ field });
   group.add(vegetation.group);
 
@@ -111,6 +111,7 @@ export function createTerrain(field, material) {
     pickupRocks.update(x, z);
     vegetation.update(x, z);
   }
-  update(0, 0);
+  // Initialise LOD and nearby assets around the real player start, not the old world origin.
+  update(SPAWN.x, SPAWN.z);
   return { group, update, chunks, pickupRocks, vegetation };
 }
