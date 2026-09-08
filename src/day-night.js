@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { SUN } from './world.js';
 import { installOasisWater } from './oasis-water.js';
+import { createWaterFireflies } from './water-fireflies.js';
 
 export const DAY_SECONDS = 5 * 60;
 export const NIGHT_SECONDS = 5 * 60;
@@ -41,6 +42,7 @@ export function createDayNightCycle({ scene, renderer, materials }) {
   }
 
   installOasisWater(materials.water, (message) => console.warn(message));
+  const fireflies = createWaterFireflies({ scene });
 
   // Standard PBR assets (hands now; props/buildings later) use real scene lights.
   // The terrain/water/sky remain on their lightweight custom shaders.
@@ -126,6 +128,7 @@ export function createDayNightCycle({ scene, renderer, materials }) {
       if (cloudTime) cloudTime.value = cloudSeconds;
     }
     apply();
+    fireflies.update(dt, state);
     return state;
   }
 
@@ -135,6 +138,7 @@ export function createDayNightCycle({ scene, renderer, materials }) {
     const phase = ((wrappedHours - 6) / 24 + 1) % 1;
     elapsedSeconds = elapsedFromPhase(phase);
     apply();
+    fireflies.update(0, state);
     return state;
   }
 
@@ -144,6 +148,7 @@ export function createDayNightCycle({ scene, renderer, materials }) {
   }
 
   apply();
+  fireflies.update(0, state);
 
   return {
     update,
@@ -151,6 +156,7 @@ export function createDayNightCycle({ scene, renderer, materials }) {
     setPaused,
     isPaused: () => paused,
     getState: () => ({ ...state }),
-    lights: { hemisphere, sunlight, moonlight }
+    lights: { hemisphere, sunlight, moonlight },
+    fireflies
   };
 }
