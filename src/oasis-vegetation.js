@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { WATER } from './world.js';
+import { WATER, SUN } from './world.js';
 
 const BUSH_DRAW_DISTANCE = 180;
 const BUSH_LOAD_DISTANCE = 230;
@@ -76,6 +76,10 @@ const FERN_LAYOUT = [
   { angle: 5.54, radius: 1.48, scale: 1.00, yaw: 0.90 },
 ];
 
+const SHADOW_SEGMENTS = 4;
+const SHADOW_WIDTH_PROFILE = [0.24, 0.74, 1.00, 0.78, 0.24];
+const SHADOW_SURFACE_OFFSET = 0.045;
+
 function radialPositions(layout) {
   return layout.map(item => ({
     ...item,
@@ -93,6 +97,141 @@ function clearOfHero(items) {
   });
 }
 
+function smoothstep(a, b, value) {
+  const t = THREE.MathUtils.clamp((value - a) / (b - a), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+// Quest-friendly projected tree shadows: no shadow map, no extra render of the 3D models.
+// Each class of tree is one tiny dynamic strip mesh (two draw calls total) laid over the terrain.
+function createProjectedTreeShadow({ field, items, sunDirection, hero = false }) {
+  const verticesPerItem = SHADOW_SEGMENTS * 6;
+  const positions = new Float32Array(items.length * verticesPerItem * 3);
+  const shadowUv = new Float32Array(items.length * verticesPerItem * 2);
+  const shadowSeed = new Float32Array(items.length * verticesPerItem);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('shadowUv', new THREE.BufferAttribute(shadowUv, 2));
+  geometry.setAttribute('shadowSeed', new THREE.BufferAttribute(shadowSeed, 1));
+
+  const material = new THREE.ShaderMaterial({
+    transparent: true,
+    depthTest: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+    uniforms: {
+      uOpacity: { value: 0 },
+    },
+    vertexShader: /* glsl */`
+      attribute vec2 shadowUv;
+      attribute float shadowSeed;
+      varying vec2 vShadowUv;
+      varying float vShadowSeed;
+      void main() {
+        vShadowUv = shadowUv;
+        vShadowSeed = shadowSeed;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */`
+      uniform float uOpacity;
+      varying vec2 vShadowUv;
+      varying float vShadowSeed;
+      void main() {
+        float sideFade = 1.0 - smoothstep(0.58, 1.0, abs(vShadowUv.x));
+        float startFade = smoothstep(0.0, 0.07, vShadowUv.y);
+        float endFade = 1.0 - smoothstep(0.82, 1.0, vShadowUv.y);
+        float broad = sin((vShadowUv.x * 3.9 + vShadowUv.y * 6.7 + vShadowSeed) * 6.2831853);
+        float cross = sin((vShadowUv.x * 7.1 - vShadowUv.y * 4.3 + vShadowSeed * 1.7) * 6.2831853);
+        float dapple = clamp(0.82 + broad * 0.10 + cross * 0.08, 0.58, 1.0);
+        float alpha = sideFade * startFade * endFade * dapple * uOpacity;
+        if (alpha < 0.006) discard;
+        gl_FragColor = vec4(0.025, 0.030, 0.022, alpha);
+      }
+    `,
+  });
+  material.name = hero ? 'Crimson hero projected shadow' : 'Alien tree projected shadows';
+
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = hero ? 'Crimson hero tree shadow' : 'Alien tree shadows';
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 2;
+  mesh.visible = false;
+
+  function rebuild() {
+    const sunY = sunDirection.y;
+    const horizontal = Math.hypot(sunDirection.x, sunDirection.z);
+    const daylight = smoothstep(-0.01, 0.24, sunY);
+    material.uniforms.uOpacity.value = (hero ? 0.225 : 0.19) * daylight;
+    if (daylight <= 0.001 || items.length === 0) return false;
+
+    // Shadows travel away from the sun. At near-vertical sun, retain the previous azimuthal
+    // convention but keep the footprint mostly beneath the canopy rather than collapsing to zero.
+    const dirX = horizontal > 0.001 ? -sunDirection.x / horizontal : 0;
+    const dirZ = horizontal > 0.001 ? -sunDirection.z / horizontal : 1;
+    const sideX = -dirZ;
+    const sideZ = dirX;
+    let p = 0;
+    let u = 0;
+    let s = 0;
+
+    function writeVertex(x, z, uvX, uvY, seed) {
+      positions[p++] = x;
+      positions[p++] = field.sample(x, z) + SHADOW_SURFACE_OFFSET;
+      positions[p++] = z;
+      shadowUv[u++] = uvX;
+      shadowUv[u++] = uvY;
+      shadowSeed[s++] = seed;
+    }
+
+    for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
+      const item = items[itemIndex];
+      const scale = item.scale || 1;
+      const height = hero ? 60 : 12 * scale;
+      const footprintLength = hero ? 32 : 6.5 * scale;
+      const projection = height * horizontal / Math.max(sunY, 0.22) * (hero ? 0.50 : 0.55);
+      const length = Math.min(hero ? 92 : 34 * scale, footprintLength + projection);
+      const width = (hero ? 50 : 8.5 * scale) * (0.96 + (itemIndex % 3) * 0.035);
+      const seed = (hero ? 4.7 : 0.9) + itemIndex * 1.618;
+      const station = [];
+
+      for (let i = 0; i <= SHADOW_SEGMENTS; i++) {
+        const t = i / SHADOW_SEGMENTS;
+        const along = (t - 0.18) * length;
+        const centerX = item.x + dirX * along;
+        const centerZ = item.z + dirZ * along;
+        const halfWidth = width * 0.5 * SHADOW_WIDTH_PROFILE[i];
+        station.push({
+          lx: centerX + sideX * halfWidth,
+          lz: centerZ + sideZ * halfWidth,
+          rx: centerX - sideX * halfWidth,
+          rz: centerZ - sideZ * halfWidth,
+          t,
+        });
+      }
+
+      for (let i = 0; i < SHADOW_SEGMENTS; i++) {
+        const a = station[i];
+        const b = station[i + 1];
+        writeVertex(a.lx, a.lz, -1, a.t, seed);
+        writeVertex(a.rx, a.rz, 1, a.t, seed);
+        writeVertex(b.lx, b.lz, -1, b.t, seed);
+        writeVertex(a.rx, a.rz, 1, a.t, seed);
+        writeVertex(b.rx, b.rz, 1, b.t, seed);
+        writeVertex(b.lx, b.lz, -1, b.t, seed);
+      }
+    }
+
+    geometry.attributes.position.needsUpdate = true;
+    geometry.attributes.shadowUv.needsUpdate = true;
+    geometry.attributes.shadowSeed.needsUpdate = true;
+    return true;
+  }
+
+  return { mesh, rebuild };
+}
+
 function disableModelShadows(root) {
   root.traverse(object => {
     if (!object.isMesh) return;
@@ -101,13 +240,14 @@ function disableModelShadows(root) {
   });
 }
 
-export function createOasisVegetation({ field }) {
+export function createOasisVegetation({ field, sunDirection = null }) {
   const group = new THREE.Group();
   group.name = 'Oasis vegetation';
 
   const bushes = clearOfHero(radialPositions(BUSH_LAYOUT));
   const trees = clearOfHero(radialPositions(TREE_LAYOUT));
   const ferns = clearOfHero(radialPositions(FERN_LAYOUT));
+  const liveSun = sunDirection || new THREE.Vector3(SUN.x, SUN.y, SUN.z).normalize();
 
   const bushGroup = new THREE.Group();
   bushGroup.name = 'Berry bushes';
@@ -124,6 +264,10 @@ export function createOasisVegetation({ field }) {
   const heroGroup = new THREE.Group();
   heroGroup.name = 'Crimson hero tree';
   group.add(heroGroup);
+
+  const regularTreeShadow = createProjectedTreeShadow({ field, items: trees, sunDirection: liveSun });
+  const heroTreeShadow = createProjectedTreeShadow({ field, items: [HERO_TREE], sunDirection: liveSun, hero: true });
+  group.add(regularTreeShadow.mesh, heroTreeShadow.mesh);
 
   let bushLoadStarted = false;
   let treeLoadStarted = false;
@@ -260,10 +404,15 @@ export function createOasisVegetation({ field }) {
   function update(x, z) {
     const distance = Math.hypot(x - WATER.x, z - WATER.z);
     const heroDistance = Math.hypot(x - HERO_TREE.x, z - HERO_TREE.z);
+    const shadowDaylight = liveSun.y > -0.01;
     bushGroup.visible = distance < BUSH_DRAW_DISTANCE;
     treeGroup.visible = distance < TREE_DRAW_DISTANCE;
     fernGroup.visible = distance < FERN_DRAW_DISTANCE;
     heroGroup.visible = heroDistance < HERO_DRAW_DISTANCE;
+    regularTreeShadow.mesh.visible = treesReady && treeGroup.visible && shadowDaylight;
+    heroTreeShadow.mesh.visible = heroReady && heroGroup.visible && shadowDaylight;
+    if (regularTreeShadow.mesh.visible) regularTreeShadow.rebuild();
+    if (heroTreeShadow.mesh.visible) heroTreeShadow.rebuild();
     if (distance < BUSH_LOAD_DISTANCE) ensureBushes();
     if (distance < TREE_LOAD_DISTANCE) ensureTrees();
     if (distance < FERN_LOAD_DISTANCE) ensureFerns();
@@ -278,6 +427,8 @@ export function createOasisVegetation({ field }) {
     treeGroup,
     fernGroup,
     heroGroup,
+    regularTreeShadow: regularTreeShadow.mesh,
+    heroTreeShadow: heroTreeShadow.mesh,
     get bushesReady() { return bushesReady; },
     get treesReady() { return treesReady; },
     get fernsReady() { return fernsReady; },
