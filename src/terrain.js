@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { HALF_WORLD, GRID_STEP, WATER, clamp, noise, terrainHeight, grassCover } from './world.js';
 import { createPickupRocks } from './rocks.js';
+import { createOasisVegetation } from './oasis-vegetation.js';
 
 const CHUNK_SIZE = 62.5;
 const LEVELS = [32, 16, 8, 4];
@@ -91,6 +92,11 @@ export function createTerrain(field, material) {
   const pickupRocks = createPickupRocks({ field });
   group.add(pickupRocks.mesh);
 
+  // The terrain texture provides the distant grass read; cheap instanced blades sell it up close.
+  // Berry bushes are lazy-loaded only as the player approaches the oasis.
+  const vegetation = createOasisVegetation({ field });
+  group.add(vegetation.group);
+
   function update(x, z) {
     for (const chunk of chunks) {
       const distance = Math.hypot(x - chunk.x, z - chunk.z);
@@ -104,7 +110,8 @@ export function createTerrain(field, material) {
       if (level !== chunk.level) { chunk.mesh.geometry = chunk.geometries[level]; chunk.level = level; }
     }
     pickupRocks.update(x, z);
+    vegetation.update(x, z);
   }
   update(0, 0);
-  return { group, update, chunks, pickupRocks };
+  return { group, update, chunks, pickupRocks, vegetation };
 }
