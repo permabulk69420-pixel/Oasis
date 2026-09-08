@@ -11,9 +11,9 @@ const SUN_PATH_AZIMUTH = Math.atan2(INITIAL_SUN.z, INITIAL_SUN.x);
 const INITIAL_PHASE = Math.asin(THREE.MathUtils.clamp(INITIAL_SUN.y, -1, 1)) / TAU;
 
 const DAY_SKY_LIGHT = new THREE.Color(0xc4ddf0);
-const NIGHT_SKY_LIGHT = new THREE.Color(0x263452);
+const NIGHT_SKY_LIGHT = new THREE.Color(0x08111f);
 const DAY_GROUND_LIGHT = new THREE.Color(0x7a5438);
-const NIGHT_GROUND_LIGHT = new THREE.Color(0x090d18);
+const NIGHT_GROUND_LIGHT = new THREE.Color(0x020307);
 const SUNRISE_LIGHT = new THREE.Color(0xff9d62);
 const NOON_LIGHT = new THREE.Color(0xfff1d5);
 const MOON_LIGHT = new THREE.Color(0x9eb6e8);
@@ -91,18 +91,18 @@ export function createDayNightCycle({ scene, renderer, materials }) {
     sunlight.color.copy(SUNRISE_LIGHT).lerp(NOON_LIGHT, warmToWhite);
 
     moonlight.position.copy(moonDirection).multiplyScalar(1000);
-    moonlight.intensity = 0.38 * moonAmount;
+    moonlight.intensity = 0.22 * moonAmount;
 
     tempSky.copy(NIGHT_SKY_LIGHT).lerp(DAY_SKY_LIGHT, daylight);
     tempGround.copy(NIGHT_GROUND_LIGHT).lerp(DAY_GROUND_LIGHT, daylight);
     hemisphere.color.copy(tempSky);
     hemisphere.groundColor.copy(tempGround);
-    hemisphere.intensity = 0.16 + daylight * 1.08 + twilight * 0.10;
+    hemisphere.intensity = 0.04 + daylight * 1.20 + twilight * 0.08;
 
-    // The existing environment shaders already follow uSun. Exposure provides a cheap
-    // scene-wide adaptation until the sky shader gets dedicated stars/moon rendering.
-    const baseExposure = THREE.MathUtils.lerp(0.22, 1.05, daylight);
-    renderer.toneMappingExposure = Math.max(baseExposure, 0.46 * twilight);
+    // Keep sunset readable, but let deep night become genuinely dark. The custom sky/terrain
+    // shaders still share uSun, so exposure is the cheapest scene-wide night adaptation on Quest.
+    const baseExposure = THREE.MathUtils.lerp(0.07, 1.05, daylight);
+    renderer.toneMappingExposure = Math.max(baseExposure, 0.42 * twilight);
 
     state = {
       phase,
