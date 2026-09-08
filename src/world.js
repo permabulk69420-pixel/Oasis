@@ -44,7 +44,7 @@ export function grassCover(x, z) {
   const r = basinRadius(x, z);
   const edgeNoise = (noise(x * 0.18, z * 0.18) - 0.5) * 0.10;
   return smooth(1.12, 1.25, r + edgeNoise * 0.3)
-    * (1 - smooth(1.50, 1.73, r + edgeNoise));
+    * (1 - smooth(1.80, 2.08, r + edgeNoise));
 }
 
 export function terrainHeight(x, z) {
