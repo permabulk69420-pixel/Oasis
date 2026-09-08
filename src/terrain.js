@@ -92,8 +92,7 @@ export function createTerrain(field, material) {
   const pickupRocks = createPickupRocks({ field });
   group.add(pickupRocks.mesh);
 
-  // The terrain texture provides the distant grass read; cheap instanced blades sell it up close.
-  // Berry bushes are lazy-loaded only as the player approaches the oasis.
+  // Ground vegetation remains a terrain texture; berry bushes are lazy-loaded nearby.
   const vegetation = createOasisVegetation({ field });
   group.add(vegetation.group);
 
