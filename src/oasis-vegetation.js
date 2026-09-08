@@ -77,8 +77,47 @@ const FERN_LAYOUT = [
 ];
 
 const SHADOW_SEGMENTS = 4;
-const SHADOW_WIDTH_PROFILE = [0.24, 0.74, 1.00, 0.78, 0.24];
+const SHADOW_WIDTH_PROFILE = [0.18, 0.70, 1.00, 0.72, 0.18];
 const SHADOW_SURFACE_OFFSET = 0.045;
+
+// These are deliberately conservative footprints. The previous generic values made the regular
+// trees enormous on the ground and still too faint to read. Low plants get their own compact
+// profile instead of borrowing tree dimensions.
+const SHADOW_STYLES = Object.freeze({
+  tree: Object.freeze({
+    materialName: 'Alien tree projected shadows',
+    meshName: 'Alien tree shadows',
+    opacity: 0.46,
+    height: 10.5,
+    footprintLength: 3.8,
+    projectionScale: 0.34,
+    maxLength: 18,
+    width: 4.8,
+    seedBase: 0.9,
+  }),
+  fern: Object.freeze({
+    materialName: 'Purple fern projected shadows',
+    meshName: 'Purple fern shadows',
+    opacity: 0.42,
+    height: 2.4,
+    footprintLength: 2.2,
+    projectionScale: 0.20,
+    maxLength: 4.8,
+    width: 3.4,
+    seedBase: 2.8,
+  }),
+  hero: Object.freeze({
+    materialName: 'Crimson hero projected shadow',
+    meshName: 'Crimson hero tree shadow',
+    opacity: 0.52,
+    height: 60,
+    footprintLength: 14,
+    projectionScale: 0.24,
+    maxLength: 52,
+    width: 24,
+    seedBase: 4.7,
+  }),
+});
 
 function radialPositions(layout) {
   return layout.map(item => ({
@@ -102,9 +141,9 @@ function smoothstep(a, b, value) {
   return t * t * (3 - 2 * t);
 }
 
-// Quest-friendly projected tree shadows: no shadow map, no extra render of the 3D models.
-// Each class of tree is one tiny dynamic strip mesh (two draw calls total) laid over the terrain.
-function createProjectedTreeShadow({ field, items, sunDirection, hero = false }) {
+// Quest-friendly projected vegetation shadows: no shadow map and no extra render of the GLBs.
+// Each vegetation class is one tiny dynamic strip mesh laid directly over the terrain.
+function createProjectedVegetationShadow({ field, items, sunDirection, style }) {
   const verticesPerItem = SHADOW_SEGMENTS * 6;
   const positions = new Float32Array(items.length * verticesPerItem * 3);
   const shadowUv = new Float32Array(items.length * verticesPerItem * 2);
@@ -139,22 +178,22 @@ function createProjectedTreeShadow({ field, items, sunDirection, hero = false })
       varying vec2 vShadowUv;
       varying float vShadowSeed;
       void main() {
-        float sideFade = 1.0 - smoothstep(0.58, 1.0, abs(vShadowUv.x));
-        float startFade = smoothstep(0.0, 0.07, vShadowUv.y);
-        float endFade = 1.0 - smoothstep(0.82, 1.0, vShadowUv.y);
+        float sideFade = 1.0 - smoothstep(0.54, 1.0, abs(vShadowUv.x));
+        float startFade = smoothstep(0.0, 0.055, vShadowUv.y);
+        float endFade = 1.0 - smoothstep(0.84, 1.0, vShadowUv.y);
         float broad = sin((vShadowUv.x * 3.9 + vShadowUv.y * 6.7 + vShadowSeed) * 6.2831853);
         float cross = sin((vShadowUv.x * 7.1 - vShadowUv.y * 4.3 + vShadowSeed * 1.7) * 6.2831853);
-        float dapple = clamp(0.82 + broad * 0.10 + cross * 0.08, 0.58, 1.0);
+        float dapple = clamp(0.79 + broad * 0.13 + cross * 0.09, 0.52, 1.0);
         float alpha = sideFade * startFade * endFade * dapple * uOpacity;
-        if (alpha < 0.006) discard;
-        gl_FragColor = vec4(0.025, 0.030, 0.022, alpha);
+        if (alpha < 0.008) discard;
+        gl_FragColor = vec4(0.008, 0.010, 0.008, alpha);
       }
     `,
   });
-  material.name = hero ? 'Crimson hero projected shadow' : 'Alien tree projected shadows';
+  material.name = style.materialName;
 
   const mesh = new THREE.Mesh(geometry, material);
-  mesh.name = hero ? 'Crimson hero tree shadow' : 'Alien tree shadows';
+  mesh.name = style.meshName;
   mesh.frustumCulled = false;
   mesh.renderOrder = 2;
   mesh.visible = false;
@@ -163,11 +202,9 @@ function createProjectedTreeShadow({ field, items, sunDirection, hero = false })
     const sunY = sunDirection.y;
     const horizontal = Math.hypot(sunDirection.x, sunDirection.z);
     const daylight = smoothstep(-0.01, 0.24, sunY);
-    material.uniforms.uOpacity.value = (hero ? 0.225 : 0.19) * daylight;
+    material.uniforms.uOpacity.value = style.opacity * daylight;
     if (daylight <= 0.001 || items.length === 0) return false;
 
-    // Shadows travel away from the sun. At near-vertical sun, retain the previous azimuthal
-    // convention but keep the footprint mostly beneath the canopy rather than collapsing to zero.
     const dirX = horizontal > 0.001 ? -sunDirection.x / horizontal : 0;
     const dirZ = horizontal > 0.001 ? -sunDirection.z / horizontal : 1;
     const sideX = -dirZ;
@@ -188,17 +225,17 @@ function createProjectedTreeShadow({ field, items, sunDirection, hero = false })
     for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
       const item = items[itemIndex];
       const scale = item.scale || 1;
-      const height = hero ? 60 : 12 * scale;
-      const footprintLength = hero ? 32 : 6.5 * scale;
-      const projection = height * horizontal / Math.max(sunY, 0.22) * (hero ? 0.50 : 0.55);
-      const length = Math.min(hero ? 92 : 34 * scale, footprintLength + projection);
-      const width = (hero ? 50 : 8.5 * scale) * (0.96 + (itemIndex % 3) * 0.035);
-      const seed = (hero ? 4.7 : 0.9) + itemIndex * 1.618;
+      const height = style.height * scale;
+      const footprintLength = style.footprintLength * scale;
+      const projection = height * horizontal / Math.max(sunY, 0.22) * style.projectionScale;
+      const length = Math.min(style.maxLength * scale, footprintLength + projection);
+      const width = style.width * scale * (0.97 + (itemIndex % 3) * 0.025);
+      const seed = style.seedBase + itemIndex * 1.618;
       const station = [];
 
       for (let i = 0; i <= SHADOW_SEGMENTS; i++) {
         const t = i / SHADOW_SEGMENTS;
-        const along = (t - 0.18) * length;
+        const along = (t - 0.16) * length;
         const centerX = item.x + dirX * along;
         const centerZ = item.z + dirZ * along;
         const halfWidth = width * 0.5 * SHADOW_WIDTH_PROFILE[i];
@@ -265,9 +302,25 @@ export function createOasisVegetation({ field, sunDirection = null }) {
   heroGroup.name = 'Crimson hero tree';
   group.add(heroGroup);
 
-  const regularTreeShadow = createProjectedTreeShadow({ field, items: trees, sunDirection: liveSun });
-  const heroTreeShadow = createProjectedTreeShadow({ field, items: [HERO_TREE], sunDirection: liveSun, hero: true });
-  group.add(regularTreeShadow.mesh, heroTreeShadow.mesh);
+  const regularTreeShadow = createProjectedVegetationShadow({
+    field,
+    items: trees,
+    sunDirection: liveSun,
+    style: SHADOW_STYLES.tree,
+  });
+  const fernShadow = createProjectedVegetationShadow({
+    field,
+    items: ferns,
+    sunDirection: liveSun,
+    style: SHADOW_STYLES.fern,
+  });
+  const heroTreeShadow = createProjectedVegetationShadow({
+    field,
+    items: [HERO_TREE],
+    sunDirection: liveSun,
+    style: SHADOW_STYLES.hero,
+  });
+  group.add(regularTreeShadow.mesh, fernShadow.mesh, heroTreeShadow.mesh);
 
   let bushLoadStarted = false;
   let treeLoadStarted = false;
@@ -410,8 +463,10 @@ export function createOasisVegetation({ field, sunDirection = null }) {
     fernGroup.visible = distance < FERN_DRAW_DISTANCE;
     heroGroup.visible = heroDistance < HERO_DRAW_DISTANCE;
     regularTreeShadow.mesh.visible = treesReady && treeGroup.visible && shadowDaylight;
+    fernShadow.mesh.visible = fernsReady && fernGroup.visible && shadowDaylight;
     heroTreeShadow.mesh.visible = heroReady && heroGroup.visible && shadowDaylight;
     if (regularTreeShadow.mesh.visible) regularTreeShadow.rebuild();
+    if (fernShadow.mesh.visible) fernShadow.rebuild();
     if (heroTreeShadow.mesh.visible) heroTreeShadow.rebuild();
     if (distance < BUSH_LOAD_DISTANCE) ensureBushes();
     if (distance < TREE_LOAD_DISTANCE) ensureTrees();
@@ -428,6 +483,7 @@ export function createOasisVegetation({ field, sunDirection = null }) {
     fernGroup,
     heroGroup,
     regularTreeShadow: regularTreeShadow.mesh,
+    fernShadow: fernShadow.mesh,
     heroTreeShadow: heroTreeShadow.mesh,
     get bushesReady() { return bushesReady; },
     get treesReady() { return treesReady; },
