@@ -8,9 +8,6 @@ const GRIP_BUTTON = 1;
 const B_BUTTON = 5;
 const PICKUP_RADIUS = 0.58;
 const TORCH_BOTTOM_BELOW_GRIP = 0.151;
-const GROUND_GLOW_RADIUS = 6.5;
-const GROUND_GLOW_RINGS = 3;
-const GROUND_GLOW_SEGMENTS = 24;
 
 const loader = new GLTFLoader();
 const handPosition = new THREE.Vector3();
@@ -86,107 +83,65 @@ function createFlameEffect() {
   const light = new THREE.PointLight(0xffa04a, 0, 8.0, 2.0);
   light.name = 'Torch warm light';
   light.castShadow = false;
-  // Raise the light into the flame rather than lighting the shaft from inside the wrapped head.
   light.position.y = 0.16;
   group.add(light);
 
   return { group, material, light };
 }
 
-function createGroundGlow() {
-  const positions = [];
-  const intensity = [];
-  const indices = [];
-  const ringStarts = [0];
+function installTerrainTorchLight(material, positionUniform, strengthUniform) {
+  if (!material?.isShaderMaterial) return false;
+  if (material.userData.torchLightInstalled) return true;
 
-  positions.push(0, 0, 0);
-  intensity.push(1);
+  const uniformMarker = 'uniform float uGrassTileMetres;';
+  const lightMarker = 'vec3 light = ambient + vec3(1.23, 1.09, 0.86) * sun;';
+  if (!material.fragmentShader.includes(uniformMarker) || !material.fragmentShader.includes(lightMarker)) return false;
 
-  for (let ring = 1; ring <= GROUND_GLOW_RINGS; ring++) {
-    ringStarts[ring] = positions.length / 3;
-    const radiusFactor = ring / GROUND_GLOW_RINGS;
-    for (let i = 0; i < GROUND_GLOW_SEGMENTS; i++) {
-      const angle = i / GROUND_GLOW_SEGMENTS * Math.PI * 2;
-      positions.push(Math.cos(angle) * radiusFactor, 0, Math.sin(angle) * radiusFactor);
-      intensity.push(Math.pow(1 - radiusFactor, 1.45));
-    }
-  }
-
-  const firstRing = ringStarts[1];
-  for (let i = 0; i < GROUND_GLOW_SEGMENTS; i++) {
-    indices.push(0, firstRing + i, firstRing + (i + 1) % GROUND_GLOW_SEGMENTS);
-  }
-  for (let ring = 2; ring <= GROUND_GLOW_RINGS; ring++) {
-    const inner = ringStarts[ring - 1];
-    const outer = ringStarts[ring];
-    for (let i = 0; i < GROUND_GLOW_SEGMENTS; i++) {
-      const next = (i + 1) % GROUND_GLOW_SEGMENTS;
-      indices.push(inner + i, outer + i, inner + next);
-      indices.push(inner + next, outer + i, outer + next);
-    }
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('aIntensity', new THREE.Float32BufferAttribute(intensity, 1));
-  geometry.setIndex(indices);
-
-  const material = new THREE.ShaderMaterial({
-    name: 'Torch terrain glow',
-    transparent: true,
-    depthWrite: false,
-    depthTest: true,
-    blending: THREE.AdditiveBlending,
-    toneMapped: false,
-    uniforms: { uGlow: { value: 0 } },
-    vertexShader: /* glsl */`
-      attribute float aIntensity;
-      varying float vIntensity;
-      void main() {
-        vIntensity = aIntensity;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: /* glsl */`
-      uniform float uGlow;
-      varying float vIntensity;
-      void main() {
-        float alpha = vIntensity * uGlow;
-        if (alpha < 0.004) discard;
-        gl_FragColor = vec4(1.0, 0.38, 0.08, alpha);
-      }
-    `,
-  });
-
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.name = 'Torch terrain illumination';
-  mesh.frustumCulled = false;
-  mesh.renderOrder = 4;
-  mesh.visible = false;
-  return { mesh, geometry, material };
+  material.uniforms.uTorchPosition = positionUniform;
+  material.uniforms.uTorchStrength = strengthUniform;
+  material.fragmentShader = material.fragmentShader.replace(
+    uniformMarker,
+    `${uniformMarker}\n      uniform vec3 uTorchPosition;\n      uniform float uTorchStrength;`
+  );
+  material.fragmentShader = material.fragmentShader.replace(
+    lightMarker,
+    `${lightMarker}\n        if (uTorchStrength > 0.001) {\n          vec3 torchVector = uTorchPosition - vWorld;\n          float torchDistance = length(torchVector);\n          vec3 torchDirection = torchVector / max(torchDistance, 0.001);\n          float torchFade = 1.0 - smoothstep(0.8, 9.0, torchDistance);\n          torchFade *= 0.55 + 0.45 * torchFade;\n          float torchDiffuse = max(dot(n, torchDirection), 0.0);\n          float torchAmount = uTorchStrength * torchFade * (0.35 + 0.65 * torchDiffuse);\n          light += vec3(11.0, 4.6, 1.3) * torchAmount;\n        }`
+  );
+  material.userData.torchLightInstalled = true;
+  material.needsUpdate = true;
+  return true;
 }
 
-function updateGroundGlow(glow, center) {
-  const position = glow.geometry.attributes.position;
-  let vertex = 0;
-  position.setXYZ(vertex++, center.x, terrainHeight(center.x, center.z) + 0.045, center.z);
-  for (let ring = 1; ring <= GROUND_GLOW_RINGS; ring++) {
-    const radius = GROUND_GLOW_RADIUS * ring / GROUND_GLOW_RINGS;
-    for (let i = 0; i < GROUND_GLOW_SEGMENTS; i++) {
-      const angle = i / GROUND_GLOW_SEGMENTS * Math.PI * 2;
-      const x = center.x + Math.cos(angle) * radius;
-      const z = center.z + Math.sin(angle) * radius;
-      position.setXYZ(vertex++, x, terrainHeight(x, z) + 0.045, z);
-    }
-  }
-  position.needsUpdate = true;
+function installWaterTorchLight(material, positionUniform, strengthUniform) {
+  if (!material?.isShaderMaterial) return false;
+  if (material.userData.torchLightInstalled) return true;
+
+  const uniformMarker = 'uniform sampler2D uElevation;';
+  const colorMarker = 'color = air(color, -view, distance);';
+  if (!material.fragmentShader.includes(uniformMarker) || !material.fragmentShader.includes(colorMarker)) return false;
+
+  material.uniforms.uTorchPosition = positionUniform;
+  material.uniforms.uTorchStrength = strengthUniform;
+  material.fragmentShader = material.fragmentShader.replace(
+    uniformMarker,
+    `${uniformMarker}\n      uniform vec3 uTorchPosition;\n      uniform float uTorchStrength;`
+  );
+  material.fragmentShader = material.fragmentShader.replace(
+    colorMarker,
+    `if (uTorchStrength > 0.001) {\n          vec3 torchVector = uTorchPosition - vWorld;\n          float torchDistance = length(torchVector);\n          vec3 torchDirection = torchVector / max(torchDistance, 0.001);\n          float torchFade = 1.0 - smoothstep(0.8, 9.0, torchDistance);\n          torchFade *= 0.55 + 0.45 * torchFade;\n          float torchFacing = max(dot(normal, torchDirection), 0.0);\n          color += vec3(5.0, 2.0, 0.55) * uTorchStrength * torchFade * (0.35 + 0.65 * torchFacing);\n        }\n        ${colorMarker}`
+  );
+  material.userData.torchLightInstalled = true;
+  material.needsUpdate = true;
+  return true;
 }
 
 export function createHeldTorch({ scene, states, onError = console.warn }) {
   if (!scene || !Array.isArray(states)) throw new Error('Torch requires the Oasis scene and VR hand states.');
 
-  const groundGlow = createGroundGlow();
-  scene.add(groundGlow.mesh);
+  const terrainTorchPosition = { value: new THREE.Vector3(0, -1000, 0) };
+  const terrainTorchStrength = { value: 0 };
+  let terrainLightingReady = false;
+  let waterLightingReady = false;
 
   let root = null;
   let flameAnchor = null;
@@ -197,13 +152,37 @@ export function createHeldTorch({ scene, states, onError = console.warn }) {
   let lit = false;
   let elapsed = 0;
 
+  function ensureEnvironmentLighting() {
+    if (!terrainLightingReady) {
+      const terrainMesh = scene.getObjectByName('sand-0-0');
+      if (terrainMesh?.material) {
+        terrainLightingReady = installTerrainTorchLight(
+          terrainMesh.material,
+          terrainTorchPosition,
+          terrainTorchStrength
+        );
+        if (!terrainLightingReady) onError('[Oasis torch] Could not inject torch lighting into terrain shader.');
+      }
+    }
+    if (!waterLightingReady) {
+      const waterMesh = scene.getObjectByName('Shallow water');
+      if (waterMesh?.material) {
+        waterLightingReady = installWaterTorchLight(
+          waterMesh.material,
+          terrainTorchPosition,
+          terrainTorchStrength
+        );
+        if (!waterLightingReady) onError('[Oasis torch] Could not inject torch lighting into water shader.');
+      }
+    }
+  }
+
   function setLit(value) {
     lit = Boolean(value);
     if (flame) flame.group.visible = lit;
-    if (groundGlow.mesh) groundGlow.mesh.visible = lit;
     if (!lit) {
       if (flame) flame.light.intensity = 0;
-      groundGlow.material.uniforms.uGlow.value = 0;
+      terrainTorchStrength.value = 0;
     }
     return lit;
   }
@@ -222,7 +201,6 @@ export function createHeldTorch({ scene, states, onError = console.warn }) {
     state.objectGrip.add(root);
     root.position.set(0, 0, 0);
     // The authored +Y torch axis points opposite the Quest hand socket's held-up direction.
-    // Flip only while held; the world spawn remains authored upright.
     root.rotation.set(Math.PI, 0, 0);
     root.scale.set(1, 1, 1);
     heldBy = state;
@@ -262,6 +240,7 @@ export function createHeldTorch({ scene, states, onError = console.warn }) {
   });
 
   function update(dt) {
+    ensureEnvironmentLighting();
     elapsed += Number.isFinite(dt) ? dt : 0;
     const right = states.find((state) => state.handedness === RIGHT_HAND);
     const buttons = right?.inputSource?.gamepad?.buttons || [];
@@ -273,8 +252,6 @@ export function createHeldTorch({ scene, states, onError = console.warn }) {
       right.objectGrip.getWorldPosition(handPosition);
       root.updateWorldMatrix(true, false);
       root.getWorldPosition(torchPosition);
-      // Aim at the useful middle of the shaft rather than only the authored grip pivot,
-      // so the upright test spawn is easy to pick up without crouching to the sand.
       torchPosition.y += 0.22;
       if (handPosition.distanceTo(torchPosition) <= PICKUP_RADIUS) grab(right);
     }
@@ -294,11 +271,11 @@ export function createHeldTorch({ scene, states, onError = console.warn }) {
       + Math.sin(elapsed * 13.1) * 0.055
       + Math.sin(elapsed * 21.7 + 0.8) * 0.035
       + Math.sin(elapsed * 7.3 + 2.1) * 0.025;
-    flame.material.uniforms.uStrength.value = THREE.MathUtils.clamp(flicker, 0.78, 1.08);
-    // The terrain shader gets its own cheap glow; this light only needs to illuminate nearby PBR props/hands.
+    const strength = THREE.MathUtils.clamp(flicker, 0.80, 1.08);
+    flame.material.uniforms.uStrength.value = strength;
     flame.light.intensity = 18 * THREE.MathUtils.clamp(flicker, 0.82, 1.08);
-    groundGlow.material.uniforms.uGlow.value = 0.17 * THREE.MathUtils.clamp(flicker, 0.80, 1.05);
-    updateGroundGlow(groundGlow, flamePosition);
+    terrainTorchPosition.value.copy(flamePosition);
+    terrainTorchStrength.value = strength;
   }
 
   return {
