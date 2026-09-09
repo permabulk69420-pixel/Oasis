@@ -17,9 +17,13 @@ function configureTexture(texture, renderer, color = false) {
 }
 
 function replaceUniformTexture(uniforms, textureUniform, flagUniform, texture) {
-  uniforms[textureUniform].value.dispose();
-  uniforms[textureUniform].value = texture;
-  uniforms[flagUniform].value = 1;
+  if (!uniforms[textureUniform]) uniforms[textureUniform] = { value: texture };
+  else {
+    uniforms[textureUniform].value?.dispose?.();
+    uniforms[textureUniform].value = texture;
+  }
+  if (!uniforms[flagUniform]) uniforms[flagUniform] = { value: 1 };
+  else uniforms[flagUniform].value = 1;
 }
 
 export function attachGrassTexture(renderer, uniforms) {
