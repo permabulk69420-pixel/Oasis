@@ -189,7 +189,11 @@ export function createMaterials(renderer, field) {
       uWater: { value: new THREE.Vector3(WATER.x, WATER.y, WATER.z) },
       uWaterRadii: { value: new THREE.Vector2(WATER.radiusX, WATER.radiusZ) },
       uGrassBase: { value: solidTexture(255, 255, 255) },
+      uGrassNormal: { value: solidTexture(128, 128, 255) },
+      uGrassRoughness: { value: solidTexture(255, 255, 255) },
       uHasGrassBase: { value: 0 },
+      uHasGrassNormal: { value: 0 },
+      uHasGrassRoughness: { value: 0 },
       uGrassTileMetres: { value: GRASS_TILE_METRES },
       uPbrBase: { value: solidTexture(255, 255, 255) },
       uPbrNormal: { value: solidTexture(128, 128, 255) },
@@ -224,7 +228,11 @@ export function createMaterials(renderer, field) {
       uniform vec3 uWater;
       uniform vec2 uWaterRadii;
       uniform sampler2D uGrassBase;
+      uniform sampler2D uGrassNormal;
+      uniform sampler2D uGrassRoughness;
       uniform float uHasGrassBase;
+      uniform float uHasGrassNormal;
+      uniform float uHasGrassRoughness;
       uniform float uGrassTileMetres;
       varying vec3 vWorld;
       varying vec3 vNormal;
@@ -236,10 +244,11 @@ export function createMaterials(renderer, field) {
         vec3 view = toEye / max(distance, 0.001);
         vec2 rotatedXZ = vec2(dot(vWorld.xz, vec2(0.84, 0.54)), dot(vWorld.xz, vec2(-0.54, 0.84)));
         vec2 pbrUv = rotatedXZ / 2.5;
+        vec2 grassUv = vWorld.xz / uGrassTileMetres;
         vec3 baseNormal = normalize(vNormal);
         float grass = clamp(vData.b, 0.0, 1.0);
 
-        // World-projected tangent basis keeps the texture aligned across all terrain LODs.
+        // World-projected tangent basis keeps the sand texture aligned across all terrain LODs.
         vec3 tangentSeed = vec3(0.84, 0.0, 0.54);
         vec3 tangent = normalize(tangentSeed - baseNormal * dot(tangentSeed, baseNormal));
         vec3 bitangent = normalize(cross(tangent, baseNormal));
@@ -258,7 +267,21 @@ export function createMaterials(renderer, field) {
         vec3 mapNormal = texture2D(uPbrNormal, pbrUv).xyz * 2.0 - 1.0;
         vec3 mappedNormal = normalize(tangent * mapNormal.x + bitangent * mapNormal.y + baseNormal * max(mapNormal.z, 0.05));
         float normalFade = 1.0 - smoothstep(20.0, 70.0, distance);
-        vec3 n = normalize(mix(baseNormal, mappedNormal, uHasPbrNormal * normalFade * (1.0 - grass)));
+        vec3 sandNormal = normalize(mix(baseNormal, mappedNormal, uHasPbrNormal * normalFade * (1.0 - grass)));
+        vec3 grassNormal = baseNormal;
+        if (grass > 0.001 && uHasGrassNormal > 0.5 && normalFade > 0.001) {
+          vec3 grassTangentSeed = vec3(1.0, 0.0, 0.0);
+          vec3 grassTangent = normalize(grassTangentSeed - baseNormal * dot(grassTangentSeed, baseNormal));
+          vec3 grassBitangent = normalize(cross(grassTangent, baseNormal));
+          vec3 grassMapNormal = texture2D(uGrassNormal, grassUv).xyz * 2.0 - 1.0;
+          vec3 grassMappedNormal = normalize(
+            grassTangent * grassMapNormal.x
+            + grassBitangent * grassMapNormal.y
+            + baseNormal * max(grassMapNormal.z, 0.05)
+          );
+          grassNormal = normalize(mix(baseNormal, grassMappedNormal, normalFade));
+        }
+        vec3 n = normalize(mix(sandNormal, grassNormal, grass));
 
         float environmentDay = daylightLevel();
         float cloudLight = cloudShadow(vWorld);
@@ -268,13 +291,15 @@ export function createMaterials(renderer, field) {
         vec3 base = mix(proceduralBase, textureBase, uHasPbrBase);
         if (grass > 0.001) {
           vec3 grassBase = mix(vec3(0.10, 0.15, 0.028), vec3(0.19, 0.25, 0.065), vData.g);
-          if (uHasGrassBase > 0.5) grassBase = texture2D(uGrassBase, vWorld.xz / uGrassTileMetres).rgb;
+          if (uHasGrassBase > 0.5) grassBase = texture2D(uGrassBase, grassUv).rgb;
           base = mix(base, grassBase, grass);
         }
 
         float roughnessMap = texture2D(uPbrRoughness, pbrUv).r;
         float roughness = mix(0.88, roughnessMap, uHasPbrRoughness);
-        roughness = mix(roughness, 0.95, grass);
+        float grassRoughness = 0.95;
+        if (grass > 0.001 && uHasGrassRoughness > 0.5) grassRoughness = texture2D(uGrassRoughness, grassUv).r;
+        roughness = mix(roughness, grassRoughness, grass);
         float poolDistance = length((vWorld.xz - uWater.xz) / uWaterRadii);
         float wet = (1.0 - smoothstep(uWater.y + 0.05, uWater.y + 0.60, vWorld.y)) * (1.0 - smoothstep(1.1, 1.6, poolDistance));
         base = mix(base, base * vec3(0.49, 0.48, 0.43), wet * 0.80);
