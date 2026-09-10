@@ -1,11 +1,10 @@
 import * as THREE from 'three';
 import { WATER, grassCover, noise } from './world.js';
 
-// Short semi-realistic oasis grass for standalone Quest.
-// The mobile proof looked continuous because tall bouquet tufts overlapped from eye height. At
-// ~20 cm, a bouquet inevitably reads as a little clump, so one instance now represents a broad
-// patch of short grass: blades are distributed across roughly a one-metre footprint instead of
-// sharing one root. This increases visual ground coverage without multiplying instance count.
+// Semi-realistic oasis grass for standalone Quest.
+// This build is an isolated height test: patch footprint, density, LOD, draw calls and placement
+// are unchanged from the previous build, while blade height is doubled so the visual difference
+// is easy to judge in headset.
 const MAX_PATCHES = 9000;
 const GENERATION_ATTEMPTS = 56000;
 const SECTOR_COUNT = 12;
@@ -34,8 +33,8 @@ function fract(value) {
 }
 
 // One instance is a grass PATCH rather than a bouquet tuft. Roots are spread over the patch and
-// each blade has a small independent outward lean. The rich patch is ~0.9-1.05 m wide but only
-// ~17-27 cm tall, which is much closer to short meadow grass while still filling visual space.
+// each blade has a small independent outward lean. The rich patch remains ~0.9-1.05 m wide, while
+// this test doubles blade height from ~17-27 cm to roughly ~34-54 cm.
 function createPatchGeometry(bladeCount, segments, rich) {
   const positions = [];
   const indices = [];
@@ -52,7 +51,7 @@ function createPatchGeometry(bladeCount, segments, rich) {
     const leanAngle = angle + ((blade % 5) - 2) * 0.31;
     const dirX = Math.cos(leanAngle);
     const dirZ = Math.sin(leanAngle);
-    const height = (rich ? 0.18 : 0.17) + ((blade * 37) % 7) / 7 * (rich ? 0.085 : 0.065);
+    const height = (rich ? 0.36 : 0.34) + ((blade * 37) % 7) / 7 * (rich ? 0.17 : 0.13);
     const lean = (rich ? 0.055 : 0.045) + ((blade * 19) % 5) / 5 * (rich ? 0.085 : 0.060);
     const width = (rich ? 0.018 : 0.021) + ((blade * 13) % 3) * 0.003;
 
