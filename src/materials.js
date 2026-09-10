@@ -191,9 +191,11 @@ export function createMaterials(renderer, field) {
       uGrassBase: { value: solidTexture(255, 255, 255) },
       uGrassNormal: { value: solidTexture(128, 128, 255) },
       uGrassRoughness: { value: solidTexture(255, 255, 255) },
+      uGrassHeight: { value: solidTexture(128, 128, 128) },
       uHasGrassBase: { value: 0 },
       uHasGrassNormal: { value: 0 },
       uHasGrassRoughness: { value: 0 },
+      uHasGrassHeight: { value: 0 },
       uGrassTileMetres: { value: GRASS_TILE_METRES },
       uPbrBase: { value: solidTexture(255, 255, 255) },
       uPbrNormal: { value: solidTexture(128, 128, 255) },
@@ -230,9 +232,11 @@ export function createMaterials(renderer, field) {
       uniform sampler2D uGrassBase;
       uniform sampler2D uGrassNormal;
       uniform sampler2D uGrassRoughness;
+      uniform sampler2D uGrassHeight;
       uniform float uHasGrassBase;
       uniform float uHasGrassNormal;
       uniform float uHasGrassRoughness;
+      uniform float uHasGrassHeight;
       uniform float uGrassTileMetres;
       varying vec3 vWorld;
       varying vec3 vNormal;
@@ -264,15 +268,29 @@ export function createMaterials(renderer, field) {
           pbrUv -= (viewTangent.xy / grazing) * height * 0.022 * heightFade;
         }
 
+        // Cheap one-sample grass parallax. It only runs on the grass shelf and is strongest close
+        // to the player, fading to zero by 22 m to limit stereo shimmer and texture cost on Quest.
+        vec3 grassTangentSeed = vec3(1.0, 0.0, 0.0);
+        vec3 grassTangent = normalize(grassTangentSeed - baseNormal * dot(grassTangentSeed, baseNormal));
+        vec3 grassBitangent = normalize(cross(grassTangent, baseNormal));
+        float grassHeightFade = (1.0 - smoothstep(5.0, 22.0, distance)) * grass;
+        if (uHasGrassHeight > 0.5 && grassHeightFade > 0.001) {
+          float grassHeight = texture2D(uGrassHeight, grassUv).r - 0.5;
+          vec3 grassViewTangent = vec3(
+            dot(view, grassTangent),
+            dot(view, grassBitangent),
+            dot(view, baseNormal)
+          );
+          float grassGrazing = max(abs(grassViewTangent.z), 0.38);
+          grassUv -= (grassViewTangent.xy / grassGrazing) * grassHeight * 0.035 * grassHeightFade;
+        }
+
         vec3 mapNormal = texture2D(uPbrNormal, pbrUv).xyz * 2.0 - 1.0;
         vec3 mappedNormal = normalize(tangent * mapNormal.x + bitangent * mapNormal.y + baseNormal * max(mapNormal.z, 0.05));
         float normalFade = 1.0 - smoothstep(20.0, 70.0, distance);
         vec3 sandNormal = normalize(mix(baseNormal, mappedNormal, uHasPbrNormal * normalFade * (1.0 - grass)));
         vec3 grassNormal = baseNormal;
         if (grass > 0.001 && uHasGrassNormal > 0.5 && normalFade > 0.001) {
-          vec3 grassTangentSeed = vec3(1.0, 0.0, 0.0);
-          vec3 grassTangent = normalize(grassTangentSeed - baseNormal * dot(grassTangentSeed, baseNormal));
-          vec3 grassBitangent = normalize(cross(grassTangent, baseNormal));
           vec3 grassMapNormal = texture2D(uGrassNormal, grassUv).xyz * 2.0 - 1.0;
           vec3 grassMappedNormal = normalize(
             grassTangent * grassMapNormal.x
