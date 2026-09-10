@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { HALF_WORLD, GRID_STEP, WATER, SPAWN, clamp, noise, terrainHeight, grassCover } from './world.js';
 import { createPickupRocks } from './rocks.js';
 import { createOasisVegetation } from './oasis-vegetation.js';
+import { createOasisGrassRing } from './oasis-grass-ring.js';
 import { createWaterReeds } from './water-reeds.js';
 
 const CHUNK_SIZE = 62.5;
@@ -93,7 +94,12 @@ export function createTerrain(field, material) {
   const pickupRocks = createPickupRocks({ field });
   group.add(pickupRocks.mesh);
 
-  // Ground vegetation remains a terrain texture; oasis plants are lazy-loaded nearby.
+  // The PBR grass texture carries the ground cover; short fanned geometry gives the shelf real
+  // close-range volume without turning every blade into an object or transparent billboard.
+  const grassRing = createOasisGrassRing({ field });
+  group.add(grassRing.group);
+
+  // Larger oasis plants are lazy-loaded nearby.
   // Reuse the terrain shader's live sun vector so cheap projected tree shadows follow the day cycle.
   const vegetation = createOasisVegetation({ field, sunDirection: material.uniforms?.uSun?.value });
   group.add(vegetation.group);
@@ -116,10 +122,11 @@ export function createTerrain(field, material) {
       if (level !== chunk.level) { chunk.mesh.geometry = chunk.geometries[level]; chunk.level = level; }
     }
     pickupRocks.update(x, z);
+    grassRing.update(x, z);
     vegetation.update(x, z);
     waterReeds.update(x, z);
   }
   // Initialise LOD and nearby assets around the real player start, not the old world origin.
   update(SPAWN.x, SPAWN.z);
-  return { group, update, chunks, pickupRocks, vegetation, waterReeds };
+  return { group, update, chunks, pickupRocks, grassRing, vegetation, waterReeds };
 }
