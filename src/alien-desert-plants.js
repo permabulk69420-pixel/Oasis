@@ -8,10 +8,10 @@ const LOD_DISTANCE = 30;
 const CULL_DISTANCE = 145;
 
 const LAYOUT = [
-  { angle: 0.60, radius: 1.50, yaw: 0.35, scale: 0.96 },
-  { angle: 2.05, radius: 1.67, yaw: 2.20, scale: 1.08 },
-  { angle: 3.72, radius: 1.54, yaw: 4.40, scale: 0.91 },
-  { angle: 5.18, radius: 1.73, yaw: 5.55, scale: 1.03 },
+  { angle: 0.60, radius: 1.50, yaw: 0.35, scale: 3.0 },
+  { angle: 2.05, radius: 1.67, yaw: 2.20, scale: 3.0 },
+  { angle: 3.72, radius: 1.54, yaw: 4.40, scale: 3.0 },
+  { angle: 5.18, radius: 1.73, yaw: 5.55, scale: 3.0 },
 ];
 
 function prepareSource(source) {
