@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-const ROCK_TEXTURE = `${import.meta.env.BASE_URL}textures/rocks/pickup-rock/rock1.png`;
+const ROCK_TEXTURE = `${import.meta.env.BASE_URL}textures/rocks/pickup-rock/pickup_rock_albedo.png`;
 const TOTAL_ROCKS = 128;
 const DRAW_DISTANCE = 150;
 
@@ -112,7 +112,7 @@ export function createPickupRocks({ field, renderer = null }) {
     roughness: 0.92,
     metalness: 0,
   });
-  material.name = 'Pickup rock — rock1';
+  material.name = 'Pickup rock';
 
   new THREE.TextureLoader().load(
     ROCK_TEXTURE,
@@ -125,7 +125,7 @@ export function createPickupRocks({ field, renderer = null }) {
       material.needsUpdate = true;
     },
     undefined,
-    () => console.warn('[Oasis rocks] rock1.png could not be loaded; using the fallback rock colour.'),
+    () => console.warn('[Oasis rocks] Pickup rock texture could not be loaded; using the fallback rock colour.'),
   );
 
   const placements = makePlacements(field);

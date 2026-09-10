@@ -2,10 +2,10 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WATER } from './world.js';
 
-const HIGH_URL = `${import.meta.env.BASE_URL}models/alien_desert_plant/alien_desert_plant_UV%20(1).glb`;
-const LOW_URL = `${import.meta.env.BASE_URL}models/alien_desert_plant/alien_desert_plant_LOD1_UV.glb`;
-const STEM_TEXTURE_URL = `${import.meta.env.BASE_URL}textures/alien_desert_plant/file_00000000e34c820b8925b0f36c360128.png`;
-const LEAF_TEXTURE_URL = `${import.meta.env.BASE_URL}textures/alien_desert_plant/file_00000000f17481f5a78d3c87a548f140.png`;
+const HIGH_URL = `${import.meta.env.BASE_URL}models/alien_desert_plant/alien_desert_plant_lod0.glb`;
+const LOW_URL = `${import.meta.env.BASE_URL}models/alien_desert_plant/alien_desert_plant_lod1.glb`;
+const STEM_TEXTURE_URL = `${import.meta.env.BASE_URL}textures/alien_desert_plant/alien_desert_plant_stem_albedo.png`;
+const LEAF_TEXTURE_URL = `${import.meta.env.BASE_URL}textures/alien_desert_plant/alien_desert_plant_leaf_albedo.png`;
 const STEM_MATERIAL_NAME = 'Mature olive stems';
 const LEAF_MATERIAL_NAME = 'Green to rust leaf tissue';
 const LOD_DISTANCE = 30;
