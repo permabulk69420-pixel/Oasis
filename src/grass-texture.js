@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 
-// Leafy oasis ground PBR. The vertical grass tufts are generated separately.
+// Oasis ground PBR. The vertical grass geometry is generated separately.
 export const GRASS_TEXTURES = {
-  base: 'leafy_grass_diff_1k.jpg',
-  normal: 'leafy_grass_nor_gl_1k.png',
-  roughness: 'leafy_grass_rough_1k.png',
+  base: 'stylized-grass1_albedo.png',
+  normal: 'stylized-grass1_normal-ogl.png',
+  roughness: 'stylized-grass1_roughness.png',
 };
 export const GRASS_TILE_METRES = 3.2;
 
