@@ -2,15 +2,18 @@ import * as THREE from 'three';
 import { WATER, grassCover, noise } from './world.js';
 
 // Semi-realistic oasis grass for standalone Quest.
-// This build is an isolated height test: patch footprint, density, LOD, draw calls and placement
-// are unchanged from the previous build, while blade height is doubled so the visual difference
-// is easy to judge in headset.
+// Base coverage stays unchanged across the oasis. A second copy of nearby patches is inserted into
+// the same rich InstancedMesh around the player, giving ~2x local density without doubling the
+// entire field or adding another draw call. Extra density is deterministically dithered away from
+// 14-32 m so there is no hard circular edge.
 const MAX_PATCHES = 9000;
 const GENERATION_ATTEMPTS = 56000;
 const SECTOR_COUNT = 12;
 const NEAR_SECTOR_DISTANCE = 74;
 const MAX_DRAW_DISTANCE = 190;
 const MOVE_REBUILD_DISTANCE = 2.25;
+const LOCAL_DENSITY_FULL_DISTANCE = 14;
+const LOCAL_DENSITY_END_DISTANCE = 32;
 
 const RICH_BLADES = 12;
 const LITE_BLADES = 6;
@@ -32,9 +35,13 @@ function fract(value) {
   return value - Math.floor(value);
 }
 
-// One instance is a grass PATCH rather than a bouquet tuft. Roots are spread over the patch and
-// each blade has a small independent outward lean. The rich patch remains ~0.9-1.05 m wide, while
-// this test doubles blade height from ~17-27 cm to roughly ~34-54 cm.
+function smoothstep(a, b, value) {
+  const t = THREE.MathUtils.clamp((value - a) / (b - a), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+// One instance is a broad grass patch rather than a bouquet tuft. Roots are spread over roughly
+// one metre and the current blade-height test remains in place at about 34-54 cm.
 function createPatchGeometry(bladeCount, segments, rich) {
   const positions = [];
   const indices = [];
@@ -100,8 +107,6 @@ function buildPatchLayout(field) {
     const cover = grassCover(x, z);
     if (cover <= 0.055) continue;
 
-    // Preserve some broad natural variation, but do not punch conspicuous empty holes into a
-    // short-grass field. The PBR grass ground texture carries the fine-scale gaps underneath.
     const patchNoise = noise(x * 0.105 + 37, z * 0.105 - 19);
     if (patchNoise < 0.11 && random() > 0.45) continue;
     if (random() > Math.min(1, 0.54 + cover * 0.68)) continue;
@@ -120,6 +125,11 @@ function buildPatchLayout(field) {
       tiltZ: (random() - 0.5) * 0.075,
       tint: random(),
       sector,
+      extraHash: random(),
+      extraAngle: random() * Math.PI * 2,
+      extraOffset: 0.28 + random() * 0.24,
+      extraYaw: (random() - 0.5) * 1.5,
+      extraScale: 0.88 + random() * 0.18,
     });
   }
   return patches;
@@ -138,22 +148,21 @@ function createMesh(geometry, material, capacity, name) {
 
 export function createOasisGrassRing({ field }) {
   const group = new THREE.Group();
-  group.name = 'Oasis short grass field';
+  group.name = 'Oasis grass field';
 
   const material = new THREE.MeshLambertMaterial({
     color: 0xffffff,
     side: THREE.DoubleSide,
   });
-  material.name = 'Short oasis grass';
+  material.name = 'Oasis grass';
 
   const richGeometry = createPatchGeometry(RICH_BLADES, 2, true);
   const liteGeometry = createPatchGeometry(LITE_BLADES, 1, false);
   const patches = buildPatchLayout(field);
 
-  // Only two draw calls. Patches from near-facing sectors are rebuilt into the rich batch and the
-  // rest into the lite batch, mirroring the successful mobile demo's sector-level LOD behaviour
-  // without creating a separate mesh for every sector.
-  const rich = createMesh(richGeometry, material, patches.length, 'Grass patches — rich sectors');
+  // Rich capacity is doubled because every base patch can theoretically gain one nearby companion.
+  // It is still one InstancedMesh / one draw call regardless of how many companions are active.
+  const rich = createMesh(richGeometry, material, patches.length * 2, 'Grass patches — rich/local');
   const lite = createMesh(liteGeometry, material, patches.length, 'Grass patches — lite sectors');
   group.add(rich, lite);
 
@@ -174,21 +183,27 @@ export function createOasisGrassRing({ field }) {
   const tint = new THREE.Color();
   let lastX = Infinity;
   let lastZ = Infinity;
-  let stats = { rich: 0, lite: 0, triangles: 0 };
+  let stats = { rich: 0, lite: 0, extra: 0, triangles: 0 };
 
-  function writeInstance(mesh, index, patch, lodScale) {
-    position.set(patch.x, patch.y, patch.z);
-    rotation.set(patch.tiltX, patch.yaw, patch.tiltZ);
+  function writeInstance(mesh, index, patch, lodScale, overrides = null) {
+    const x = overrides?.x ?? patch.x;
+    const z = overrides?.z ?? patch.z;
+    const y = overrides?.y ?? patch.y;
+    const yawOffset = overrides?.yawOffset ?? 0;
+    const instanceScale = overrides?.scale ?? 1;
+
+    position.set(x, y, z);
+    rotation.set(patch.tiltX, patch.yaw + yawOffset, patch.tiltZ);
     quaternion.setFromEuler(rotation);
     scale.set(
-      patch.scaleX * lodScale,
-      patch.scaleY,
-      patch.scaleZ * lodScale,
+      patch.scaleX * lodScale * instanceScale,
+      patch.scaleY * instanceScale,
+      patch.scaleZ * lodScale * instanceScale,
     );
     matrix.compose(position, quaternion, scale);
     mesh.setMatrixAt(index, matrix);
 
-    const c = patch.tint;
+    const c = THREE.MathUtils.clamp(patch.tint + (overrides?.tintOffset ?? 0), 0, 1);
     tint.setRGB(0.14 + c * 0.11, 0.31 + c * 0.20, 0.045 + c * 0.055);
     mesh.setColorAt(index, tint);
   }
@@ -206,20 +221,50 @@ export function createOasisGrassRing({ field }) {
 
     let richCount = 0;
     let liteCount = 0;
+    let extraCount = 0;
     const maxDrawSq = MAX_DRAW_DISTANCE * MAX_DRAW_DISTANCE;
+    const localEndSq = LOCAL_DENSITY_END_DISTANCE * LOCAL_DENSITY_END_DISTANCE;
 
     for (const patch of patches) {
       const dx = patch.x - playerX;
       const dz = patch.z - playerZ;
-      if (dx * dx + dz * dz > maxDrawSq) continue;
+      const distanceSq = dx * dx + dz * dz;
+      if (distanceSq > maxDrawSq) continue;
 
-      if (sectorRich[patch.sector]) {
+      const local = distanceSq < localEndSq;
+      if (local || sectorRich[patch.sector]) {
         writeInstance(rich, richCount++, patch, 1.0);
       } else {
-        // Unlike the previous per-tuft LOD, do not randomly delete most of the distant field.
-        // Geometry gets cheaper, but ground coverage remains continuous.
         writeInstance(lite, liteCount++, patch, 0.98);
       }
+
+      // Full second layer inside 14 m, then smoothly/deterministically thin it to zero at 32 m.
+      // Dithering the *population* rather than alpha-fading avoids mobile transparency/overdraw.
+      if (!local) continue;
+      const distance = Math.sqrt(distanceSq);
+      const extraChance = 1 - smoothstep(
+        LOCAL_DENSITY_FULL_DISTANCE,
+        LOCAL_DENSITY_END_DISTANCE,
+        distance,
+      );
+      if (patch.extraHash > extraChance) continue;
+
+      let extraX = patch.x + Math.cos(patch.extraAngle) * patch.extraOffset;
+      let extraZ = patch.z + Math.sin(patch.extraAngle) * patch.extraOffset;
+      if (grassCover(extraX, extraZ) <= 0.04) {
+        extraX = patch.x - Math.cos(patch.extraAngle) * patch.extraOffset;
+        extraZ = patch.z - Math.sin(patch.extraAngle) * patch.extraOffset;
+      }
+      if (grassCover(extraX, extraZ) <= 0.04) continue;
+
+      writeInstance(rich, richCount++, patch, 1.0, {
+        x: extraX,
+        y: field.sample(extraX, extraZ) + 0.010,
+        yawOffset: patch.extraYaw,
+        scale: patch.extraScale,
+        tintOffset: (patch.extraHash - 0.5) * 0.10,
+      });
+      extraCount++;
     }
 
     rich.count = richCount;
@@ -232,6 +277,7 @@ export function createOasisGrassRing({ field }) {
     stats = {
       rich: richCount,
       lite: liteCount,
+      extra: extraCount,
       triangles: richCount * RICH_TRIANGLES + liteCount * LITE_TRIANGLES,
     };
   }
