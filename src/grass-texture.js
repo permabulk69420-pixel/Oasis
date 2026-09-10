@@ -5,6 +5,7 @@ export const GRASS_TEXTURES = {
   base: 'stylized-grass1_albedo.png',
   normal: 'stylized-grass1_normal-ogl.png',
   roughness: 'stylized-grass1_roughness.png',
+  height: 'stylized-grass1_height.png',
 };
 export const GRASS_TILE_METRES = 3.2;
 
@@ -64,5 +65,17 @@ export function attachGrassTexture(renderer, uniforms) {
     ),
     undefined,
     () => console.warn('[Oasis grass] Roughness texture unavailable; keeping the grass roughness fallback.'),
+  );
+
+  loader.load(
+    `${basePath}${GRASS_TEXTURES.height}`,
+    texture => replaceUniformTexture(
+      uniforms,
+      'uGrassHeight',
+      'uHasGrassHeight',
+      configureTexture(texture, renderer),
+    ),
+    undefined,
+    () => console.warn('[Oasis grass] Height texture unavailable; keeping flat grass UVs.'),
   );
 }
