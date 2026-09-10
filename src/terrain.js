@@ -6,6 +6,7 @@ import { createOasisGrassRing } from './oasis-grass-ring.js';
 import { createWaterReeds } from './water-reeds.js';
 import { createAlienDesertPlants } from './alien-desert-plants.js';
 import { addFernReplacementTrees } from './fern-replacement-trees.js';
+import { createGreenFerns } from './green-ferns.js';
 
 const CHUNK_SIZE = 62.5;
 const LEVELS = [32, 16, 8, 4];
@@ -119,6 +120,11 @@ export function createTerrain(field, material) {
   const alienPlants = createAlienDesertPlants({ field });
   group.add(alienPlants.group);
 
+  // Ten green ferns around the oasis shelf, all at authored scale. The supplied lower LOD takes
+  // over after 22 m.
+  const greenFerns = createGreenFerns({ field });
+  group.add(greenFerns.group);
+
   function update(x, z) {
     for (const chunk of chunks) {
       const distance = Math.hypot(x - chunk.x, z - chunk.z);
@@ -136,8 +142,9 @@ export function createTerrain(field, material) {
     vegetation.update(x, z);
     waterReeds.update(x, z);
     alienPlants.update(x, z);
+    greenFerns.update(x, z);
   }
   // Initialise LOD and nearby assets around the real player start, not the old world origin.
   update(SPAWN.x, SPAWN.z);
-  return { group, update, chunks, pickupRocks, grassRing, vegetation, waterReeds, alienPlants };
+  return { group, update, chunks, pickupRocks, grassRing, vegetation, waterReeds, alienPlants, greenFerns };
 }
