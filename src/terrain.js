@@ -4,6 +4,7 @@ import { createPickupRocks } from './rocks.js';
 import { createOasisVegetation } from './oasis-vegetation.js';
 import { createOasisGrassRing } from './oasis-grass-ring.js';
 import { createWaterReeds } from './water-reeds.js';
+import { createAlienDesertPlants } from './alien-desert-plants.js';
 
 const CHUNK_SIZE = 62.5;
 const LEVELS = [32, 16, 8, 4];
@@ -109,6 +110,11 @@ export function createTerrain(field, material) {
   const waterReeds = createWaterReeds({ field });
   group.add(waterReeds.group);
 
+  // Four sparse alien plants around the oasis shelf. Their authored high model is used inside
+  // 30 m, then swapped to the supplied lower LOD; very distant plants are culled entirely.
+  const alienPlants = createAlienDesertPlants({ field });
+  group.add(alienPlants.group);
+
   function update(x, z) {
     for (const chunk of chunks) {
       const distance = Math.hypot(x - chunk.x, z - chunk.z);
@@ -125,8 +131,9 @@ export function createTerrain(field, material) {
     grassRing.update(x, z);
     vegetation.update(x, z);
     waterReeds.update(x, z);
+    alienPlants.update(x, z);
   }
   // Initialise LOD and nearby assets around the real player start, not the old world origin.
   update(SPAWN.x, SPAWN.z);
-  return { group, update, chunks, pickupRocks, grassRing, vegetation, waterReeds };
+  return { group, update, chunks, pickupRocks, grassRing, vegetation, waterReeds, alienPlants };
 }
