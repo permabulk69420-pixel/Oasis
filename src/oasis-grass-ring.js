@@ -1,18 +1,19 @@
 import * as THREE from 'three';
 import { WATER, grassCover, noise } from './world.js';
 
-// Short, semi-realistic oasis grass for standalone Quest.
-// One rich tuft occupies more visual space than a single blade, so the ring can stay dense-looking
-// without brute-forcing tens of thousands of separate instances.
-const MAX_TUFTS = 7600;
-const GENERATION_ATTEMPTS = 52000;
-const BASE_HEIGHT = 0.20; // metres
-const NEAR_DISTANCE = 24;
-const MID_DISTANCE = 58;
-const FAR_DISTANCE = 135;
+// Short semi-realistic oasis grass for standalone Quest.
+// Important: height and footprint are intentionally decoupled. The mobile prototype looked full
+// because each short-ish cluster occupied a broad patch of ground. Uniformly shrinking the whole
+// tuft to 20 cm made the first Oasis pass look like sparse pins, so these blades stay ~15–25 cm tall
+// while fanning/leaning across a much wider ~35–55 cm footprint.
+const MAX_TUFTS = 18000;
+const GENERATION_ATTEMPTS = 85000;
+const NEAR_DISTANCE = 28;
+const MID_DISTANCE = 68;
+const FAR_DISTANCE = 150;
 const MOVE_REBUILD_DISTANCE = 1.75;
 
-const FULL_BLADES = 9;
+const FULL_BLADES = 10;
 const MID_BLADES = 5;
 const FAR_BLADES = 3;
 
@@ -27,59 +28,50 @@ function seededRandom(seed = 0x8a51f2d3) {
   };
 }
 
-function createTuftGeometry(bladeCount, spread = 1) {
+// This deliberately mirrors the mobile proof-of-concept geometry: curved two-segment ribbons
+// radiating from a small base, with substantial sideways lean. Geometry is authored around 1 m
+// vertically and then instances use a small Y scale but a much larger X/Z scale.
+function createTuftGeometry(bladeCount, segments, rich) {
   const positions = [];
-  const colors = [];
   const indices = [];
+  let vertexIndex = 0;
 
-  // Geometry is authored at one metre and uniformly scaled per instance to ~20 cm.
-  // Each blade is a tapered three-triangle ribbon with a real sideways lean.
   for (let blade = 0; blade < bladeCount; blade++) {
-    const angle = (blade / bladeCount) * Math.PI * 2 + Math.sin(blade * 4.71) * 0.19;
-    const sideX = Math.cos(angle);
-    const sideZ = Math.sin(angle);
-    const tangentX = -sideZ;
-    const tangentZ = sideX;
-    const radial = (0.045 + (blade % 3) * 0.018) * spread;
-    const lean = (0.22 + (blade % 4) * 0.045) * spread;
-    const width = 0.072 + (blade % 2) * 0.012;
-    const height = 0.88 + (blade % 5) * 0.035;
+    const angle = (blade / bladeCount) * Math.PI * 2 + ((blade % 3) - 1) * 0.12;
+    const dirX = Math.cos(angle);
+    const dirZ = Math.sin(angle);
+    const baseRadius = 0.035 + (blade % 4) * 0.026;
+    const rootX = dirX * baseRadius;
+    const rootZ = dirZ * baseRadius;
+    const height = (rich ? 0.72 : 0.66) + ((blade * 37) % 7) / 7 * (rich ? 0.28 : 0.20);
+    const lean = (rich ? 0.18 : 0.14) + ((blade * 19) % 5) / 5 * (rich ? 0.20 : 0.12);
+    const width = (rich ? 0.027 : 0.030) + ((blade * 13) % 3) * 0.004;
 
-    const rootX = sideX * radial;
-    const rootZ = sideZ * radial;
-    const midX = rootX + sideX * lean * 0.34;
-    const midZ = rootZ + sideZ * lean * 0.34;
-    const tipX = rootX + sideX * lean;
-    const tipZ = rootZ + sideZ * lean;
-    const base = positions.length / 3;
+    for (let segment = 0; segment <= segments; segment++) {
+      const t = segment / segments;
+      const curve = t * t;
+      const y = height * t;
+      const centerX = rootX + dirX * lean * curve;
+      const centerZ = rootZ + dirZ * lean * curve;
+      const taper = 1 - t * 0.86;
+      const widthX = -dirZ * width * taper;
+      const widthZ = dirX * width * taper;
+      positions.push(
+        centerX - widthX, y, centerZ - widthZ,
+        centerX + widthX, y, centerZ + widthZ,
+      );
+    }
 
-    positions.push(
-      rootX - tangentX * width * 0.50, 0, rootZ - tangentZ * width * 0.50,
-      rootX + tangentX * width * 0.50, 0, rootZ + tangentZ * width * 0.50,
-      midX - tangentX * width * 0.34, height * 0.56, midZ - tangentZ * width * 0.34,
-      midX + tangentX * width * 0.34, height * 0.56, midZ + tangentZ * width * 0.34,
-      tipX, height, tipZ,
-    );
-
-    // Slight vertical colour gradient gives the little ribbons more depth without textures.
-    colors.push(
-      0.46, 0.58, 0.24,
-      0.46, 0.58, 0.24,
-      0.62, 0.72, 0.31,
-      0.62, 0.72, 0.31,
-      0.76, 0.82, 0.39,
-    );
-
-    indices.push(
-      base, base + 2, base + 1,
-      base + 1, base + 2, base + 3,
-      base + 2, base + 4, base + 3,
-    );
+    for (let segment = 0; segment < segments; segment++) {
+      const a = vertexIndex + segment * 2;
+      const c = a + 2;
+      indices.push(a, a + 1, c, a + 1, c + 1, c);
+    }
+    vertexIndex += (segments + 1) * 2;
   }
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
@@ -89,31 +81,40 @@ function createTuftGeometry(bladeCount, spread = 1) {
 function buildTuftLayout(field) {
   const random = seededRandom();
   const tufts = [];
-  const extentX = WATER.radiusX * 2.16;
-  const extentZ = WATER.radiusZ * 2.16;
+  const inner = 1.10;
+  const outer = 2.10;
 
   for (let attempt = 0; attempt < GENERATION_ATTEMPTS && tufts.length < MAX_TUFTS; attempt++) {
-    const x = WATER.x + (random() * 2 - 1) * extentX;
-    const z = WATER.z + (random() * 2 - 1) * extentZ;
+    // Area-correct elliptical-annulus sampling keeps the candidate density even while still using
+    // the real grassCover() function as the final shoreline/shelf mask.
+    const angle = random() * Math.PI * 2;
+    const radius = Math.sqrt(inner * inner + random() * (outer * outer - inner * inner));
+    const x = WATER.x + Math.cos(angle) * WATER.radiusX * radius;
+    const z = WATER.z + Math.sin(angle) * WATER.radiusZ * radius;
     const cover = grassCover(x, z);
     if (cover <= 0.04) continue;
 
-    // Patchiness prevents a synthetic carpet. The terrain PBR grass remains visible in the gaps.
-    const patch = 0.68 + noise(x * 0.105 + 37, z * 0.105 - 19) * 0.46;
-    if (random() > Math.min(1, cover * patch)) continue;
+    // Keep natural pockets and gaps, but much less aggressively than the first repo pass. The
+    // existing PBR grass terrain texture remains visible underneath and bridges small holes.
+    const patch = noise(x * 0.105 + 37, z * 0.105 - 19);
+    if (patch < 0.18 && random() > 0.34) continue;
+    if (random() > Math.min(1, 0.40 + cover * 0.78)) continue;
 
-    const heightScale = 0.70 + random() * 0.55; // ~14–25 cm around the 20 cm nominal height.
-    const yaw = random() * Math.PI * 2;
-    const tint = random();
-    const lodHash = random();
     tufts.push({
       x,
       z,
-      y: field.sample(x, z) + 0.008,
-      heightScale,
-      yaw,
-      tint,
-      lodHash,
+      y: field.sample(x, z) + 0.012,
+      yaw: random() * Math.PI * 2,
+      // Y controls blade height; X/Z control visual footprint. Keeping them separate is the key
+      // difference from the bad first implementation.
+      verticalScale: 0.205 + random() * 0.055,
+      horizontalScale: 0.50 + random() * 0.18,
+      stretchX: 0.90 + random() * 0.20,
+      stretchZ: 0.90 + random() * 0.20,
+      tiltX: (random() - 0.5) * 0.11,
+      tiltZ: (random() - 0.5) * 0.11,
+      tint: random(),
+      lodHash: random(),
     });
   }
   return tufts;
@@ -125,8 +126,6 @@ function createMesh(geometry, material, capacity, name) {
   mesh.count = 0;
   mesh.castShadow = false;
   mesh.receiveShadow = false;
-  // The instances move between LOD batches; distance culling already keeps these cheap and avoids
-  // stale InstancedMesh bounds incorrectly hiding a whole batch on mobile/Quest browsers.
   mesh.frustumCulled = false;
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   return mesh;
@@ -136,16 +135,18 @@ export function createOasisGrassRing({ field }) {
   const group = new THREE.Group();
   group.name = 'Oasis short grass ring';
 
+  // Match the mobile prototype's straightforward shaded geometry. Per-instance colour variation
+  // supplies the richness; avoiding a second material tint prevents the triple-multiply dullness
+  // of the first Oasis pass.
   const material = new THREE.MeshLambertMaterial({
-    color: 0xb8c46f,
-    vertexColors: true,
+    color: 0xffffff,
     side: THREE.DoubleSide,
   });
   material.name = 'Short oasis grass';
 
-  const fullGeometry = createTuftGeometry(FULL_BLADES, 1.0);
-  const midGeometry = createTuftGeometry(MID_BLADES, 0.94);
-  const farGeometry = createTuftGeometry(FAR_BLADES, 0.88);
+  const fullGeometry = createTuftGeometry(FULL_BLADES, 2, true);   // 40 tris / tuft
+  const midGeometry = createTuftGeometry(MID_BLADES, 1, false);   // 10 tris / tuft
+  const farGeometry = createTuftGeometry(FAR_BLADES, 1, false);   // 6 tris / tuft
   const tufts = buildTuftLayout(field);
 
   const full = createMesh(fullGeometry, material, tufts.length, 'Grass tufts — near');
@@ -163,20 +164,21 @@ export function createOasisGrassRing({ field }) {
   let lastZ = Infinity;
   let stats = { near: 0, mid: 0, far: 0, triangles: 0 };
 
-  function writeInstance(mesh, index, tuft, lodScale) {
+  function writeInstance(mesh, index, tuft, horizontalLodScale, verticalLodScale) {
     position.set(tuft.x, tuft.y, tuft.z);
-    rotation.set(0, tuft.yaw, 0);
+    rotation.set(tuft.tiltX, tuft.yaw, tuft.tiltZ);
     quaternion.setFromEuler(rotation);
-    const s = BASE_HEIGHT * tuft.heightScale * lodScale;
-    scale.setScalar(s);
+    scale.set(
+      tuft.horizontalScale * tuft.stretchX * horizontalLodScale,
+      tuft.verticalScale * verticalLodScale,
+      tuft.horizontalScale * tuft.stretchZ * horizontalLodScale,
+    );
     matrix.compose(position, quaternion, scale);
     mesh.setMatrixAt(index, matrix);
 
-    // Narrow natural variation, intentionally much less saturated than the alien foliage.
-    const hue = 0.205 + (tuft.tint - 0.5) * 0.035;
-    const saturation = 0.34 + tuft.tint * 0.08;
-    const lightness = 0.62 + (tuft.tint - 0.5) * 0.08;
-    tint.setHSL(hue, saturation, lightness);
+    // Same darker natural palette that made the mobile proof read as grass instead of pale spikes.
+    const c = tuft.tint;
+    tint.setRGB(0.14 + c * 0.11, 0.31 + c * 0.20, 0.045 + c * 0.055);
     mesh.setColorAt(index, tint);
   }
 
@@ -200,12 +202,11 @@ export function createOasisGrassRing({ field }) {
       const distanceSq = dx * dx + dz * dz;
 
       if (distanceSq < nearSq) {
-        writeInstance(full, nearCount++, tuft, 1.0);
+        writeInstance(full, nearCount++, tuft, 1.0, 1.0);
       } else if (distanceSq < midSq) {
-        // Tiny grass no longer needs every tuft once it occupies only a few pixels in VR.
-        if (tuft.lodHash < 0.72) writeInstance(mid, midCount++, tuft, 0.98);
+        if (tuft.lodHash < 0.72) writeInstance(mid, midCount++, tuft, 0.96, 0.98);
       } else if (distanceSq < farSq) {
-        if (tuft.lodHash < 0.34) writeInstance(far, farCount++, tuft, 0.94);
+        if (tuft.lodHash < 0.34) writeInstance(far, farCount++, tuft, 0.92, 0.95);
       }
     }
 
@@ -223,7 +224,7 @@ export function createOasisGrassRing({ field }) {
       near: nearCount,
       mid: midCount,
       far: farCount,
-      triangles: nearCount * FULL_BLADES * 3 + midCount * MID_BLADES * 3 + farCount * FAR_BLADES * 3,
+      triangles: nearCount * 40 + midCount * 10 + farCount * 6,
     };
   }
 
