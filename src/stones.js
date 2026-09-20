@@ -2,14 +2,12 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WATER, terrainHeight } from './world.js';
 import { addInventoryItem, getInventoryCount } from './inventory.js';
+import { isHandAtChest } from './chest-storage.js';
 
-const STONE_URL = `${import.meta.env.BASE_URL}models/stone/vr_pickup_stone_uv_200.glb`;
-const ROCK_TEXTURE = `${import.meta.env.BASE_URL}textures/rocks/pickup-rock/rock1.png`;
+const STONE_URL = `${import.meta.env?.BASE_URL ?? '/'}models/stone/vr_pickup_stone_uv_200.glb`;
+const ROCK_TEXTURE = `${import.meta.env?.BASE_URL ?? '/'}textures/rocks/pickup-rock/rock1.png`;
 const GRIP_BUTTON = 1;
 const PICKUP_RADIUS = 0.34;
-const CHEST_Y_OFFSET = 0.38;
-const CHEST_HORIZONTAL_RADIUS = 0.34;
-const CHEST_VERTICAL_RADIUS = 0.25;
 
 // Twelve hand-sized stones scattered across the sandy band around the oasis.
 // Radius is normalized to the water ellipse, so ~1.0 is the shoreline.
@@ -30,8 +28,6 @@ const STONE_LAYOUT = [
 
 const handPosition = new THREE.Vector3();
 const stonePosition = new THREE.Vector3();
-const headPosition = new THREE.Vector3();
-const chestPosition = new THREE.Vector3();
 
 function makeStoneMaterial(renderer) {
   const material = new THREE.MeshStandardMaterial({
@@ -114,15 +110,9 @@ export function createHeldStones({ scene, states, renderer = null, onError = con
 
   const heldByState = new Map();
   const gripDown = new Map();
-  let stoneGroup = scene.getObjectByName('Loose oasis stones');
-  if (!stoneGroup) {
-    stoneGroup = createGroundStones({
-      field: { sample: terrainHeight },
-      renderer,
-      onError,
-    });
-    scene.add(stoneGroup);
-  }
+  // main.js owns resource spawning. Hands are created first, so look up the
+  // group lazily instead of creating a second, overlapping set of stones here.
+  let stoneGroup = null;
 
   function getStoneGroup() {
     if (!stoneGroup || !stoneGroup.parent) stoneGroup = scene.getObjectByName('Loose oasis stones');
@@ -139,27 +129,6 @@ export function createHeldStones({ scene, states, renderer = null, onError = con
     stone.userData.held = true;
     heldByState.set(state, stone);
     return true;
-  }
-
-  function isHandAtChest(state) {
-    if (!renderer?.xr?.isPresenting || !state?.objectGrip) return false;
-    const xrCamera = renderer.xr.getCamera();
-    if (!xrCamera) return false;
-
-    xrCamera.updateWorldMatrix(true, false);
-    xrCamera.getWorldPosition(headPosition);
-    chestPosition.copy(headPosition);
-    chestPosition.y -= CHEST_Y_OFFSET;
-
-    state.objectGrip.updateWorldMatrix(true, false);
-    state.objectGrip.getWorldPosition(handPosition);
-
-    const horizontalDistance = Math.hypot(
-      handPosition.x - chestPosition.x,
-      handPosition.z - chestPosition.z,
-    );
-    const verticalDistance = Math.abs(handPosition.y - chestPosition.y);
-    return horizontalDistance <= CHEST_HORIZONTAL_RADIUS && verticalDistance <= CHEST_VERTICAL_RADIUS;
   }
 
   function store(state) {
@@ -228,7 +197,7 @@ export function createHeldStones({ scene, states, renderer = null, onError = con
       const heldStone = heldByState.get(state);
 
       if (heldStone && (!state.inputSource || !grip)) {
-        if (state.inputSource && !grip && isHandAtChest(state)) store(state);
+        if (state.inputSource && !grip && isHandAtChest(renderer, state)) store(state);
         else drop(state);
       } else if (!heldStone && grip && !wasDown && state.objectGrip.children.length === 0) {
         const stone = findNearestStone(state);

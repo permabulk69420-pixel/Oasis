@@ -2,13 +2,11 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WATER, terrainHeight } from './world.js';
 import { addInventoryItem, getInventoryCount } from './inventory.js';
+import { isHandAtChest } from './chest-storage.js';
 
-const STICK_URL = `${import.meta.env.BASE_URL}models/stick/dead_ground_stick_vr_thin.glb`;
+const STICK_URL = `${import.meta.env?.BASE_URL ?? '/'}models/stick/dead_ground_stick_vr_thin.glb`;
 const GRIP_BUTTON = 1;
 const PICKUP_RADIUS = 0.48;
-const CHEST_Y_OFFSET = 0.38;
-const CHEST_HORIZONTAL_RADIUS = 0.34;
-const CHEST_VERTICAL_RADIUS = 0.25;
 
 // The stick is authored lengthwise on local X. Match the axe's proven handle axis,
 // but anchor the hand to a thin section of the actual stick rather than the GLB origin.
@@ -19,8 +17,6 @@ const handPosition = new THREE.Vector3();
 const stickPosition = new THREE.Vector3();
 const localVertex = new THREE.Vector3();
 const gripOffset = new THREE.Vector3();
-const headPosition = new THREE.Vector3();
-const chestPosition = new THREE.Vector3();
 
 // Sparse placements around the grassy oasis shelf. Radius is in normalized shoreline space,
 // matching the vegetation layout and keeping every stick safely outside the water.
@@ -188,27 +184,6 @@ export function createHeldSticks({ scene, states, renderer = null, onError = con
     return true;
   }
 
-  function isHandAtChest(state) {
-    if (!renderer?.xr?.isPresenting || !state?.objectGrip) return false;
-    const xrCamera = renderer.xr.getCamera();
-    if (!xrCamera) return false;
-
-    xrCamera.updateWorldMatrix(true, false);
-    xrCamera.getWorldPosition(headPosition);
-    chestPosition.copy(headPosition);
-    chestPosition.y -= CHEST_Y_OFFSET;
-
-    state.objectGrip.updateWorldMatrix(true, false);
-    state.objectGrip.getWorldPosition(handPosition);
-
-    const horizontalDistance = Math.hypot(
-      handPosition.x - chestPosition.x,
-      handPosition.z - chestPosition.z,
-    );
-    const verticalDistance = Math.abs(handPosition.y - chestPosition.y);
-    return horizontalDistance <= CHEST_HORIZONTAL_RADIUS && verticalDistance <= CHEST_VERTICAL_RADIUS;
-  }
-
   function store(state) {
     const stick = heldByState.get(state);
     if (!stick) return false;
@@ -279,7 +254,7 @@ export function createHeldSticks({ scene, states, renderer = null, onError = con
       if (heldStick && (!state.inputSource || !grip)) {
         // Releasing a held stick at the player's chest stores it instead of dropping it.
         // A controller disconnect still drops normally so it cannot grant inventory accidentally.
-        if (state.inputSource && !grip && isHandAtChest(state)) store(state);
+        if (state.inputSource && !grip && isHandAtChest(renderer, state)) store(state);
         else drop(state);
       } else if (!heldStick && grip && !wasDown && state.objectGrip.children.length === 0) {
         const stick = findNearestStick(state);
