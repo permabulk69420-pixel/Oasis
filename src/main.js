@@ -8,6 +8,7 @@ import { createDayNightCycle } from './day-night.js';
 import { createSandFootsteps } from './footsteps.js';
 import { createGroundSticks } from './sticks.js';
 import { createGroundStones } from './stones.js';
+import { createSurvivorMenu } from './survivor-menu.js';
 import { getInventoryWeight, getCarrySpeedMultiplier } from './inventory.js';
 
 const canvas = document.querySelector('#world');
@@ -17,6 +18,7 @@ const explore = document.querySelector('#explore');
 const enterVR = document.querySelector('#enter-vr');
 const seatedMode = document.querySelector('#seated-mode');
 const menu = document.querySelector('#menu');
+const inventoryToggle = document.querySelector('#inventory-toggle');
 const touchControls = document.querySelector('#touch-controls');
 const movePad = document.querySelector('#move-pad');
 const touchDevice = matchMedia('(pointer: coarse)').matches;
@@ -116,6 +118,21 @@ let jumpHeight = 0, jumpVelocity = 0, jumpHeld = false;
 let crouchOffset = 0, crouchActive = false, crouchButtonDown = false;
 let sprintActive = false, sprintButtonDown = false;
 
+const survivorMenu = createSurvivorMenu({
+  scene, renderer, states: hands.states,
+  onToggle(open) {
+    keys.clear(); touchMove = { x: 0, z: 0 }; touchMoveId = null; touchLookId = null; mouseDragging = false;
+    velocity.set(0, 0, 0); footsteps.reset(); movePad.firstElementChild.style.transform = '';
+    touchControls.hidden = open || !playing || !touchDevice || renderer.xr.isPresenting;
+    if (open) document.exitPointerLock?.();
+    else if (playing && !touchDevice && !renderer.xr.isPresenting) {
+      // A close click/key is a user gesture; drag-to-look remains a fallback.
+      canvas.requestPointerLock?.()?.catch(() => {});
+    }
+  },
+});
+inventoryToggle.addEventListener('click', () => survivorMenu.toggle());
+
 function clearInput() {
   keys.clear(); touchMove = { x: 0, z: 0 }; touchMoveId = null; touchLookId = null; mouseDragging = false;
   velocity.set(0, 0, 0); jumpHeld = false;
@@ -124,12 +141,15 @@ function clearInput() {
   footsteps.reset(); movePad.firstElementChild.style.transform = '';
 }
 function setPlaying(value) {
-  playing = value; welcome.hidden = value; menu.hidden = !value;
+  playing = value;
+  if (!value) survivorMenu.setOpen(false);
+  inventoryToggle.hidden = !value || renderer.xr.isPresenting;
+  welcome.hidden = value; menu.hidden = !value;
   touchControls.hidden = !value || !touchDevice || renderer.xr.isPresenting;
   if (!value) clearInput();
 }
 function look(dx, dy) {
-  if (!playing || renderer.xr.isPresenting) return;
+  if (!playing || survivorMenu.isOpen() || renderer.xr.isPresenting) return;
   rig.rotation.y -= dx * 0.0024;
   camera.rotation.x = clamp(camera.rotation.x - dy * 0.0024, -1.40, 1.40);
 }
@@ -142,11 +162,14 @@ explore.addEventListener('click', async () => {
 });
 menu.addEventListener('click', () => { document.exitPointerLock?.(); setPlaying(false); });
 document.addEventListener('pointerlockchange', () => {
-  if (!document.pointerLockElement && !touchDevice && !renderer.xr.isPresenting) setPlaying(false);
+  if (!document.pointerLockElement && !touchDevice && !renderer.xr.isPresenting && !survivorMenu.isOpen()) setPlaying(false);
 });
 window.addEventListener('keydown', e => {
+  if (playing && !renderer.xr.isPresenting && (e.code === 'KeyY' || (e.code === 'Escape' && survivorMenu.isOpen()))) {
+    e.preventDefault(); if (!e.repeat) survivorMenu.toggle(); return;
+  }
   if (e.code === 'Escape' && !renderer.xr.isPresenting) setPlaying(false);
-  if (!playing || renderer.xr.isPresenting) return;
+  if (!playing || survivorMenu.isOpen() || renderer.xr.isPresenting) return;
   if (['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight','Space'].includes(e.code)) {
     e.preventDefault(); keys.add(e.code);
   }
@@ -158,7 +181,7 @@ document.addEventListener('mousemove', e => {
   if (document.pointerLockElement === canvas) look(e.movementX, e.movementY);
 });
 canvas.addEventListener('pointerdown', e => {
-  if (!playing || renderer.xr.isPresenting) return;
+  if (!playing || survivorMenu.isOpen() || renderer.xr.isPresenting) return;
   if (e.pointerType === 'touch') {
     if (e.clientX < innerWidth * 0.40 || touchLookId !== null) return;
     touchLookId = e.pointerId;
@@ -249,6 +272,7 @@ renderer.xr.addEventListener('sessionend', () => {
 });
 
 function readInput() {
+  if (survivorMenu.isOpen()) return { x: 0, z: 0, turn: 0, fast: false, sprintPressed: false, jump: false, crouchPressed: false };
   if (renderer.xr.isPresenting) {
     const session = renderer.xr.getSession();
     if (session.visibilityState !== 'visible') return { x: 0, z: 0, turn: 0, fast: false, sprintPressed: false, jump: false, crouchPressed: false };
@@ -295,6 +319,7 @@ function frame(time) {
   if (renderer.xr.isPresenting) renderer.xr.updateCamera(camera);
   const activeCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
   activeCamera.getWorldPosition(head);
+  survivorMenu.update();
 
   // local-floor still reports the real headset height while sitting. In seated mode,
   // measure it once at VR start and raise the entire player rig to a normal eye height.
