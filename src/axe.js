@@ -3,9 +3,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SPAWN, terrainHeight } from './world.js';
 import { pulseHaptics } from './haptics.js';
 
-const AXE_URL = `${import.meta.env.BASE_URL}models/axe/stone_survival_axe.glb`;
-const CHOP_AUDIO_URLS = [1, 2, 3].map(index => `${import.meta.env.BASE_URL}audio/chopping/axe_chop_0${index}.mp3`);
-const RIGHT_HAND = 'right';
+const AXE_URL = `${import.meta.env?.BASE_URL ?? '/'}models/axe/stone_survival_axe.glb`;
+const CHOP_AUDIO_URLS = [1, 2, 3].map(index => `${import.meta.env?.BASE_URL ?? '/'}audio/chopping/axe_chop_0${index}.mp3`);
 const GRIP_BUTTON = 1;
 const PICKUP_RADIUS = 0.52;
 
@@ -37,10 +36,6 @@ const treePosition = new THREE.Vector3();
 const fallDirection = new THREE.Vector3();
 const fallAxis = new THREE.Vector3();
 const shakeAxis = new THREE.Vector3();
-const previousGripLocal = new THREE.Vector3();
-const currentGripLocal = new THREE.Vector3();
-const previousGripQuaternion = new THREE.Quaternion();
-const currentGripQuaternion = new THREE.Quaternion();
 const temporaryQuaternion = new THREE.Quaternion();
 const heldFlip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
 const bladeForwardTwist = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2);
@@ -92,14 +87,18 @@ function ensureTreeChopState(tree) {
   return tree.userData.chopState;
 }
 
-export function createHeldAxe({ scene, states, onError = console.warn }) {
+export function createHeldAxe({ scene, states, onError = console.warn, spawnOnGround = true }) {
   if (!scene || !Array.isArray(states)) throw new Error('Axe requires the Oasis scene and VR hand states.');
 
+  const previousGripLocal = new THREE.Vector3();
+  const currentGripLocal = new THREE.Vector3();
+  const previousGripQuaternion = new THREE.Quaternion();
+  const currentGripQuaternion = new THREE.Quaternion();
   const chopAudio = makeChopAudio();
   let chopAudioIndex = 0;
   let root = null;
   let heldBy = null;
-  let gripDown = false;
+  const gripDown = new Map();
   let previousGripReady = false;
   let hitCooldown = 0;
   let hitRearmed = true;
@@ -128,7 +127,7 @@ export function createHeldAxe({ scene, states, onError = console.warn }) {
   }
 
   function grab(state) {
-    if (!root || !state?.objectGrip) return false;
+    if (!root || heldBy || !state?.inputSource || !state?.objectGrip || state.objectGrip.children.length) return false;
     state.objectGrip.add(root);
     root.position.set(0, 0, 0);
 
@@ -137,6 +136,7 @@ export function createHeldAxe({ scene, states, onError = console.warn }) {
     root.quaternion.copy(heldFlip).multiply(bladeForwardTwist);
     root.scale.set(1, 1, 1);
     heldBy = state;
+    gripDown.set(state, true);
     previousGripReady = false;
     hitRearmed = true;
     return true;
@@ -257,10 +257,10 @@ export function createHeldAxe({ scene, states, onError = console.warn }) {
     root = gltf.scene;
     root.name = 'Stone survival axe';
     prepareAxe(root);
-    scene.add(root);
+    if (spawnOnGround) scene.add(root);
 
     // Opposite side of the start from the torch so both pickups are easy to distinguish.
-    placeOnGround(SPAWN.x - 0.85, SPAWN.z - 1.05);
+    if (spawnOnGround) placeOnGround(SPAWN.x - 0.85, SPAWN.z - 1.05);
   }, undefined, (error) => {
     onError(`[Oasis axe] Axe model failed to load: ${error?.message || error}`);
   });
@@ -268,25 +268,20 @@ export function createHeldAxe({ scene, states, onError = console.warn }) {
   function update(dt = 0) {
     const safeDt = THREE.MathUtils.clamp(Number.isFinite(dt) ? dt : 0, 0, 0.05);
     hitCooldown = Math.max(0, hitCooldown - safeDt);
-    updateTreeAnimations(safeDt);
+    if (spawnOnGround) updateTreeAnimations(safeDt);
 
-    const right = states.find((state) => state.handedness === RIGHT_HAND);
-    const buttons = right?.inputSource?.gamepad?.buttons || [];
-    const grip = Boolean(buttons[GRIP_BUTTON]?.pressed);
-
-    if (right && root && !heldBy && grip && !gripDown) {
-      right.objectGrip.updateWorldMatrix(true, false);
-      right.objectGrip.getWorldPosition(handPosition);
-      root.updateWorldMatrix(true, false);
-      root.getWorldPosition(axePosition);
-
-      // Target the useful middle of the handle for pickup rather than the sand-level pivot.
-      axePosition.y += 0.14;
-      if (handPosition.distanceTo(axePosition) <= PICKUP_RADIUS) grab(right);
+    if (heldBy && !heldBy.inputSource?.gamepad?.buttons[GRIP_BUTTON]?.pressed) drop();
+    for (const state of states) {
+      const grip = Boolean(state.inputSource?.gamepad?.buttons[GRIP_BUTTON]?.pressed);
+      if (root?.parent === scene && !heldBy && grip && !gripDown.get(state) && state.objectGrip.children.length === 0) {
+        state.objectGrip.updateWorldMatrix(true, false);
+        state.objectGrip.getWorldPosition(handPosition);
+        root.getWorldPosition(axePosition);
+        axePosition.y += 0.14;
+        if (handPosition.distanceTo(axePosition) <= PICKUP_RADIUS) grab(state);
+      }
+      gripDown.set(state, grip);
     }
-
-    if (heldBy && !grip) drop();
-    gripDown = grip;
 
     if (!heldBy || !root || safeDt <= 0) {
       previousGripReady = false;
@@ -327,6 +322,7 @@ export function createHeldAxe({ scene, states, onError = console.warn }) {
 
   return {
     update,
+    equip: grab,
     drop,
     isHeld: () => Boolean(heldBy),
     getObject: () => root,

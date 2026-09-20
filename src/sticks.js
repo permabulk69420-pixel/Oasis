@@ -151,7 +151,7 @@ export function createGroundSticks({ field, onError = console.warn }) {
   return group;
 }
 
-export function createHeldSticks({ scene, states, renderer = null, onError = console.warn }) {
+export function createHeldSticks({ scene, states, renderer = null, onError = console.warn, onStore = () => {} }) {
   if (!scene || !Array.isArray(states)) throw new Error('Stick grabbing requires the Oasis scene and VR hand states.');
 
   const heldByState = new Map();
@@ -193,6 +193,7 @@ export function createHeldSticks({ scene, states, renderer = null, onError = con
     stick.userData.collected = true;
     heldByState.delete(state);
     addInventoryItem('stick', 1);
+    onStore('stick');
     return true;
   }
 

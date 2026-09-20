@@ -1,6 +1,7 @@
 import * as THREE from 'three';
+import { createGripHold } from './grip-hold.js';
 import { ITEMS, RECIPES, getRecipeStatus, craftItem } from './crafting.js';
-import { BASE_CARRY_WEIGHT, getInventoryItems, getInventoryWeight } from './inventory.js';
+import { BASE_CARRY_WEIGHT, getInventoryCount, getInventoryItems, getInventoryWeight } from './inventory.js';
 
 const WIDTH = 1440, HEIGHT = 900;
 const C = { background: '#0a1b20', panel: '#112a30', cell: '#18383f', line: '#31565c', ink: '#e7f2ec', muted: '#99b7b8', accent: '#8ed4bf', gold: '#debd7e', missing: '#e9a18b' };
@@ -8,7 +9,7 @@ export function hitMenuControl(controls, x, y) {
   return controls.find(control => x >= control.x && x <= control.x + control.w && y >= control.y && y <= control.y + control.h) || null;
 }
 
-export function createSurvivorMenu({ scene, renderer, states, onToggle = () => {} }) {
+export function createSurvivorMenu({ scene, renderer, states, onToggle = () => {}, onEquip = () => ({ ok: false, message: 'Equipment unavailable.' }) }) {
   const controllers = states.map(state => state.controller);
   const surface = document.createElement('canvas');
   surface.width = WIDTH; surface.height = HEIGHT;
@@ -39,6 +40,8 @@ export function createSurvivorMenu({ scene, renderer, states, onToggle = () => {
     controller.add(line); return line;
   });
   const triggerDown = controllers.map(() => false);
+  const gripHolds = controllers.map(() => createGripHold());
+  let equipProgress = 0, equipTarget = '';
   let open = false, tab = 'inventory', selection = 'axe', selectedItem = '', page = 0;
   let yDown = false, dirty = true, controls = [], hovered = '', message = '', snapshot = '', previousFocus = null;
 
@@ -107,10 +110,10 @@ export function createSurvivorMenu({ scene, renderer, states, onToggle = () => {
     ctx.moveTo(1174, 382); ctx.lineTo(1137, 462); ctx.moveTo(1268, 382); ctx.lineTo(1305, 462);
     ctx.moveTo(1194, 491); ctx.lineTo(1185, 594); ctx.moveTo(1248, 491); ctx.lineTo(1257, 594); ctx.stroke();
     text('Equipment slots coming later', 1054, 700, 21, C.muted);
-    text('Crafted tools stay in inventory', 1054, 734, 20, C.muted);
+    text('Tools: hold grip for 3 seconds', 1054, 734, 20, C.muted);
     const weight = getInventoryWeight();
     text(`CARRY WEIGHT  ${weight} / ${BASE_CARRY_WEIGHT}`, 48, 830, 22, weight > BASE_CARRY_WEIGHT ? C.missing : C.accent, 600);
-    text(message || 'Collect sticks and stones. Release them at your chest to store.', 48, 867, 21, message ? C.gold : C.muted);
+    text(equipTarget ? `Equipping ${ITEMS[equipTarget].name.toLowerCase()} · ${(equipProgress * 3).toFixed(1)} / 3 seconds` : message || 'Collect sticks and stones. Release them at your chest to store.', 48, 867, 21, message ? C.gold : C.muted);
     text(renderer.xr.isPresenting ? 'Point + trigger to select' : 'Y / Esc to close', 1080, 840, 19, C.muted);
     texture.needsUpdate = true;
     syncButtons();
@@ -129,6 +132,7 @@ export function createSurvivorMenu({ scene, renderer, states, onToggle = () => {
         text(`x${item.count}`, x + 132, y + 30, 22, C.accent, 600);
         text(ITEMS[item.type]?.name || item.type, x + 16, y + 126, 23);
         text(ITEMS[item.type]?.category || 'ITEM', x + 16, y + 151, 15, C.muted);
+        if (equipTarget === item.type) rect(x + 2, y + 158, 188 * equipProgress, 5, C.accent);
       } else text('—', x + 86, y + 93, 24, C.line);
     }
     if (!items.length) {
@@ -138,7 +142,7 @@ export function createSurvivorMenu({ scene, renderer, states, onToggle = () => {
       const item = ITEMS[selectedItem];
       text(item?.name || 'Select an item to inspect it', 48, 658, 25);
       // Keep the description inside the left column at VR-readable text sizes.
-      const description = item?.description || 'Switch to Crafting to make your first tools.';
+      const description = item?.description || 'Tools: point at an item and hold grip for 3 seconds.';
       wrap(description, 48, 692, 590, 22);
     }
     if (pages > 1) {
@@ -212,6 +216,7 @@ export function createSurvivorMenu({ scene, renderer, states, onToggle = () => {
   function setOpen(value) {
     if (open === value) return;
     open = value; hovered = ''; message = ''; dirty = true;
+    gripHolds.forEach(hold => hold.reset()); equipProgress = 0; equipTarget = '';
     overlay.hidden = !open || renderer.xr.isPresenting; panel.visible = open && renderer.xr.isPresenting;
     if (open) {
       previousFocus = document.activeElement;
@@ -235,7 +240,7 @@ export function createSurvivorMenu({ scene, renderer, states, onToggle = () => {
     const index = focusable.indexOf(document.activeElement);
     event.preventDefault(); focusable[(index + (event.shiftKey ? -1 : 1) + focusable.length) % focusable.length]?.focus();
   });
-  function update() {
+  function update(dt = 0) {
     const session = renderer.xr.getSession();
     const visible = session?.visibilityState === 'visible';
     const sources = [...(session?.inputSources || [])];
@@ -244,11 +249,14 @@ export function createSurvivorMenu({ scene, renderer, states, onToggle = () => {
     yDown = y;
     if (session && !visible && open) setOpen(false);
     let hover = '', pendingAction = null;
+    let nextProgress = 0, nextTarget = '';
+    const equips = [];
     controllers.forEach((controller, index) => {
       // Use the connected hand source; source order can change after a reconnect.
       const source = states[index].inputSource;
       const pressed = visible && Boolean(source?.gamepad?.buttons[0]?.pressed);
       const line = rays[index]; line.visible = false;
+      let pointedTool = null;
       if (open && renderer.xr.isPresenting && visible && source?.targetRayMode === 'tracked-pointer' && controller.visible) {
         controller.updateWorldMatrix(true, false); origin.setFromMatrixPosition(controller.matrixWorld);
         rotation.extractRotation(controller.matrixWorld); forward.set(0, 0, -1).applyMatrix4(rotation);
@@ -259,12 +267,32 @@ export function createSurvivorMenu({ scene, renderer, states, onToggle = () => {
           const control = hitMenuControl(controls, hit.uv.x * WIDTH, (1 - hit.uv.y) * HEIGHT);
           if (control && !control.disabled) {
             hover = control.id;
+            if (tab === 'inventory' && ['item:axe', 'item:torch'].includes(control.id)) pointedTool = control.id.slice(5);
             if (pressed && !triggerDown[index]) pendingAction = control.id;
           }
         }
       }
+      const gripping = visible && Boolean(source?.gamepad?.buttons[1]?.pressed);
+      const emptyHand = states[index].objectGrip?.children.length === 0;
+      if (pointedTool && gripping && !emptyHand && message !== 'Free this hand first.') { message = 'Free this hand first.'; dirty = true; }
+      const hold = gripHolds[index].update(
+        pointedTool && emptyHand && getInventoryCount(pointedTool) > 0 ? pointedTool : null,
+        source, gripping, dt,
+      );
+      if (hold.progress > nextProgress) { nextProgress = hold.progress; nextTarget = pointedTool; }
+      if (hold.complete) equips.push({ type: pointedTool, state: states[index] });
       triggerDown[index] = pressed;
     });
+    // Quantize the progress repaint to tenths of a second on Quest.
+    if (Math.floor(nextProgress * 30) !== Math.floor(equipProgress * 30) || nextTarget !== equipTarget) dirty = true;
+    equipProgress = nextProgress; equipTarget = nextTarget;
+    for (const request of equips) {
+      if (!open) break;
+      const result = onEquip(request.type, request.state);
+      if (result.ok) { setOpen(false); pendingAction = null; break; }
+      message = result.message; announcement.textContent = message;
+      equipProgress = 0; equipTarget = ''; dirty = true;
+    }
     if (pendingAction) activate(pendingAction);
     if (renderer.xr.isPresenting) setHover(hover);
     if (open) {

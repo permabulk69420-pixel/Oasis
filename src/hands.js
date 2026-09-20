@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
-import { createHeldTorch } from './torch.js';
+import { createInventoryTools } from './inventory-tools.js';
+import { createHeldTorch, updateTorchLighting } from './torch.js';
 import { createHeldAxe } from './axe.js';
 import { createHeldSticks } from './sticks.js';
 import { createHeldStones } from './stones.js';
@@ -61,7 +62,7 @@ function setPose(state, name, amount) {
   action.time = THREE.MathUtils.clamp(amount, 0, 1);
 }
 
-export function createVRHands({ renderer, scene, parent = null, onError = console.warn }) {
+export function createVRHands({ renderer, scene, parent = null, onError = console.warn, onResourceStored = () => {} }) {
   // Oasis moves/turns a camera rig through the world. Match dumbgame by putting
   // WebXR controller and grip nodes under that rig rather than directly in scene space.
   const controllerParent = parent
@@ -200,8 +201,10 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
 
   const torch = createHeldTorch({ scene, states, onError });
   const axe = createHeldAxe({ scene, states, onError });
-  const sticks = createHeldSticks({ scene, states, renderer, onError });
-  const stones = createHeldStones({ scene, states, renderer, onError });
+  const sticks = createHeldSticks({ scene, states, renderer, onError, onStore: onResourceStored });
+  const stones = createHeldStones({ scene, states, renderer, onError, onStore: onResourceStored });
+
+  const inventoryTools = createInventoryTools({ scene, states, onError });
 
   function update(dt) {
     for (const state of states) {
@@ -247,6 +250,8 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
 
     torch.update(dt);
     axe.update(dt);
+    inventoryTools.update(dt);
+    updateTorchLighting(scene);
     sticks.update(dt);
     stones.update(dt);
 
@@ -295,6 +300,7 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
     objectGrips: states.map((state) => state.objectGrip),
     torch,
     axe,
+    equipInventoryTool: inventoryTools.equip,
     sticks,
     stones,
     setVisible,

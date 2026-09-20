@@ -63,9 +63,17 @@ use the **Inventory / Y** button; the three-column panel scrolls horizontally in
 Collect the existing loose sticks and stones around the oasis with grip, then release
 them at your chest to store them. These provisional recipes deliberately use currently
 gatherable resources. Crafting spends all ingredients together and updates carry weight.
-Crafted tools remain in inventory until equipment handling is added; the existing
-physical axe and torch pickups still work as before. Inventory is session-only, as it
-was before this menu; reloading starts with an empty backpack.
+To equip a crafted axe or torch, point at its **inventory tile** with either controller
+and **hold that controller's grip for 3 seconds**. The tile shows progress. Moving off
+the tile or releasing grip cancels. A completed hold takes one item from inventory,
+places the working tool in that hand, and closes the menu. The hand must be empty.
+Keep holding grip to carry the tool; release to drop it, and grab it again with either
+hand. **B on the right controller** toggles a held torch's flame in either hand. Armour
+and equipment slots remain placeholders. The original physical tool pickups still work.
+
+Storing a resource at your chest briefly shows **1 stick** or **1 rock** in your view.
+Dropping an item on the ground does not show a collection message. Inventory remains
+session-only; reloading starts with an empty backpack.
 
 The menu uses one canvas texture in VR, repainted only when its contents or hover state
 change. Controller-ray tests run without a headset; final readability and comfort still
