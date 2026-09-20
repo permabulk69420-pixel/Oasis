@@ -31,7 +31,8 @@ function fixture(type, factory, { seated = false } = {}) {
   xrCamera.updateMatrixWorld(true);
   xrCamera.matrixWorld.setPosition(headWorld);
   const renderer = { xr: { isPresenting: true, getCamera: () => xrCamera } };
-  const system = factory({ scene, states: [state], renderer });
+  const stored = [];
+  const system = factory({ scene, states: [state], renderer, onStore: type => stored.push(type) });
   const group = new THREE.Group();
   group.name = type === 'stone' ? 'Loose oasis stones' : 'Loose oasis sticks';
   scene.add(group);
@@ -45,7 +46,7 @@ function fixture(type, factory, { seated = false } = {}) {
   grip.getWorldPosition(item.position);
   const update = pressed => { inputSource.gamepad.buttons[1].pressed = pressed; system.update(); };
   const toChest = () => grip.position.copy(localHead).add(new THREE.Vector3(0, -0.38, 0));
-  return { scene, rig, grip, objectGrip, state, renderer, xrCamera, system, group, item, update, toChest };
+  return { stored, scene, rig, grip, objectGrip, state, renderer, xrCamera, system, group, item, update, toChest };
 }
 
 test('creating stone hands before the world does not spawn duplicate stones', t => {
@@ -77,11 +78,13 @@ for (const [type, factory] of [['stick', createHeldSticks], ['stone', createHeld
       assert.equal(f.item.parent, null, 'stored object disappears from the scene');
       assert.equal(f.objectGrip.children.length, 0);
       assert.equal(f.item.userData.collected, true);
+      assert.deepEqual(f.stored, [type], 'emit exactly one resource notice on storage');
       assert.equal(f.system.isHolding('left'), false);
       assert.equal(getInventoryCount(type), before + 1);
       assert.deepEqual(f.xrCamera.matrixWorld.elements, worldBefore.elements, 'do not overwrite XR world pose');
       f.update(false); f.update(true); f.update(false);
       assert.equal(getInventoryCount(type), before + 1, 'a stored object cannot be collected twice');
+      assert.deepEqual(f.stored, [type]);
     });
   }
 
@@ -93,6 +96,7 @@ for (const [type, factory] of [['stick', createHeldSticks], ['stone', createHeld
     assert.equal(f.item.parent, f.group);
     assert.equal(f.group.children.length, 1);
     assert.equal(getInventoryCount(type), before);
+    assert.deepEqual(f.stored, [], 'ordinary drops/disconnects must not show collection notices');
     const world = f.item.getWorldPosition(new THREE.Vector3());
     f.grip.position.copy(f.rig.worldToLocal(world));
     f.update(true);
@@ -106,6 +110,7 @@ for (const [type, factory] of [['stick', createHeldSticks], ['stone', createHeld
     f.update(true); f.toChest(); f.state.inputSource = null; f.system.update();
     assert.equal(f.item.parent, f.group);
     assert.equal(getInventoryCount(type), before);
+    assert.deepEqual(f.stored, [], 'ordinary drops/disconnects must not show collection notices');
   });
 }
 

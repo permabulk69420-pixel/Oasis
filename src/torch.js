@@ -3,10 +3,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SPAWN, terrainHeight } from './world.js';
 import { pulseHaptics } from './haptics.js';
 
-const TORCH_URL = `${import.meta.env.BASE_URL}models/torch/handheld_fire_torch.glb`;
-const TORCH_AUDIO_URL = `${import.meta.env.BASE_URL}audio/fire/torch_fire_crackle_loop.mp3`;
+const TORCH_URL = `${import.meta.env?.BASE_URL ?? '/'}models/torch/handheld_fire_torch.glb`;
+const TORCH_AUDIO_URL = `${import.meta.env?.BASE_URL ?? '/'}audio/fire/torch_fire_crackle_loop.mp3`;
 const TORCH_AUDIO_VOLUME = 0.65;
-const RIGHT_HAND = 'right';
 const GRIP_BUTTON = 1;
 const B_BUTTON = 5;
 const PICKUP_RADIUS = 0.58;
@@ -16,6 +15,26 @@ const loader = new GLTFLoader();
 const handPosition = new THREE.Vector3();
 const torchPosition = new THREE.Vector3();
 const flamePosition = new THREE.Vector3();
+
+// All torches share the existing single terrain/water light slot. Prefer a held
+// lit torch; individual flames and point lights still belong to each physical tool.
+const sceneLighting = new WeakMap();
+function getSceneLighting(scene) {
+  if (!sceneLighting.has(scene)) sceneLighting.set(scene, {
+    position: { value: new THREE.Vector3(0, -1000, 0) },
+    strength: { value: 0 },
+    sources: [],
+  });
+  return sceneLighting.get(scene);
+}
+export function updateTorchLighting(scene) {
+  const lighting = sceneLighting.get(scene);
+  if (!lighting) return;
+  const lit = lighting.sources.filter(source => source.active());
+  const source = lit.find(source => source.held()) || lit[0];
+  lighting.strength.value = source?.strength || 0;
+  if (source) lighting.position.value.copy(source.position);
+}
 
 function prepareTorch(root) {
   root.traverse((object) => {
@@ -138,11 +157,12 @@ function installWaterTorchLight(material, positionUniform, strengthUniform) {
   return true;
 }
 
-export function createHeldTorch({ scene, states, onError = console.warn }) {
+export function createHeldTorch({ scene, states, onError = console.warn, spawnOnGround = true }) {
   if (!scene || !Array.isArray(states)) throw new Error('Torch requires the Oasis scene and VR hand states.');
 
-  const terrainTorchPosition = { value: new THREE.Vector3(0, -1000, 0) };
-  const terrainTorchStrength = { value: 0 };
+  const lighting = getSceneLighting(scene);
+  const terrainTorchPosition = lighting.position;
+  const terrainTorchStrength = lighting.strength;
   const fireAudio = new Audio(TORCH_AUDIO_URL);
   fireAudio.loop = true;
   fireAudio.preload = 'auto';
@@ -156,10 +176,15 @@ export function createHeldTorch({ scene, states, onError = console.warn }) {
   let flameAnchor = null;
   let flame = null;
   let heldBy = null;
-  let gripDown = false;
+  const gripDown = new Map();
   let bDown = false;
   let lit = false;
   let elapsed = 0;
+  const lightSource = {
+    position: new THREE.Vector3(), strength: 0,
+    active: () => lit && Boolean(root?.parent), held: () => Boolean(heldBy),
+  };
+  lighting.sources.push(lightSource);
 
   function ensureEnvironmentLighting() {
     if (!terrainLightingReady) {
@@ -208,7 +233,7 @@ export function createHeldTorch({ scene, states, onError = console.warn }) {
     } else {
       stopFireAudio();
       if (flame) flame.light.intensity = 0;
-      terrainTorchStrength.value = 0;
+      lightSource.strength = 0;
     }
     return lit;
   }
@@ -223,13 +248,14 @@ export function createHeldTorch({ scene, states, onError = console.warn }) {
   }
 
   function grab(state) {
-    if (!root || !state?.objectGrip) return false;
+    if (!root || heldBy || !state?.inputSource || !state?.objectGrip || state.objectGrip.children.length) return false;
     state.objectGrip.add(root);
     root.position.set(0, 0, 0);
     // The authored +Y torch axis points opposite the Quest hand socket's held-up direction.
     root.rotation.set(Math.PI, 0, 0);
     root.scale.set(1, 1, 1);
     heldBy = state;
+    gripDown.set(state, true);
     return true;
   }
 
@@ -259,8 +285,8 @@ export function createHeldTorch({ scene, states, onError = console.warn }) {
     flame = createFlameEffect();
     flameAnchor.add(flame.group);
     flame.group.visible = false;
-    scene.add(root);
-    placeOnGround(SPAWN.x + 0.75, SPAWN.z - 1.05);
+    if (spawnOnGround) scene.add(root);
+    if (spawnOnGround) placeOnGround(SPAWN.x + 0.75, SPAWN.z - 1.05);
   }, undefined, (error) => {
     onError(`[Oasis torch] Torch model failed to load: ${error?.message || error}`);
   });
@@ -268,27 +294,26 @@ export function createHeldTorch({ scene, states, onError = console.warn }) {
   function update(dt) {
     ensureEnvironmentLighting();
     elapsed += Number.isFinite(dt) ? dt : 0;
-    const right = states.find((state) => state.handedness === RIGHT_HAND);
-    const buttons = right?.inputSource?.gamepad?.buttons || [];
-    const grip = Boolean(buttons[GRIP_BUTTON]?.pressed);
-    const b = Boolean(buttons[B_BUTTON]?.pressed);
-
-    if (right && root && !heldBy && grip && !gripDown) {
-      right.objectGrip.updateWorldMatrix(true, false);
-      right.objectGrip.getWorldPosition(handPosition);
-      root.updateWorldMatrix(true, false);
-      root.getWorldPosition(torchPosition);
-      torchPosition.y += 0.22;
-      if (handPosition.distanceTo(torchPosition) <= PICKUP_RADIUS) grab(right);
+    if (heldBy && !heldBy.inputSource?.gamepad?.buttons[GRIP_BUTTON]?.pressed) drop();
+    for (const state of states) {
+      const grip = Boolean(state.inputSource?.gamepad?.buttons[GRIP_BUTTON]?.pressed);
+      if (root?.parent === scene && !heldBy && grip && !gripDown.get(state) && state.objectGrip.children.length === 0) {
+        state.objectGrip.updateWorldMatrix(true, false);
+        state.objectGrip.getWorldPosition(handPosition);
+        root.getWorldPosition(torchPosition);
+        torchPosition.y += 0.22;
+        if (handPosition.distanceTo(torchPosition) <= PICKUP_RADIUS) grab(state);
+      }
+      gripDown.set(state, grip);
     }
-    if (heldBy && !grip) drop();
-
-    if (heldBy === right && b && !bDown) {
+    // Keep B for ignition in either hand; left Y remains the inventory button.
+    const right = states.find(state => state.handedness === 'right');
+    const b = Boolean(right?.inputSource?.gamepad?.buttons[B_BUTTON]?.pressed);
+    if (heldBy && b && !bDown) {
       const turningOn = !lit;
       setLit(turningOn);
-      pulseHaptics(right, turningOn ? 0.40 : 0.22, turningOn ? 55 : 28);
+      pulseHaptics(heldBy, turningOn ? 0.40 : 0.22, turningOn ? 55 : 28);
     }
-    gripDown = grip;
     bDown = b;
 
     if (!root || !flameAnchor || !flame) return;
@@ -304,12 +329,13 @@ export function createHeldTorch({ scene, states, onError = console.warn }) {
     const strength = THREE.MathUtils.clamp(flicker, 0.80, 1.08);
     flame.material.uniforms.uStrength.value = strength;
     flame.light.intensity = 18 * THREE.MathUtils.clamp(flicker, 0.82, 1.08);
-    terrainTorchPosition.value.copy(flamePosition);
-    terrainTorchStrength.value = strength;
+    lightSource.position.copy(flamePosition);
+    lightSource.strength = strength;
   }
 
   return {
     update,
+    equip: grab,
     drop,
     setLit,
     isLit: () => lit,
