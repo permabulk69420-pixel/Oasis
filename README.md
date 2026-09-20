@@ -39,3 +39,34 @@ Terrain uses 62.5 m chunks with four distance-based geometry levels and skirts t
 VR requests a 72 Hz refresh rate when supported, a framebuffer scale of 1, and fixed foveation of 0.65. Actual headset frame rate still needs verification on Quest 3; desktop/browser checks cannot certify hardware performance.
 
 `src/world.js` owns dimensions, deterministic height generation, water placement, and collision. `src/terrain.js` builds the terrain. `src/materials.js` owns the sand, sky, and water shaders. `src/grass-texture.js` configures the optional grass texture and its repeat size. `src/main.js` handles input and rendering. Development-only `?view=shore`, `?view=oasis` (elevated overview), and `?view=wide` camera fixtures support visual QA and are removed by the production build.
+
+## Inventory and starter crafting
+
+Press **Y on the left Quest controller** to open/close the survivor menu. Point either
+controller at a tab, recipe, or button and press its **trigger** to select it. The panel
+stays where it was opened; walking, turning, and jumping inputs are suspended while it
+is open. Head tracking remains active. Close and reopen Y to bring it in front of you.
+Desktop: **Y**, then mouse or Tab/Enter; **Y / Escape** closes the panel. Touch users can
+use the **Inventory / Y** button; the three-column panel scrolls horizontally in portrait.
+
+- **Left:** inventory and crafting tabs, resource counts, ingredient requirements, and
+  a Craft 1 button that only enables when the full recipe is available.
+- **Middle:** placeholder level, health, stamina, food, water, melee damage, and crafting
+  skill. These preview values do not apply effects. Carry weight below is live.
+- **Right:** reserved equipment box for later armour, weapons, and gear.
+
+| Starter recipe | Materials | Result |
+| --- | --- | --- |
+| Stone axe | 3 sticks + 2 stones | 1 axe in inventory |
+| Torch | 2 sticks + 1 stone | 1 torch in inventory |
+
+Collect the existing loose sticks and stones around the oasis with grip, then release
+them at your chest to store them. These provisional recipes deliberately use currently
+gatherable resources. Crafting spends all ingredients together and updates carry weight.
+Crafted tools remain in inventory until equipment handling is added; the existing
+physical axe and torch pickups still work as before. Inventory is session-only, as it
+was before this menu; reloading starts with an empty backpack.
+
+The menu uses one canvas texture in VR, repainted only when its contents or hover state
+change. Controller-ray tests run without a headset; final readability and comfort still
+need a Quest check.
