@@ -79,3 +79,11 @@ export function exchangeInventoryItems(cost, output) {
   for (const [type, count] of next) if (count > 0) counts.set(type, count);
   return true;
 }
+
+export function removeInventoryItem(type, amount = 1) {
+  if (!Number.isSafeInteger(amount) || amount <= 0 || getInventoryCount(type) < amount) return false;
+  const remaining = getInventoryCount(type) - amount;
+  if (remaining) counts.set(type, remaining);
+  else counts.delete(type);
+  return true;
+}

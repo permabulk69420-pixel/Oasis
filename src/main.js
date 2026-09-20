@@ -8,6 +8,7 @@ import { createDayNightCycle } from './day-night.js';
 import { createSandFootsteps } from './footsteps.js';
 import { createGroundSticks } from './sticks.js';
 import { createGroundStones } from './stones.js';
+import { createPickupNotice } from './pickup-notice.js';
 import { createSurvivorMenu } from './survivor-menu.js';
 import { getInventoryWeight, getCarrySpeedMultiplier } from './inventory.js';
 
@@ -47,10 +48,12 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.07, 6500);
 const rig = new THREE.Group();
 rig.add(camera); scene.add(rig);
+const pickupNotice = createPickupNotice({ camera, renderer });
 const hands = createVRHands({
   renderer,
   scene,
-  onError: (message) => console.warn('[Oasis hands]', message)
+  onError: (message) => console.warn('[Oasis hands]', message),
+  onResourceStored: pickupNotice.show
 });
 const footsteps = createSandFootsteps({
   onError: (message) => console.warn(message)
@@ -120,6 +123,7 @@ let sprintActive = false, sprintButtonDown = false;
 
 const survivorMenu = createSurvivorMenu({
   scene, renderer, states: hands.states,
+  onEquip: hands.equipInventoryTool,
   onToggle(open) {
     keys.clear(); touchMove = { x: 0, z: 0 }; touchMoveId = null; touchLookId = null; mouseDragging = false;
     velocity.set(0, 0, 0); footsteps.reset(); movePad.firstElementChild.style.transform = '';
@@ -319,9 +323,10 @@ function frame(time) {
   // Resource storage compares controller and headset WORLD positions. Refresh
   // the XR camera first; its raw pose at frame start is reference-space local.
   hands.update(dt);
+  pickupNotice.update(dt);
   const activeCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
   activeCamera.getWorldPosition(head);
-  survivorMenu.update();
+  survivorMenu.update(dt);
 
   // local-floor still reports the real headset height while sitting. In seated mode,
   // measure it once at VR start and raise the entire player rig to a normal eye height.

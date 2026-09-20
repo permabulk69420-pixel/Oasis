@@ -105,7 +105,7 @@ export function createGroundStones({ field, renderer = null, onError = console.w
   return group;
 }
 
-export function createHeldStones({ scene, states, renderer = null, onError = console.warn }) {
+export function createHeldStones({ scene, states, renderer = null, onError = console.warn, onStore = () => {} }) {
   if (!scene || !Array.isArray(states)) throw new Error('Stone grabbing requires the Oasis scene and VR hand states.');
 
   const heldByState = new Map();
@@ -140,6 +140,7 @@ export function createHeldStones({ scene, states, renderer = null, onError = con
     stone.userData.collected = true;
     heldByState.delete(state);
     addInventoryItem('stone', 1);
+    onStore('stone');
     return true;
   }
 

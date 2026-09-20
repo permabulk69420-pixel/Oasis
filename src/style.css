@@ -35,3 +35,4 @@ p{font-size:14px;line-height:1.55;margin:18px 0 0;color:#f2e8d6}
 .survivor-buttons button:focus-visible{outline:2px solid #e7f2ec;outline-offset:-3px;background:#ffffff0d}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @media(max-width:700px) and (orientation:portrait){#survivor-menu{align-items:center;justify-content:flex-start}.survivor-viewport{width:960px} }
+#pickup-notice{position:fixed;z-index:30;top:68%;left:50%;transform:translateX(-50%);padding:10px 24px;border:1px solid #8ed4bf66;border-radius:3px;background:#081c1fdd;color:#e7f2ec;font-size:20px;line-height:1.6;white-space:pre-line;text-align:center;pointer-events:none}
