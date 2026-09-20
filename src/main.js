@@ -314,9 +314,11 @@ function frame(time) {
   const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0;
   lastTime = time;
   dayNight.update(dt);
-  hands.update(dt);
   rig.updateMatrixWorld(true);
   if (renderer.xr.isPresenting) renderer.xr.updateCamera(camera);
+  // Resource storage compares controller and headset WORLD positions. Refresh
+  // the XR camera first; its raw pose at frame start is reference-space local.
+  hands.update(dt);
   const activeCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
   activeCamera.getWorldPosition(head);
   survivorMenu.update();
