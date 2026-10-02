@@ -63,7 +63,7 @@ function cloudTexture() {
   return texture;
 }
 
-const atmosphere = /* glsl */`
+export const atmosphere = /* glsl */`
   uniform vec3 uSun;
   uniform sampler2D uCloudMap;
   uniform float uCloudTime;

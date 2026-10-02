@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { atmosphere } from './materials.js';
 
 // Rebuild the existing Oasis water material in-place. The mesh already carries a
 // per-vertex `waterDepth` attribute derived from the terrain heightfield, so we keep
@@ -8,7 +9,8 @@ import * as THREE from 'three';
 // - centimetre-scale vertex waves
 // - analytic ripple normals (no normal-map texture fetch)
 // - depth-based tint/opacity over the real terrain beneath the pool
-// - Fresnel + cheap analytic sky/sun reflection
+// - Fresnel reflection of the real sky, drifting clouds and nearby dunes
+// - two scrolling ripple layers from the existing noise texture
 // - a readable but fixed shoreline contact band
 // - no planar reflection camera, SSR, FFT ocean, refraction render target or particles
 export function installOasisWater(material, onError = console.warn) {
@@ -17,7 +19,8 @@ export function installOasisWater(material, onError = console.warn) {
     return false;
   }
   if (material.userData.oasisWaterV2) return true;
-  if (!material.uniforms?.uTime || !material.uniforms?.uSun || !material.uniforms?.uElevation) {
+  if (!material.uniforms?.uTime || !material.uniforms?.uSun || !material.uniforms?.uElevation
+    || !material.uniforms?.uCloudMap || !material.uniforms?.uCloudTime) {
     onError('[Oasis water] Existing water uniforms are incomplete.');
     return false;
   }
@@ -58,29 +61,55 @@ export function installOasisWater(material, onError = console.warn) {
 
   material.fragmentShader = /* glsl */`
     uniform float uTime;
-    uniform vec3 uSun;
     uniform sampler2D uElevation;
     varying vec3 vWorld;
     varying float vDepth;
+    ${atmosphere}
 
-    float daylightLevel() {
-      return smoothstep(-0.07, 0.16, uSun.y);
+    float groundAt(vec2 p) {
+      vec2 rg = texture2D(uElevation, ((p + 500.0) / 1000.0 * 512.0 + 0.5) / 513.0).rg;
+      return dot(rg, vec2(256.0, 1.0)) * (255.0 * 64.0 / 65535.0);
     }
 
-    vec3 reflectedSky(vec3 ray, float daylight) {
-      float h = clamp(ray.y * 0.5 + 0.5, 0.0, 1.0);
-      vec3 dayHorizon = vec3(0.48, 0.62, 0.67);
-      vec3 dayZenith = vec3(0.035, 0.18, 0.38);
-      vec3 nightHorizon = vec3(0.006, 0.009, 0.016);
-      vec3 nightZenith = vec3(0.002, 0.005, 0.014);
-      vec3 horizon = mix(nightHorizon, dayHorizon, daylight);
-      vec3 zenith = mix(nightZenith, dayZenith, daylight);
-      return mix(horizon, zenith, pow(h, 0.62));
+    // The same sky the player sees above: gradient, sun halo and the drifting cloud layer.
+    // Reflecting real clouds is what stops the pond reading as a flat grey sheet.
+    vec3 skyWithClouds(vec3 ray, float daylight) {
+      vec3 color = skyColor(ray);
+      float horizonFade = smoothstep(0.045, 0.19, ray.y);
+      if (horizonFade > 0.001) {
+        float planeDistance = max(CLOUD_HEIGHT - vWorld.y, 1.0) / max(ray.y, 0.06);
+        float rawCloud = skyCloudNoise(vWorld.xz + ray.xz * planeDistance);
+        float cloud = smoothstep(0.49, 0.65, rawCloud) * horizonFade * 0.86;
+        vec3 cloudColor = mix(vec3(0.005, 0.007, 0.012), vec3(0.90, 0.91, 0.89), daylight);
+        cloudColor *= 1.0 - smoothstep(0.60, 0.74, rawCloud) * 0.17;
+        color = mix(color, cloudColor, cloud * (0.32 + daylight * 0.46));
+      }
+      return color;
+    }
+
+    // Short height-field march so low reflections pick up the surrounding dunes and bank.
+    vec3 environmentReflection(vec3 ray, float daylight) {
+      if (ray.y < 0.22) {
+        float d = 2.5;
+        for (int i = 0; i < 6; i++) {
+          vec3 point = vWorld + ray * d;
+          if (max(abs(point.x), abs(point.z)) > 499.0) break;
+          if (groundAt(point.xz) > point.y + 0.05) {
+            float dx = groundAt(point.xz + vec2(2.0, 0.0)) - groundAt(point.xz - vec2(2.0, 0.0));
+            float dz = groundAt(point.xz + vec2(0.0, 2.0)) - groundAt(point.xz - vec2(0.0, 2.0));
+            vec3 n = normalize(vec3(-dx, 4.0, -dz));
+            vec3 light = mix(vec3(0.008, 0.012, 0.020), vec3(0.28, 0.35, 0.43), daylight);
+            light += vec3(1.23, 1.09, 0.86) * max(dot(n, uSun), 0.0) * daylight;
+            return air(vec3(0.68, 0.46, 0.23) * light * 0.78, ray, d);
+          }
+          d *= 2.3;
+        }
+      }
+      return skyWithClouds(ray, daylight);
     }
 
     void main() {
-      // The terrain itself defines the bank. When the displaced surface falls below it,
-      // the water fragment disappears and the actual terrain remains visible underneath.
+      // The terrain itself defines the bank; below it the real ground stays visible.
       if (vDepth <= 0.002) discard;
 
       float environmentDay = daylightLevel();
@@ -89,66 +118,67 @@ export function installOasisWater(material, onError = console.warn) {
       vec3 view = toEye / max(distance, 0.001);
       vec2 p = vWorld.xz;
 
-      // Analytic slopes for the same broad waves used by the vertex shader, plus two much
-      // smaller high-frequency ripples. This gives visible moving water without textures.
+      // Broad swell: analytic slopes matching the vertex waves.
       float c1 = cos(p.x * 0.34 + p.y * 0.19 - uTime * 0.82);
       float c2 = cos(p.x * -0.21 + p.y * 0.41 + uTime * 0.61 + 1.7);
       float c3 = cos(p.x * 0.53 + p.y * -0.27 - uTime * 0.47 + 3.1);
+      vec2 slope = vec2(
+        c1 * 0.34 * 0.0078 + c2 * -0.21 * 0.0047 + c3 * 0.53 * 0.0026,
+        c1 * 0.19 * 0.0078 + c2 * 0.41 * 0.0047 + c3 * -0.27 * 0.0026
+      );
+
+      // Wind ripples: two layers of the existing mipmapped noise texture scrolling in
+      // different directions (the classic two-normal-map trick, no extra texture).
+      float rippleFade = 1.0 - smoothstep(45.0, 240.0, distance);
+      float depthCalm = smoothstep(0.015, 0.22, vDepth);
+      vec2 rA = texture2D(uCloudMap, p / 5.3 + vec2(uTime * 0.021, uTime * 0.013)).rg - 0.5;
+      vec2 rB = texture2D(uCloudMap, vec2(p.y, -p.x) / 3.1 + vec2(-uTime * 0.017, uTime * 0.026)).rg - 0.5;
       float r1 = cos(p.x * 1.73 + p.y * 1.14 - uTime * 1.43);
       float r2 = cos(p.x * -1.29 + p.y * 2.07 + uTime * 1.08 + 0.8);
+      slope += (rA * 0.085 + rB * 0.060 + vec2(r1 * 0.010 - r2 * 0.008, r1 * 0.007 + r2 * 0.011))
+        * rippleFade * depthCalm;
+      // Far away, ripples blur into a gentle roughness instead of shimmering.
+      slope += vec2(0.0035) * (1.0 - rippleFade) * sin(p.x * 0.9 + p.y * 0.6 + uTime);
 
-      float normalFade = 1.0 - smoothstep(35.0, 130.0, distance);
-      float depthCalm = smoothstep(0.02, 0.30, vDepth);
-      float dHdx = (c1 * 0.34 * 0.0078 + c2 * -0.21 * 0.0047 + c3 * 0.53 * 0.0026)
-        + (r1 * 0.0060 - r2 * 0.0045) * depthCalm;
-      float dHdz = (c1 * 0.19 * 0.0078 + c2 * 0.41 * 0.0047 + c3 * -0.27 * 0.0026)
-        + (r1 * 0.0040 + r2 * 0.0072) * depthCalm;
-      vec3 normal = normalize(vec3(-dHdx * normalFade, 1.0, -dHdz * normalFade));
-
+      vec3 normal = normalize(vec3(-slope.x, 1.0, -slope.y));
       vec3 reflected = reflect(-view, normal);
+      reflected.y = abs(reflected.y);
       float facing = max(dot(normal, view), 0.0);
-      float fresnel = 0.022 + 0.978 * pow(1.0 - facing, 5.0);
+      // Slightly under-1 at grazing angles so a little of the water body always shows.
+      float fresnel = 0.02 + 0.70 * pow(1.0 - facing, 5.0);
 
-      // The actual terrain is rendered below the transparent surface. These colours are
-      // therefore absorption/tint, not a painted fake bottom.
-      float depthAmount = 1.0 - exp(-max(vDepth, 0.0) * 0.72);
-      vec3 shallowWater = vec3(0.075, 0.31, 0.27);
-      vec3 deepWater = vec3(0.020, 0.135, 0.19);
+      // Absorption/tint layer over the real terrain bottom.
+      float depthAmount = 1.0 - exp(-max(vDepth, 0.0) * 0.85);
+      vec3 shallowWater = vec3(0.07, 0.40, 0.36);
+      vec3 deepWater = vec3(0.010, 0.17, 0.21);
       vec3 transmission = mix(shallowWater, deepWater, depthAmount);
       transmission *= mix(0.11, 1.0, environmentDay);
 
-      // Very restrained moving shallow light. Because the real sand is visible below this
-      // remains a surface modulation instead of looking like a texture painted on the floor.
-      float caustic = sin(p.x * 2.9 + uTime * 0.42 + r1 * 0.35)
-        * sin(p.y * 3.2 - uTime * 0.36 + r2 * 0.28);
-      transmission += vec3(0.035, 0.050, 0.030)
-        * caustic * (1.0 - depthAmount) * environmentDay * 0.38;
+      float caustic = sin(p.x * 2.9 + uTime * 0.42 + rA.x * 2.0)
+        * sin(p.y * 3.2 - uTime * 0.36 + rB.y * 2.0);
+      transmission += vec3(0.045, 0.065, 0.040)
+        * caustic * (1.0 - depthAmount) * environmentDay * 0.45;
 
-      vec3 reflectedColor = reflectedSky(reflected, environmentDay);
-      float sunGlint = pow(max(dot(reflected, uSun), 0.0), 260.0);
-      reflectedColor += vec3(2.0, 1.72, 1.15) * sunGlint * environmentDay;
+      // A faint oasis-green bias in reflections helps it read as fresh water, not a mirror.
+      vec3 reflectedColor = environmentReflection(reflected, environmentDay) * vec3(0.80, 0.94, 0.96);
+      float sunGlint = pow(max(dot(reflected, uSun), 0.0), 320.0);
+      reflectedColor += vec3(2.4, 2.05, 1.4) * sunGlint * environmentDay;
 
       // Keep this exact expression as the torch integration hook. Torch light modifies
       // transmission/reflectedColor before the final Fresnel blend.
       vec3 color = mix(transmission, reflectedColor, fresnel);
 
-      // A stable shoreline contact cue. It changes brightness subtly with the existing
-      // ripples but never moves the shoreline mask itself, so sloped banks cannot open holes.
+      // Stable shoreline contact band with a gentle moving sheen.
       float edgeFade = smoothstep(0.002, 0.038, vDepth);
       float shoreBand = (1.0 - smoothstep(0.025, 0.135, vDepth)) * edgeFade;
       float shoreShimmer = 0.78 + 0.22 * sin(p.x * 0.58 - p.y * 0.46 + uTime * 0.92);
-      vec3 shoreTint = mix(vec3(0.012, 0.016, 0.020), vec3(0.25, 0.31, 0.27), environmentDay);
-      color += shoreTint * shoreBand * shoreShimmer * 0.16;
+      vec3 shoreTint = mix(vec3(0.012, 0.016, 0.020), vec3(0.30, 0.34, 0.27), environmentDay);
+      color += shoreTint * shoreBand * shoreShimmer * 0.18;
 
-      // Readable clear water: shallow areas still show the sand strongly, but never become
-      // visually invisible. Depth and grazing-angle reflection build opacity naturally.
-      float waterAlpha = 0.22
-        + depthAmount * 0.43
-        + fresnel * 0.23
-        + shoreBand * 0.10;
+      float waterAlpha = 0.40 + depthAmount * 0.40 + fresnel * 0.18 + shoreBand * 0.08;
       waterAlpha *= edgeFade;
 
-      gl_FragColor = vec4(color, clamp(waterAlpha, 0.0, 0.84));
+      gl_FragColor = vec4(color, clamp(waterAlpha, 0.0, 0.93));
       #include <tonemapping_fragment>
       #include <colorspace_fragment>
     }
