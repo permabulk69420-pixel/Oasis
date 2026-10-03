@@ -64,7 +64,7 @@ anything odd for him.
 Merged so far (PR numbers, newest last): #25 campfire, #26 and #27 CLAUDE.md, #28 wind-blown sand and dust, #29 fire
 smoke plus a moonlit fill/rim for lit objects at night, #30 the night sky (moon, Milky Way, shooting stars), #31 plant
 sway (grass, ferns, reeds, desert plants and the alien trees lean with the same gusts as the sand; `src/wind.js`;
-the hero tree is left still).
+the hero tree is left still), #32 the alien bird's model (3 LODs, 19 bones), pose code and pose lab (not in the game yet).
 Kane also asked (while asleep) for a spear, if there is time: a held tool like the axe and torch, my call on the
 design, no combat mechanics. Heat haze was skipped on purpose (it needs a full-screen copy of the scene: too costly on Quest). Tasks left in
 order: alien bird, backpack, spear, newer trees with LODs, perf check.
