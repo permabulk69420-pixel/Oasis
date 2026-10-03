@@ -4,8 +4,9 @@ import { installOasisWater } from './oasis-water.js';
 import { createWaterFireflies } from './water-fireflies.js';
 
 // The game leans toward twilight and night: a shorter day, a longer night.
-export const DAY_SECONDS = 4 * 60;
-export const NIGHT_SECONDS = 6 * 60;
+// Short on purpose while testing; the shipped game will use 30+ minute days.
+export const DAY_SECONDS = 3 * 60;
+export const NIGHT_SECONDS = 3 * 60;
 export const CYCLE_SECONDS = DAY_SECONDS + NIGHT_SECONDS;
 
 const NIGHT_EXPOSURE = 0.035;
