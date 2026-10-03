@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { WATER, grassCover, noise } from './world.js';
+import { addWindSway, SWAY } from './wind.js';
 
 // Semi-realistic oasis grass for standalone Quest.
 // Base coverage stays unchanged across the oasis. A second copy of nearby patches is inserted into
@@ -155,6 +156,7 @@ export function createOasisGrassRing({ field }) {
     side: THREE.DoubleSide,
   });
   material.name = 'Oasis grass';
+  addWindSway(material, SWAY.grass); // ripples roll across the field with the gusts
 
   const richGeometry = createPatchGeometry(RICH_BLADES, 2, true);
   const liteGeometry = createPatchGeometry(LITE_BLADES, 1, false);

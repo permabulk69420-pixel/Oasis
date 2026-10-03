@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WATER } from './world.js';
+import { addWindSwayToModel, SWAY } from './wind.js';
 
 const HIGH_URL = `${import.meta.env.BASE_URL}models/alien_desert_plant/alien_desert_plant_lod0.glb`;
 const LOW_URL = `${import.meta.env.BASE_URL}models/alien_desert_plant/alien_desert_plant_lod1.glb`;
@@ -32,6 +33,8 @@ function applyPlantTextures(source, stemTexture, leafTexture) {
 }
 
 function prepareSource(source, stemTexture, leafTexture) {
+  // Stems bend with the wind; the leaves bend with them and tremble a little on top.
+  addWindSwayToModel(source, material => (material.name === LEAF_MATERIAL_NAME ? SWAY.plantLeaf : SWAY.plantStem));
   source.updateMatrixWorld(true);
   source.traverse(object => {
     if (!object.isMesh) return;

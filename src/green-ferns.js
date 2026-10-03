@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WATER } from './world.js';
+import { addWindSwayToModel, SWAY } from './wind.js';
 
 const HIGH_URL = `${import.meta.env.BASE_URL}models/vegetation/green-fern/ark_style_fern.glb`;
 const LOW_URL = `${import.meta.env.BASE_URL}models/vegetation/green-fern/ark_style_fern_lod1_fixed.glb`;
@@ -22,6 +23,7 @@ const LAYOUT = [
 ];
 
 function prepareSource(source) {
+  addWindSwayToModel(source, () => SWAY.fern);
   source.updateMatrixWorld(true);
   source.traverse(object => {
     if (!object.isMesh) return;

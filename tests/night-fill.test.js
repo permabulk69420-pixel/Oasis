@@ -70,7 +70,7 @@ test('the real material types get the fill when installed', () => {
   const lambert = fakeShader(THREE.ShaderLib.lambert.fragmentShader);
   new THREE.MeshLambertMaterial().onBeforeCompile(lambert);
   assert.equal(lambert.uniforms.uNightFill, nightFill);
-  // and a material with its own hook (like the swaying reeds) keeps it without the fill
+  // and a material with its own hook keeps it, without the fill unless it chains to the original
   const own = new THREE.MeshStandardMaterial();
   own.onBeforeCompile = shaderArg => { shaderArg.fragmentShader += '/*own*/'; };
   const ownShader = fakeShader(THREE.ShaderLib.standard.fragmentShader);
