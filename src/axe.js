@@ -233,8 +233,8 @@ export function createAxeKind({ scene, onError = console.warn }) {
     pickupRadius: PICKUP_RADIUS,
     // Keep the proven vertical flip, then twist so the blade faces forward in the hand.
     heldRotation: heldFlip.clone().multiply(bladeForwardTwist),
-    // Hangs head-down from the belt with the handle up, ready to draw.
-    holster: { flip: true, lift: 0.12, outward: 0.2, pitch: -0.1 },
+    // Head up at the hip, handle hanging down the thigh, blade facing forward.
+    holster: { dir: [0.10, 1, 0.12], edge: [1, 0, 0], along: 0.30 },
     spawns: [{ x: SPAWN.x - 0.85, z: SPAWN.z - 1.05 }],
 
     prepareTemplate(root) {

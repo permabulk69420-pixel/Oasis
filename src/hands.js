@@ -206,7 +206,7 @@ export function createVRHands({ renderer, scene, parent = null, camera = null, g
 
   // Torch first so overlapping pickups keep their old priority.
   const tools = createTools({
-    scene, states, renderer, camera, onError,
+    scene, rig: controllerParent, states, renderer, camera, onError,
     kinds: [createTorchKind({ scene, onError }), createAxeKind({ scene, onError })],
   });
   const firstTool = kind => ({ getObject: () => tools.getInstances(kind)[0]?.root || null });

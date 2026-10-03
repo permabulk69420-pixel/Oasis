@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { createTools, holsterQuaternion, inHolsterZone, HOLSTER_RADIUS, HOLSTER_HALF_HEIGHT } from '../src/tools.js';
+import { createTools, holsterPose, inHolsterZone, HOLSTER_RADIUS, HOLSTER_HALF_HEIGHT } from '../src/tools.js';
 import { createAxeKind, TREE_DROPS, TREE_HITS_TO_FELL } from '../src/axe.js';
 import { createTorchKind } from '../src/torch.js';
 import { registerDropSpawner } from '../src/resource-drops.js';
@@ -37,7 +37,7 @@ function fixture(t) {
   const buttons = Array.from({ length: 6 }, () => ({ pressed: false, value: 0 }));
   const state = { handedness: 'right', grip, objectGrip, inputSource: { gamepad: { buttons } } };
   const tools = createTools({
-    scene, states: [state], renderer, onError: () => {},
+    scene, rig, states: [state], renderer, onError: () => {},
     kinds: [createTorchKind({ scene, onError: () => {} }), createAxeKind({ scene, onError: () => {} })],
   });
   const handTo = world => { rig.updateMatrixWorld(true); grip.position.copy(rig.worldToLocal(world.clone())); grip.updateMatrixWorld(true); };
@@ -106,10 +106,10 @@ test('a tool drawn from one hip can be put on the other, dropped, or packed at t
 });
 
 test('holsters mirror left and right', () => {
-  const holster = { outward: 0.2, pitch: 0.3, flip: true };
-  const down = new THREE.Vector3(0, 1, 0);
-  const left = down.clone().applyQuaternion(holsterQuaternion(holster, 'left'));
-  const right = down.clone().applyQuaternion(holsterQuaternion(holster, 'right'));
+  const holster = { dir: [0.3, 1, 0.2], along: 0.2 };
+  const up = new THREE.Vector3(0, 1, 0);
+  const left = up.clone().applyQuaternion(holsterPose(holster, 'left').quaternion);
+  const right = up.clone().applyQuaternion(holsterPose(holster, 'right').quaternion);
   assert.ok(Math.abs(left.x + right.x) < 1e-6 && Math.abs(left.y - right.y) < 1e-6);
 });
 
