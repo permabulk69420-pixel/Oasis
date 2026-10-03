@@ -9,10 +9,11 @@ import { createSandFootsteps } from './footsteps.js';
 import { createGroundSticks } from './sticks.js';
 import { createGroundStones } from './stones.js';
 import { createGroundFruit } from './glow-fruit.js';
+import { createCampfires, campfireSpot, campfireSite } from './campfire.js';
 import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater } from './survival.js';
 import { pulseHaptics } from './haptics.js';
 import { createSurvivorMenu } from './survivor-menu.js';
-import { getInventoryWeight, getCarrySpeedMultiplier } from './inventory.js';
+import { getInventoryWeight, getCarrySpeedMultiplier, removeInventoryItem } from './inventory.js';
 
 const canvas = document.querySelector('#world');
 const welcome = document.querySelector('#welcome');
@@ -154,8 +155,36 @@ let crouchOffset = 0, crouchActive = false, crouchButtonDown = false;
 let sprintActive = false, sprintButtonDown = false;
 let drinkTick = 0;
 
+// Campfires: crafted, placed from the menu, lit by touching a lit torch to the logs.
+const campfires = createCampfires({
+  scene,
+  heightAt: field.sample,
+  getExposure: () => renderer.toneMappingExposure,
+  onError: message => console.warn(message),
+  getFlames: () => hands.tools.getInstances('torch')
+    .filter(torch => torch.state.lit && torch.state.flameAnchor)
+    .map(torch => {
+      torch.state.flameAnchor.updateWorldMatrix(true, false);
+      return { position: new THREE.Vector3().setFromMatrixPosition(torch.state.flameAnchor.matrixWorld), heldBy: torch.heldBy };
+    }),
+});
+const placeHead = new THREE.Vector3(), placeForward = new THREE.Vector3();
+function placeFromMenu(type) {
+  if (type !== 'campfire') return { ok: false, message: 'You can’t place that.' };
+  const view = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
+  view.getWorldPosition(placeHead); view.getWorldDirection(placeForward);
+  const spot = campfireSpot(placeHead, placeForward);
+  const check = campfires.canPlace(spot.x, spot.z);
+  if (!check.ok) return check;
+  if (!removeInventoryItem('campfire', 1)) return { ok: false, message: 'No campfire in your backpack.' };
+  campfires.place(spot.x, spot.z);
+  return { ok: true, message: 'Campfire placed. Light it with a torch.' };
+}
+// Development-only: ?camp=lit or ?camp=unlit puts a campfire in view near the spawn point.
+let devCamp = import.meta.env.DEV ? new URLSearchParams(location.search).get('camp') : null;
+
 const survivorMenu = createSurvivorMenu({
-  scene, renderer, states: hands.states, tools: hands.tools,
+  scene, renderer, states: hands.states, tools: hands.tools, onPlace: placeFromMenu,
   onToggle(open) {
     keys.clear(); touchMove = { x: 0, z: 0 }; touchMoveId = null; touchLookId = null; mouseDragging = false;
     velocity.set(0, 0, 0); footsteps.reset(); movePad.firstElementChild.style.transform = '';
@@ -351,6 +380,25 @@ function frame(time) {
   lastTime = time;
   dayNight.update(dt);
   glowFruit.update(dt);
+  campfires.update(dt, renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
+  if (devCamp && campfires.ready) {
+    // The flattest spot within a few metres of the spawn point, so the ring sits level.
+    let cx = SPAWN.x + 4, cz = SPAWN.z - 4, flattest = Infinity;
+    for (let dx = -14; dx <= 14; dx += 2) {
+      for (let dz = -14; dz <= 14; dz += 2) {
+        const { slope } = campfireSite(SPAWN.x + dx, SPAWN.z + dz, field.sample);
+        if (slope < flattest) { flattest = slope; cx = SPAWN.x + dx; cz = SPAWN.z + dz; }
+      }
+    }
+    campfires.place(cx, cz, { lit: devCamp === 'lit' });
+    const away = Number(new URLSearchParams(location.search).get('campd')) || 2.5; // metres from the fire
+    const ox = away * 0.77, oz = away * 0.64;
+    const px = cx + ox, pz = cz + oz, gy = field.sample(px, pz);
+    rig.position.set(px, gy, pz); groundY = gy;
+    rig.rotation.y = Math.atan2(ox, oz);
+    camera.rotation.x = Math.atan2(field.sample(cx, cz) + 0.3 - (gy + STANDING_EYE_HEIGHT), away);
+    devCamp = null;
+  }
   rig.updateMatrixWorld(true);
   if (renderer.xr.isPresenting) renderer.xr.updateCamera(camera);
   // Resource storage compares controller and headset WORLD positions. Refresh
@@ -461,6 +509,7 @@ function frame(time) {
   if (import.meta.env.DEV && time - telemetryTime > 1000) {
     canvas.dataset.position = JSON.stringify({ x: +head.x.toFixed(2), z: +head.z.toFixed(2), ground: +field.sample(head.x, head.z).toFixed(2), yaw: +rig.rotation.y.toFixed(3) });
     canvas.dataset.render = JSON.stringify({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures });
+    canvas.dataset.campfires = JSON.stringify(campfires.list().map(fire => ({ x: +fire.x.toFixed(1), z: +fire.z.toFixed(1), lit: fire.lit })));
     canvas.dataset.survival = JSON.stringify(Object.fromEntries(Object.entries(getSurvivalStats()).map(([k, v]) => [k, +v.toFixed(1)])));
     canvas.dataset.inventory = JSON.stringify({ weight: getInventoryWeight(), speedMultiplier: getCarrySpeedMultiplier() });
     telemetryTime = time;
