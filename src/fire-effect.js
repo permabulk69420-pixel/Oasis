@@ -1,9 +1,11 @@
 import * as THREE from 'three';
+import { WIND_SAND } from './wind-sand.js';
 
 // A campfire's flame: a few upright billboards of scrolling fractal noise shaped like licking
 // tongues (white-yellow core, orange body, red edge), a soft heat glow at the base and a handful of
 // sparks drifting up. Everything is additive and drawn without tone mapping, so it reads the same at
-// noon and at midnight; the cost is a few quads and a small point cloud per fire.
+// noon and at midnight; the cost is a few quads and a small point cloud per fire. Above the flame a
+// thin plume of smoke rises, leans downwind and thins out: grey by day, glowing orange near the fire at night.
 
 const NOISE_GLSL = /* glsl */`
   float hash21(vec2 p) {
@@ -126,6 +128,66 @@ const SPARK_FRAGMENT = /* glsl */`
   }
 `;
 
+
+// Smoke: soft round puffs that rise from the top of the flame, lean downwind, grow and fade. Like the
+// sparks, all motion is computed from time in the vertex shader.
+const SMOKE_VERTEX = /* glsl */`
+  attribute vec4 aSeed; // x: life, y: phase, z: size, w: swirl
+  uniform float uTime;
+  uniform float uGrow;
+  uniform vec2 uWind;
+  uniform float uHeight;
+  varying vec2 vUv;
+  varying float vPhase;
+  varying float vSeed;
+  varying float vNear;
+  void main() {
+    float life = 4.4 + aSeed.x * 3.2;
+    float t = uTime / life + aSeed.y;
+    float phase = fract(t);
+    float cycle = floor(t);
+    float r = fract(sin((aSeed.z + cycle) * 43.7) * 9371.3);
+    vec3 centre = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+    float rise = phase * uHeight * mix(0.4, 1.0, uGrow);
+    vec3 drift = vec3(uWind.x, 0.0, uWind.y) * (phase * phase * 2.2 + phase * 0.3);
+    float swirl = sin(uTime * 0.7 + aSeed.w * 20.0 + phase * 4.0) * 0.14 * phase;
+    vec3 world = centre + vec3(0.0, 0.55 + rise, 0.0) + drift + vec3(swirl, 0.0, -swirl * 0.7)
+      + vec3(r - 0.5, 0.0, fract(r * 7.3) - 0.5) * 0.14;
+    vec4 mv = viewMatrix * vec4(world, 1.0);
+    float size = mix(0.20, 1.05, sqrt(phase)) * (0.8 + 0.4 * aSeed.z);
+    mv.xy += position.xy * size * 0.5;
+    gl_Position = projectionMatrix * mv;
+    vUv = position.xy;
+    vPhase = phase;
+    vSeed = aSeed.z + cycle * 0.37;
+    vNear = smoothstep(0.35, 1.4, -mv.z);
+  }
+`;
+
+const SMOKE_FRAGMENT = /* glsl */`
+  uniform float uTime;
+  uniform float uStrength;
+  uniform float uDay;
+  varying vec2 vUv;
+  varying float vPhase;
+  varying float vSeed;
+  varying float vNear;
+  ${NOISE_GLSL}
+  void main() {
+    float d = length(vUv);
+    if (d > 1.0) discard;
+    float n = fbm(vUv * 1.7 + vec2(vSeed * 13.1, vSeed * 7.7) + vec2(0.0, -uTime * 0.12));
+    float body = 1.0 - smoothstep(0.22, 1.0, d + (n - 0.5) * 0.75);
+    float a = body * smoothstep(0.0, 0.10, vPhase) * (1.0 - smoothstep(0.42, 1.0, vPhase)) * uStrength * vNear * 0.36;
+    if (a < 0.008) discard;
+    float low = 1.0 - smoothstep(0.0, 0.55, vPhase); // near the fire
+    vec3 dayColour = mix(vec3(0.24, 0.23, 0.22), vec3(0.64, 0.62, 0.59), smoothstep(0.0, 0.6, vPhase) * (0.6 + 0.4 * n));
+    // At night the smoke is only seen where the fire lights it from below.
+    vec3 nightColour = vec3(0.012, 0.014, 0.020) + vec3(0.90, 0.34, 0.08) * low * low * 0.5 * (0.6 + 0.4 * n);
+    gl_FragColor = vec4(mix(nightColour, dayColour, uDay), a);
+  }
+`;
+
 // Layers: size (width, height) in metres, offset from the anchor, noise seed and scroll speed.
 const FLAME_LAYERS = [
   { size: [0.80, 1.20], offset: [0.00, 0.00], seed: 1.7, speed: 1.00 },
@@ -134,8 +196,9 @@ const FLAME_LAYERS = [
   { size: [0.88, 0.62], offset: [0.02, -0.12], seed: 13.6, speed: 1.50 },
 ];
 const SPARK_COUNT = 36;
+const SMOKE_COUNT = 14;
 
-export function createFireEffect({ spark = true } = {}) {
+export function createFireEffect({ spark = true, smoke = true } = {}) {
   const group = new THREE.Group();
   group.name = 'Campfire flame';
 
@@ -226,8 +289,41 @@ export function createFireEffect({ spark = true } = {}) {
     group.add(points);
   }
 
-  // time in seconds, strength 0..1.1 (flicker already applied), grow 0..1 (fade-in)
-  function update(time, strength = 1, grow = 1) {
+  let smokeMaterial = null, smokeGeometry = null;
+  if (smoke) {
+    smokeGeometry = new THREE.InstancedBufferGeometry();
+    smokeGeometry.setAttribute('position', new THREE.Float32BufferAttribute([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0], 3));
+    smokeGeometry.setIndex([0, 1, 2, 0, 2, 3]);
+    const seeds = new Float32Array(SMOKE_COUNT * 4);
+    for (let i = 0; i < SMOKE_COUNT; i++) {
+      seeds[i * 4] = ((Math.sin(i * 17.31 + 0.7) * 43758.5453) % 1 + 1) % 1;
+      seeds[i * 4 + 1] = i / SMOKE_COUNT; // spread evenly over the cycle
+      seeds[i * 4 + 2] = ((Math.sin(i * 51.77 + 2.9) * 24634.6345) % 1 + 1) % 1;
+      seeds[i * 4 + 3] = ((Math.sin(i * 7.13 + 4.2) * 12345.6789) % 1 + 1) % 1;
+    }
+    smokeGeometry.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 4));
+    smokeGeometry.instanceCount = SMOKE_COUNT;
+    smokeMaterial = new THREE.ShaderMaterial({
+      name: 'Campfire smoke',
+      uniforms: {
+        uTime: { value: 0 }, uStrength: { value: 1 }, uGrow: { value: 1 }, uDay: { value: 0 },
+        uWind: { value: new THREE.Vector2(...WIND_SAND.wind).normalize() }, uHeight: { value: 2.5 },
+      },
+      vertexShader: SMOKE_VERTEX,
+      fragmentShader: SMOKE_FRAGMENT,
+      transparent: true,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    const plume = new THREE.Mesh(smokeGeometry, smokeMaterial);
+    plume.frustumCulled = false;
+    plume.renderOrder = 18;
+    plume.name = 'Smoke';
+    group.add(plume);
+  }
+
+  // time in seconds, strength 0..1.1 (flicker already applied), grow 0..1 (fade-in), day 0..1 (night to day)
+  function update(time, strength = 1, grow = 1, day = 0) {
     for (const material of flames) {
       material.uniforms.uTime.value = time;
       material.uniforms.uStrength.value = strength * grow;
@@ -238,13 +334,19 @@ export function createFireEffect({ spark = true } = {}) {
       sparkMaterial.uniforms.uTime.value = time;
       sparkMaterial.uniforms.uStrength.value = grow;
     }
+    if (smokeMaterial) {
+      smokeMaterial.uniforms.uTime.value = time;
+      smokeMaterial.uniforms.uStrength.value = Math.min(1, strength) * grow;
+      smokeMaterial.uniforms.uGrow.value = grow;
+      smokeMaterial.uniforms.uDay.value = day;
+    }
   }
 
   function dispose() {
-    planeGeometry.dispose(); glowGeometry.dispose(); sparkGeometry?.dispose();
+    planeGeometry.dispose(); glowGeometry.dispose(); sparkGeometry?.dispose(); smokeGeometry?.dispose();
     for (const material of flames) material.dispose();
-    glowMaterial.dispose(); sparkMaterial?.dispose();
+    glowMaterial.dispose(); sparkMaterial?.dispose(); smokeMaterial?.dispose();
   }
 
-  return { group, update, dispose, flames, glow: glowMaterial, sparks: sparkMaterial };
+  return { group, update, dispose, flames, glow: glowMaterial, sparks: sparkMaterial, smoke: smokeMaterial };
 }

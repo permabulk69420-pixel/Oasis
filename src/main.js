@@ -11,11 +11,13 @@ import { createGroundStones } from './stones.js';
 import { createGroundFruit } from './glow-fruit.js';
 import { createCampfires, campfireSpot, campfireSite } from './campfire.js';
 import { createWindSand, WIND_SAND } from './wind-sand.js';
+import { installNightFill } from './night-fill.js';
 import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater } from './survival.js';
 import { pulseHaptics } from './haptics.js';
 import { createSurvivorMenu } from './survivor-menu.js';
 import { getInventoryWeight, getCarrySpeedMultiplier, removeInventoryItem } from './inventory.js';
 
+installNightFill(); // moonlit fill for the lit (PBR) objects: before anything compiles
 const canvas = document.querySelector('#world');
 const welcome = document.querySelector('#welcome');
 const status = document.querySelector('#status');
