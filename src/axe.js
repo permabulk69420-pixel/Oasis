@@ -234,7 +234,7 @@ export function createAxeKind({ scene, onError = console.warn }) {
     // Keep the proven vertical flip, then twist so the blade faces forward in the hand.
     heldRotation: heldFlip.clone().multiply(bladeForwardTwist),
     // Head up at the hip, handle hanging down the thigh, blade facing forward.
-    holster: { dir: [0.04, 1, 0], edge: [1, 0, 0], along: 0.30 },
+    holster: { dir: [0.04, -1, 0], edge: [1, 0, 0], along: 0 },
     spawns: [{ x: SPAWN.x - 0.85, z: SPAWN.z - 1.05 }],
 
     prepareTemplate(root) {
