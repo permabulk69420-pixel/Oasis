@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import './style.css';
-import { createHeightField, clamp, stickAxis, stickVector, pivotRig, SPAWN, WATER } from './world.js';
+import { createHeightField, clamp, stickAxis, stickVector, pivotRig, SPAWN, WATER, HERO_TREE } from './world.js';
 import { createTerrain } from './terrain.js';
 import { createMaterials, createWater } from './materials.js';
 import { createVRHands } from './hands.js';
@@ -95,6 +95,19 @@ if (import.meta.env.DEV) {
     rig.position.set(WATER.x - 88, WATER.y + 76, WATER.z + 86);
     rig.rotation.y = -Math.atan2(88, 86); camera.rotation.x = -0.58;
   }
+  // Aim the camera at a point: rig turns to face it, the camera tilts up or down to meet it.
+  const aimAt = (px, pz, target, eye = 1.68) => {
+    const groundY = field.sample(px, pz);
+    rig.position.set(px, groundY, pz);
+    const dx = target.x - px, dz = target.z - pz;
+    rig.rotation.y = Math.atan2(-dx, -dz);
+    camera.rotation.x = Math.atan2(target.y - (groundY + eye), Math.hypot(dx, dz));
+  };
+  const heroY = field.sample(HERO_TREE.x, HERO_TREE.z);
+  if (view === 'hero') aimAt(HERO_TREE.x - 150, HERO_TREE.z + 150, { x: HERO_TREE.x, y: heroY + 38, z: HERO_TREE.z });
+  if (view === 'under') aimAt(HERO_TREE.x - 30, HERO_TREE.z + 30, { x: HERO_TREE.x, y: heroY + 22, z: HERO_TREE.z });
+  const hour = Number(new URLSearchParams(location.search).get('hour'));
+  if (new URLSearchParams(location.search).has('hour') && Number.isFinite(hour)) { dayNight.setTimeOfDay(hour); dayNight.setPaused(true); }
   if (view === 'wide') {
     rig.position.set(-90, field.sample(-90, 30) + 8, 30);
     rig.rotation.y = -0.7; camera.rotation.x = -0.2;
