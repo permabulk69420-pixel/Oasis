@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { WORLD_SIZE, WATER, SPAWN, GRID_STEP, GRID_SEGMENTS, createHeightField, terrainHeight, grassCover, stickVector, stickAxis, pivotRig } from '../src/world.js';
+import { WORLD_SIZE, WATER, SPAWN, GRID_STEP, GRID_SEGMENTS, createHeightField, terrainHeight, grassCover, stickVector, stickAxis, pivotRig, isInPond } from '../src/world.js';
 
 const field = createHeightField();
 test('the world is one kilometre square and the player starts on a hill near the oasis', () => {
@@ -65,4 +65,17 @@ test('continuous turning preserves the headset pivot after room-scale movement',
   const rz = -ox * Math.sin(angle) + oz * Math.cos(angle);
   assert.ok(Math.abs(result.x + rx - pivot.x) < 1e-10);
   assert.ok(Math.abs(result.z + rz - pivot.z) < 1e-10);
+});
+
+test('isInPond is true only when wading in the pool, not on the bank, the grass or at spawn', () => {
+  assert.ok(isInPond(WATER.x, WATER.z, field.sample(WATER.x, WATER.z)), 'pool centre');
+  assert.ok(isInPond(WATER.x, WATER.z), 'default ground lookup agrees');
+  assert.equal(isInPond(SPAWN.x, SPAWN.z, field.sample(SPAWN.x, SPAWN.z)), false, 'spawn dune');
+  for (let i = 0; i < 64; i++) {
+    const a = i / 64 * Math.PI * 2;
+    const bank = [WATER.x + Math.cos(a) * WATER.radiusX * 1.2, WATER.z + Math.sin(a) * WATER.radiusZ * 1.2];
+    assert.equal(isInPond(...bank), false, 'dry bank is not water');
+    const mid = [WATER.x + Math.cos(a) * WATER.radiusX * 0.5, WATER.z + Math.sin(a) * WATER.radiusZ * 0.5];
+    assert.ok(isInPond(...mid), 'halfway to the shore is deep enough to wade');
+  }
 });
