@@ -13,14 +13,12 @@ import { pulseHaptics } from './haptics.js';
 const GRIP_BUTTON = 1;
 export const HIP_SIDES = Object.freeze(['left', 'right']);
 
-// The belt follows the headset: a fixed drop below the eyes, so it also works seated or
-// crouched. Body yaw trails head yaw so glancing sideways doesn't swing the belt round.
+// The belt follows the headset's position (a fixed drop below the eyes, so it also works
+// seated or crouched) but never its facing.
 // Where a relaxed arm hangs, not the belt line: a hand at your side sits well below your waist.
 const HIP_DROP = 0.80;
 const HIP_SIDE = 0.20;
 const HIP_FORWARD = -0.10;
-const BODY_DEADZONE = 0.9; // ~50 degrees of head turn before the body follows
-const BODY_DRIFT_RATE = 0.2;
 const HIP_GRAB_RADIUS = 0.24;
 // Holster zone: a tall, forgiving ellipsoid around each hip. Wide enough to hit without
 // looking, tall enough that a hand hanging at your side or lifted to your waist both count.
@@ -35,8 +33,6 @@ const handPosition = new THREE.Vector3();
 const toolPosition = new THREE.Vector3();
 const anchorPosition = new THREE.Vector3();
 const headPosition = new THREE.Vector3();
-const headForward = new THREE.Vector3();
-const headRotation = new THREE.Matrix4();
 const inverseParent = new THREE.Matrix4();
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 const FORWARD = new THREE.Vector3(0, 0, -1);
@@ -46,10 +42,6 @@ const FORWARD = new THREE.Vector3(0, 0, -1);
 export function inHolsterZone(hand, anchor) {
   return Math.hypot(hand.x - anchor.x, hand.z - anchor.z) <= HOLSTER_RADIUS
     && Math.abs(hand.y - anchor.y) <= HOLSTER_HALF_HEIGHT;
-}
-
-function wrapAngle(angle) {
-  return Math.atan2(Math.sin(angle), Math.cos(angle));
 }
 
 // Hip pose, described by what you see rather than by Euler angles:
@@ -89,7 +81,7 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     (rig || scene).add(anchor);
     belt[side] = anchor;
   }
-  let bodyYaw = null;
+  let bodyYaw = 0;
 
   // Empty hips get a small soft dot while a hand holds a tool. When that hand is in the
   // zone a faint ghost of the held tool shows exactly how it will sit on the hip.
@@ -297,26 +289,14 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     // WebXR prepares the XR camera's world matrix; do not recompute it (see chest-storage.js).
     if (!presenting) view.updateWorldMatrix(true, false);
     headPosition.setFromMatrixPosition(view.matrixWorld);
-    headRotation.extractRotation(view.matrixWorld);
-    headForward.set(0, 0, -1).applyMatrix4(headRotation);
     // Work in the rig's space, so the belt rides along with walking and stick-turning.
     const parent = belt.left.parent;
     parent.updateWorldMatrix(true, false);
     inverseParent.copy(parent.matrixWorld).invert();
     headPosition.applyMatrix4(inverseParent);
-    headForward.transformDirection(inverseParent);
-    if (Math.hypot(headForward.x, headForward.z) > 0.15) {
-      const headYaw = Math.atan2(-headForward.x, -headForward.z);
-      if (bodyYaw === null || !(dt > 0)) bodyYaw = headYaw;
-      else {
-        // The body stays put while you look around, is dragged along once you turn far, and
-        // slowly settles toward where you face.
-        const offset = wrapAngle(headYaw - bodyYaw);
-        const excess = Math.abs(offset) - BODY_DEADZONE;
-        if (excess > 0) bodyYaw += Math.sign(offset) * excess;
-        bodyYaw += wrapAngle(headYaw - bodyYaw) * (1 - Math.exp(-dt * BODY_DRIFT_RATE));
-      }
-    }
+    // The belt never turns with the head: it keeps the rig's facing and only follows where
+    // the head is. Stick-turning the rig carries it round.
+    bodyYaw = 0;
     if (bodyYaw === null) return;
     const fx = -Math.sin(bodyYaw), fz = -Math.cos(bodyYaw);
     const rx = Math.cos(bodyYaw), rz = -Math.sin(bodyYaw);
