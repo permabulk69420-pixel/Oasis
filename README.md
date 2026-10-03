@@ -15,7 +15,7 @@ Desktop: **Explore**, WASD / arrow up and down to walk, mouse to look, Shift to 
 - A bare sandy bank surrounds the water, followed by a textured grass band on a gently sloping shelf.
 - Seeded wind-shaped dunes, sand ripples, wet shore sand, and animated shallow water with reeds and fireflies.
 - Around the oasis: blue alien trees, green ferns, alien desert plants, loose sticks and stones. The glowing 81 m veil tree stands a short walk from the pool (`?hero=crimson` swaps the old 60 m tree back in for comparison); small glow fruit lie around its base.
-- A short day/night cycle (3 min day, 3 min night while testing; `DAY_SECONDS` / `NIGHT_SECONDS` in `src/day-night.js`) with stars, desert ambience, sand footsteps, and a lightable torch. Night is dark and moonlit; the veil tree's pods glow and light the ground beneath them. Wind blows sand along the dunes: fine grains skimming the ground, soft veils spilling over the crests and big slow clouds of dust, all moved on the GPU (`src/wind-sand.js`). The air is calm at the oasis.
+- A short day/night cycle (3 min day, 3 min night while testing; `DAY_SECONDS` / `NIGHT_SECONDS` in `src/day-night.js`) with stars, desert ambience, sand footsteps, and a lightable torch. Night is dark and moonlit; the veil tree's pods glow and light the ground beneath them. Wind blows sand along the dunes: fine grains skimming the ground, soft veils spilling over the crests and big slow clouds of dust, all moved on the GPU (`src/wind-sand.js`). The air is calm at the oasis. Lit objects (props, trees, hands, tools) get a faint moonlit fill and a thin cool rim at night so they read as shapes instead of black holes (`src/night-fill.js`).
 - A coarse continuation of the sand outside the playable square hides the world edge.
 
 ## Run
@@ -88,7 +88,7 @@ Deliberately light (`src/survival.js`, rates in one table at the top):
 Craft a campfire, select it in the menu and press **Place campfire**: it goes down about 1.6 m in
 front of you. It refuses water, steep dune slopes and anywhere within 2.5 m of another fire, and you
 can have up to three. Hold a lit torch to the fire (within about half a metre) to light it. A lit
-fire has billboarded flames, sparks, a crackle that fades with distance, and lights the ground and
+fire has billboarded flames, sparks, a plume of smoke that leans downwind (grey by day, glowing orange near the fire at night), a crackle that fades with distance, and lights the ground and
 water around it (`src/campfire.js`, `src/fire-effect.js`). By day the light fades out so the stones
 don't bleach. For now a lit fire burns forever; fuel, warmth and putting it out come later.
 

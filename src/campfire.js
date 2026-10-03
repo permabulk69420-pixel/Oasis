@@ -284,6 +284,7 @@ export function createCampfires({
     // The light is tuned for the night's tiny exposure. By day the same light would blow the stones out
     // white (and the sun makes it matter far less), so it fades as the exposure rises.
     const dayFactor = THREE.MathUtils.clamp(CAMPFIRE.fullLightExposure / Math.max(getExposure(), 0.02), 0.05, 1);
+    const day = THREE.MathUtils.smoothstep(getExposure(), 0.07, 0.5); // 0 at night, 1 by day: the smoke's colour
 
     let nearest = null, nearestDistance = Infinity;
     let slot = 0;
@@ -296,7 +297,7 @@ export function createCampfires({
         + Math.sin(elapsed * 19.1 + fire.seed * 2.3) * 0.035
         + Math.sin(elapsed * 6.7 + fire.seed * 0.7) * 0.03;
       const strength = THREE.MathUtils.clamp(flicker, 0.78, 1.08);
-      fire.fx.update(elapsed + fire.seed, strength, eased);
+      fire.fx.update(elapsed + fire.seed, strength, eased, day);
       if (fire.embers?.material) {
         // Displayed brightness is the same by day and night: undo the tone-mapping exposure.
         const glow = CAMPFIRE.emberGlow * (0.85 + (strength - 0.9) * 1.6) * eased;
