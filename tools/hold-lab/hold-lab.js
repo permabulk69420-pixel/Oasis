@@ -1,21 +1,31 @@
-// A scratch page for judging how a hand holds the backpack by its handle: it builds the hand exactly as the game does
-// (grip space, hand offset, socket, adaptive finger grip) and attaches the pack with the same call the game uses.
+// A scratch page for judging how a hand holds something: it builds the hand exactly as the game does (grip space, hand
+// offset, socket, adaptive finger grip) and attaches the item with the same call the game uses.
 //
-//   npm run dev, then open /tools/backpack/hold-lab.html?side=right&map=+y,+z&pitch=-90
+//   npm run dev, then open /tools/hold-lab/hold-lab.html?item=spear&side=right&pitch=-90
 //
+//   item    pack (the default, held by its carry handle) | spear | torch | axe: the game's own definitions, from
+//           src/backpack.js, src/spear.js, src/torch.js and src/axe.js
 //   side    right | left
-//   map     where the pack's X and Y axes point in the hand's grip-socket frame, e.g. "%2By,%2Bz" (a + must be written %2B in
-//           a URL). The default is the game's own pose from src/backpack.js. The pack's Z follows from the other two.
+//   map     pack only: where the pack's X and Y axes point in the hand's grip-socket frame, e.g. "%2By,%2Bz" (a + must be
+//           written %2B in a URL). The default is the game's own pose. The pack's Z follows from the other two.
+//   tilt    degrees to turn the item about the hand socket's X axis (the palm normal) on top of the game's pose, to try an
+//           angled grip; twist is degrees about the item's own long axis (Y)
 //   pitch   degrees the hand is tipped about the world X axis: 0 is the controller pointing forward, -90 an arm hanging
 //   roll    degrees about the forearm after that (positive turns the palm outward), default 0
-//   point   handle grip point as "x,y,z" in pack space, halfLength= for the length of handle the fingers close on
+//   point   grip point as "x,y,z" in the item's space, halfLength= for the length the fingers close on
 //   debug   1 draws the contact outline the fingers close against
+//   axes    1 draws the hand socket's axes (X red, Y green, Z blue) and the item's own
+//   close   1 for three close-ups of the hand instead of the whole item
+//   player  1 for what the player sees: three views from the eyes of someone holding it in the right hand (left for side=left)
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { createAdaptiveGrip } from '../../src/adaptive-grip.js';
 import { attachHeldObject, setGripSurface } from '../../src/grip-contact.js';
 import { PACK_GRIP, PACK_HELD_ROTATION } from '../../src/backpack.js';
+import { createSpearKind } from '../../src/spear.js';
+import { createTorchKind } from '../../src/torch.js';
+import { createAxeKind } from '../../src/axe.js';
 
 const params = new URLSearchParams(location.search);
 const side = params.get('side') === 'left' ? 'left' : 'right';
@@ -23,6 +33,9 @@ const pitch = THREE.MathUtils.degToRad(Number(params.get('pitch') ?? -90));
 const roll = THREE.MathUtils.degToRad(Number(params.get('roll') ?? 0));
 const debug = params.get('debug') === '1';
 const base = '../../public/models/';
+const item = params.get('item') || 'pack';
+const tilt = THREE.MathUtils.degToRad(Number(params.get('tilt') ?? 0));
+const twist = THREE.MathUtils.degToRad(Number(params.get('twist') ?? 0));
 
 function axisVector(token) {
   const sign = token.startsWith('-') ? -1 : 1;
@@ -30,22 +43,30 @@ function axisVector(token) {
   return new THREE.Vector3(axis === 'x' ? sign : 0, axis === 'y' ? sign : 0, axis === 'z' ? sign : 0);
 }
 
+// What is held: its model, how the game sets it up, and the rotation the game holds it with.
+const kinds = { spear: createSpearKind, torch: createTorchKind, axe: createAxeKind };
+const kind = kinds[item]?.({ scene: new THREE.Scene(), onError: console.warn }) ?? null;
+let itemUrl = `${base}backpack/backpack.glb`;
 let rotation = PACK_HELD_ROTATION[side].clone();
-if (params.get('map')) {
+let surface = { ...PACK_GRIP };
+if (kind) {
+  itemUrl = kind.url.replace(/^.*?models\//, base);
+  rotation = kind.heldRotation.clone();
+} else if (params.get('map')) {
   const [mx, my] = params.get('map').split(',');
   const x = axisVector(mx);
   const y = axisVector(my);
   const z = new THREE.Vector3().crossVectors(x, y);
   rotation = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
 }
-const surface = { ...PACK_GRIP };
-if (params.get('point')) surface.point = params.get('point').split(',').map(Number);
-if (params.get('halfLength')) surface.halfLength = Number(params.get('halfLength'));
+// Angled-grip experiments: turn about the socket's X on the outside, about the item's own long axis on the inside.
+rotation.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), tilt));
+rotation.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), twist));
 
 const loader = new GLTFLoader();
 const [handGltf, packGltf] = await Promise.all([
   loader.loadAsync(`${base}hands/${side === 'left' ? 'Left' : 'Right'}Hand.glb`),
-  loader.loadAsync(`${base}backpack/backpack.glb`),
+  loader.loadAsync(itemUrl),
 ]);
 
 const scene = new THREE.Scene();
@@ -75,6 +96,13 @@ new THREE.Matrix4().copy(grip.matrixWorld).invert().multiply(socket.matrixWorld)
   .decompose(objectGrip.position, objectGrip.quaternion, objectGrip.scale);
 
 const pack = packGltf.scene;
+if (kind) {
+  kind.prepareTemplate?.(pack);
+  kind.prepare?.({ root: pack, state: kind.createState?.() ?? {} });
+  surface = pack.userData.gripSurface ? { ...pack.userData.gripSurface } : surface;
+}
+if (params.get('point')) surface.point = params.get('point').split(',').map(Number);
+if (params.get('halfLength')) surface.halfLength = Number(params.get('halfLength'));
 setGripSurface(pack, surface);
 const state = { objectGrip };
 const attached = attachHeldObject(state, pack, rotation);
@@ -100,10 +128,10 @@ const worldUp = new THREE.Vector3(0, 1, 0).transformDirection(pack.matrixWorld);
 const worldFront = new THREE.Vector3(0, 0, 1).transformDirection(pack.matrixWorld);
 const worldBar = new THREE.Vector3(1, 0, 0).transformDirection(pack.matrixWorld);
 const fmt = v => v.toArray().map(n => n.toFixed(2)).join(',');
-console.log('pack up in the world', fmt(worldUp), '| front', fmt(worldFront), '| handle bar', fmt(worldBar));
+console.log(item, 'axis Y in the world', fmt(worldUp), '| Z', fmt(worldFront), '| X', fmt(worldBar));
 // Where the pack ended up, in the world, so the heights and the swing of it can be read off.
 const bounds = new THREE.Box3().setFromObject(pack);
-console.log('attached', attached, 'solved', solved, 'pack bounds', bounds.min.toArray().map(v => v.toFixed(3)).join(','), bounds.max.toArray().map(v => v.toFixed(3)).join(','));
+console.log('attached', attached, 'solved', solved, item, 'bounds', bounds.min.toArray().map(v => v.toFixed(3)).join(','), bounds.max.toArray().map(v => v.toFixed(3)).join(','));
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(1);
@@ -113,7 +141,14 @@ renderer.setSize(width, height);
 document.body.style.margin = '0';
 document.body.appendChild(renderer.domElement);
 const close = params.get('close') === '1';
-const views = close ? [
+const player = params.get('player') === '1';
+// The eyes of the person holding it: the hand is at the origin, 0.65 m below and a little to the side and ahead of the eyes.
+const mirror = side === 'left' ? -1 : 1;
+const views = player ? [
+  { pos: [-0.22 * mirror, 1.62, 0.30], look: [0.0, 1.05, -0.9], fov: 75 },    // looking straight ahead
+  { pos: [-0.22 * mirror, 1.62, 0.30], look: [0.05 * mirror, 0.95, -0.35], fov: 75 }, // looking down at the hand
+  { pos: [-0.22 * mirror, 1.62, 0.30], look: [0.3 * mirror, 1.3, -0.9], fov: 100 },  // wide, with the hand low in the view
+] : close ? [
   { pos: [0, 1.0, -0.75], look: [0, 0.9, 0], fov: 30 },   // the hand from the front
   { pos: [0.75, 1.0, 0], look: [0, 0.9, 0], fov: 30 },    // from the right
   { pos: [0.1, 1.65, -0.35], look: [0, 0.9, 0], fov: 30 }, // from above

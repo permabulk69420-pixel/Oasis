@@ -7,6 +7,7 @@ export const ITEMS = Object.freeze({
   fibre: { name: 'Fibre', category: 'RESOURCE', description: 'Plant fibres for future recipes.' },
   axe: { name: 'Stone axe', category: 'TOOL', description: 'Fells trees for wood and sticks. Put it on a hip to carry it.', equippable: true },
   torch: { name: 'Torch', category: 'TOOL', description: 'Light it with B (right hand) or X (left). Put it on a hip to carry it.', equippable: true },
+  spear: { name: 'Stone-tipped spear', category: 'TOOL', description: 'A straight shaft, a stone point and a tassel of feathers. Put it on a hip to carry it.', equippable: true },
   campfire: { name: 'Campfire', category: 'STRUCTURE', description: 'A ring of stones around a stack of logs. Place it on the ground, then touch a lit torch to the logs to light it.', placeable: true },
 });
 
@@ -14,6 +15,7 @@ export const ITEMS = Object.freeze({
 export const RECIPES = Object.freeze([
   Object.freeze({ id: 'axe', name: 'Stone axe', description: 'Lash a stone head to a wooden handle.', ingredients: Object.freeze({ stick: 3, stone: 2 }), output: 'axe' }),
   Object.freeze({ id: 'torch', name: 'Torch', description: 'Bundle dry sticks with a striking stone.', ingredients: Object.freeze({ stick: 2, stone: 1 }), output: 'torch' }),
+  Object.freeze({ id: 'spear', name: 'Stone-tipped spear', description: 'Lash a stone point to a long, straight shaft.', ingredients: Object.freeze({ stick: 3, stone: 1 }), output: 'spear' }),
   Object.freeze({ id: 'campfire', name: 'Campfire', description: 'Stack sticks for kindling and ring them with stones. Light it with a torch.', ingredients: Object.freeze({ stick: 6, stone: 5 }), output: 'campfire' }),
 ]);
 
