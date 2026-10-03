@@ -111,6 +111,7 @@ if (import.meta.env.DEV) {
   };
   const heroY = field.sample(HERO_TREE.x, HERO_TREE.z);
   if (view === 'hero') aimAt(HERO_TREE.x - 150, HERO_TREE.z + 150, { x: HERO_TREE.x, y: heroY + 38, z: HERO_TREE.z });
+  if (view === 'approach') aimAt(HERO_TREE.x - 80, HERO_TREE.z + 80, { x: HERO_TREE.x, y: heroY + 22, z: HERO_TREE.z }, 1.7);
   if (view === 'base') aimAt(HERO_TREE.x - 16, HERO_TREE.z + 17, { x: HERO_TREE.x - 2, y: heroY + 1.5, z: HERO_TREE.z + 2 }, 1.3);
   if (view === 'under') aimAt(HERO_TREE.x - 30, HERO_TREE.z + 30, { x: HERO_TREE.x, y: heroY + 22, z: HERO_TREE.z });
   const hour = Number(new URLSearchParams(location.search).get('hour'));

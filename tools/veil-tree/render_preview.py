@@ -5,8 +5,11 @@ import sys
 import bpy
 from mathutils import Vector
 
-GLB = "/home/claude/veil/veil_tree.glb"
-OUTDIR = "/home/claude/veil/"
+# usage: python3 render_preview.py [--glb file.glb] [--outdir dir] [--views a,b] [--samples N]
+GLB = sys.argv[sys.argv.index("--glb") + 1] if "--glb" in sys.argv else "public/models/vegetation/veil-tree/veil_tree.glb"
+OUTDIR = sys.argv[sys.argv.index("--outdir") + 1] if "--outdir" in sys.argv else "/tmp/"
+if not OUTDIR.endswith("/"):
+    OUTDIR += "/"
 which = sys.argv[sys.argv.index("--views") + 1].split(",") if "--views" in sys.argv else ["far_day", "under_night", "far_night", "mid_day"]
 SAMPLES = int(sys.argv[sys.argv.index("--samples") + 1]) if "--samples" in sys.argv else 24
 RES = (960, 540)

@@ -13,7 +13,8 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
 S = 2048
-OUT = "/home/claude/veil/veil_atlas.png"
+import os, sys
+OUT = sys.argv[sys.argv.index("--out") + 1] if "--out" in sys.argv else os.path.join(os.path.dirname(os.path.abspath(__file__)), "veil_atlas.png")
 atlas = np.zeros((S, S, 4), np.float32)
 np.seterr(all='ignore')  # rows top->bottom
 
@@ -235,8 +236,12 @@ b = 0.30 + 0.70 * np.sin(np.pi * np.clip(s * 1.08 - 0.04, 0, 1)) ** 0.55
 ribs = (0.5 + 0.5 * np.cos(2 * np.pi * 6 * x)) ** 6
 spk = sstep(1.8, 2.8, pnoise(512, 512, 90, 90, 41))
 k = np.clip(b * (0.78 + 0.28 * ribs) + 0.25 * spk, 0, 1.2)[..., None]
-dim, bright = srgb((8, 70, 135)), srgb((95, 222, 255))
-pod = np.clip(dim + (bright - dim) * np.clip(k, 0, 1), 0, 1)
+dim, bright, hot = srgb((6, 58, 120)), srgb((70, 205, 255)), srgb((205, 250, 255))
+kk = np.clip(k, 0, 1)
+pod = dim + (bright - dim) * kk
+# white-hot core through the belly of the fruit so it reads as a light source, not a flat cyan blob
+core = sstep(0.55, 0.95, kk) * np.clip(np.sin(np.pi * np.clip((s - 0.18) / 0.72, 0, 1)), 0, 1) ** 1.5
+pod = np.clip(pod + (hot - pod) * core * 0.85, 0, 1)
 pd = np.ones((512, 512, 4), np.float32)
 pd[..., :3] = pod
 place((1024, 1536), pd)
