@@ -14,8 +14,8 @@ Desktop: **Explore**, WASD / arrow up and down to walk, mouse to look, Shift to 
 - The pool centre is `(300, -400)`, exactly 500 metres from spawn. It is approximately 80 × 68 metres, with an irregular shoreline and a maximum depth of 0.88 metres.
 - A bare sandy bank surrounds the water, followed by a textured grass band on a gently sloping shelf.
 - Seeded wind-shaped dunes, sand ripples, wet shore sand, and animated shallow water with reeds and fireflies.
-- Around the oasis: blue alien trees, the 60 m crimson hero tree, berry bushes, green ferns, alien desert plants, loose sticks and stones.
-- A 10-minute day/night cycle with stars, desert ambience, sand footsteps, and a lightable torch.
+- Around the oasis: blue alien trees, green ferns, alien desert plants, loose sticks and stones. The glowing 81 m veil tree stands a short walk from the pool (`?hero=crimson` swaps the old 60 m tree back in for comparison); small glow fruit lie around its base.
+- A short day/night cycle (3 min day, 3 min night while testing; `DAY_SECONDS` / `NIGHT_SECONDS` in `src/day-night.js`) with stars, desert ambience, sand footsteps, and a lightable torch. Night is dark and moonlit; the veil tree's pods glow and light the ground beneath them.
 - A coarse continuation of the sand outside the playable square hides the world edge.
 
 ## Run
@@ -51,8 +51,7 @@ The menu is three glass panels in the style of Ark:
 
 - **Inventory / Crafting:** a 5 × 5 grid. Tiles show the count (top left) and total weight
   (bottom left). On the crafting tab, a gold edge means you have everything for that recipe.
-- **You:** a left and right hip slot, plus health, stamina, food, water and carry weight.
-  Only carry weight is live; the survival stats don't drain yet.
+- **You:** a left and right hip slot, plus health, stamina, food, water and carry weight (all live).
 - **Details:** whatever is selected, with its actions: craft, put on the left or right hip,
   or send a hip tool back to the backpack.
 
@@ -70,3 +69,19 @@ torch with **B** (right hand) or **X** (left hand).
 (Wood) and three sticks along where it fell, sinks away, and regrows after three minutes.
 Pick up sticks, stones and logs with grip and let go at your chest to pack them.
 Inventory is session-only; reloading starts with an empty backpack.
+
+## Survival
+
+Deliberately light (`src/survival.js`, rates in one table at the top):
+
+- **Food and water** drain slowly (about 35 and 22 minutes from full). **Stamina** drains while
+  sprinting and returns when you stop; run dry and you can't sprint until it recovers a little.
+- **Drink** by wading into the pond. **Eat** glow fruit: grab one with the grip button and bring it
+  to your mouth. Fruit lie around the veil tree (stone-sized, faintly luminous so they are easy to
+  spot at night) and regrow slowly where they were picked.
+- **Health** only slides down if food or water hit zero, and recovers when both are comfortable.
+  There is no death yet: health stops at a low floor.
+
+Development-only camera fixtures: `?view=fruit`, `?view=orchard`, `?view=glade`, `?view=approach`,
+`?view=wade`, plus `?hour=N` to fix the time of day.
+

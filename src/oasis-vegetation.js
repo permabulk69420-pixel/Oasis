@@ -3,8 +3,6 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WATER, SUN, HERO_TREE } from './world.js';
 import { createPodHalos, buildGroundLights, applyGroundLights } from './glow-halos.js';
 
-const BUSH_DRAW_DISTANCE = 180;
-const BUSH_LOAD_DISTANCE = 230;
 const TREE_DRAW_DISTANCE = 240;
 const TREE_LOAD_DISTANCE = 275;
 const HERO_DRAW_DISTANCE = 420;
@@ -29,17 +27,6 @@ const TREE_LODS = [
   { file: 'blue_alien_tree.glb', distance: 0 },
   { file: 'blue_alien_tree_optimized_code.glb', distance: 18 },
   { file: 'blue_alien_tree_lod3_ultra.glb', distance: 45 },
-];
-
-// Hand-placed in normalized shoreline space so the food plants feel discovered rather
-// than evenly distributed. Keep all berry bushes at the model's original scale.
-const BUSH_LAYOUT = [
-  { angle: 0.28, radius: 1.34, scale: 1.00, yaw: 0.4 },
-  { angle: 1.17, radius: 1.46, scale: 1.00, yaw: 2.1 },
-  { angle: 2.06, radius: 1.38, scale: 1.00, yaw: 4.7 },
-  { angle: 3.02, radius: 1.51, scale: 1.00, yaw: 1.2 },
-  { angle: 4.12, radius: 1.41, scale: 1.00, yaw: 5.4 },
-  { angle: 5.22, radius: 1.47, scale: 1.00, yaw: 3.3 },
 ];
 
 // Sparse taller anchors kept safely inside the grass shelf. Scale/yaw variation keeps repeated
@@ -76,17 +63,6 @@ const SHADOW_SURFACE_OFFSET = 0.045;
 // trees enormous on the ground and still too faint to read. Low plants get their own compact
 // profile instead of borrowing tree dimensions.
 const SHADOW_STYLES = Object.freeze({
-  bush: Object.freeze({
-    materialName: 'Berry bush projected shadows',
-    meshName: 'Berry bush shadows',
-    opacity: 0.44,
-    height: 1.35,
-    footprintLength: 1.35,
-    projectionScale: 0.18,
-    maxLength: 3.0,
-    width: 2.1,
-    seedBase: 0.35,
-  }),
   tree: Object.freeze({
     materialName: 'Alien tree projected shadows',
     meshName: 'Alien tree shadows',
@@ -284,16 +260,11 @@ export function createOasisVegetation({ field, sunDirection = null, groundGlowUn
   const group = new THREE.Group();
   group.name = 'Oasis vegetation';
 
-  const bushes = clearOfHero(radialPositions(BUSH_LAYOUT));
   const trees = [
     ...clearOfHero(radialPositions(TREE_LAYOUT)),
     ...radialPositions(SECOND_TREE_LAYOUT),
   ];
   const liveSun = sunDirection || new THREE.Vector3(SUN.x, SUN.y, SUN.z).normalize();
-
-  const bushGroup = new THREE.Group();
-  bushGroup.name = 'Berry bushes';
-  group.add(bushGroup);
 
   const treeGroup = new THREE.Group();
   treeGroup.name = 'Alien desert trees';
@@ -303,12 +274,6 @@ export function createOasisVegetation({ field, sunDirection = null, groundGlowUn
   heroGroup.name = 'Crimson hero tree';
   group.add(heroGroup);
 
-  const bushShadow = createProjectedVegetationShadow({
-    field,
-    items: bushes,
-    sunDirection: liveSun,
-    style: SHADOW_STYLES.bush,
-  });
   const regularTreeShadow = createProjectedVegetationShadow({
     field,
     items: trees,
@@ -321,43 +286,15 @@ export function createOasisVegetation({ field, sunDirection = null, groundGlowUn
     sunDirection: liveSun,
     style: SHADOW_STYLES[HERO_MODEL.shadow],
   });
-  group.add(bushShadow.mesh, regularTreeShadow.mesh, heroTreeShadow.mesh);
+  group.add(regularTreeShadow.mesh, heroTreeShadow.mesh);
 
   const glowMaterials = new Set();
   const leafMaterials = new Set();
-  let bushLoadStarted = false;
   let treeLoadStarted = false;
   let heroLoadStarted = false;
-  let bushesReady = false;
   let treesReady = false;
   let heroReady = false;
   let heroHalos = null;
-
-  function ensureBushes() {
-    if (bushLoadStarted) return;
-    bushLoadStarted = true;
-    const loader = new GLTFLoader();
-    const url = `${import.meta.env.BASE_URL}models/berry-bush/desert_berry_bush_optimized.glb`;
-    loader.load(url, gltf => {
-      const source = gltf.scene;
-      source.updateMatrixWorld(true);
-      for (let i = 0; i < bushes.length; i++) {
-        const item = bushes[i];
-        const bush = source.clone(true);
-        bush.name = `Berry bush ${i + 1}`;
-        bush.position.set(item.x, field.sample(item.x, item.z) - 0.015, item.z);
-        bush.rotation.y = item.yaw;
-        bush.scale.setScalar(item.scale);
-        bush.userData.foodSource = 'berries';
-        bush.userData.berryBush = true;
-        disableModelShadows(bush);
-        bushGroup.add(bush);
-      }
-      bushesReady = true;
-    }, undefined, error => {
-      console.warn('[Oasis vegetation] Berry bush model unavailable.', error);
-    });
-  }
 
   function ensureTrees() {
     if (treeLoadStarted) return;
@@ -442,7 +379,6 @@ export function createOasisVegetation({ field, sunDirection = null, groundGlowUn
     const distance = Math.hypot(x - WATER.x, z - WATER.z);
     const heroDistance = Math.hypot(x - HERO_TREE.x, z - HERO_TREE.z);
     const shadowDaylight = liveSun.y > -0.01;
-    bushGroup.visible = distance < BUSH_DRAW_DISTANCE;
     treeGroup.visible = distance < TREE_DRAW_DISTANCE;
     heroGroup.visible = heroDistance < HERO_DRAW_DISTANCE;
     if (leafMaterials.size) {
@@ -458,13 +394,10 @@ export function createOasisVegetation({ field, sunDirection = null, groundGlowUn
       heroHalos.setNight(night);
       if (groundGlowUniforms?.uPodLightArea) groundGlowUniforms.uPodLightArea.value.w = night;
     }
-    bushShadow.mesh.visible = bushesReady && bushGroup.visible && shadowDaylight;
     regularTreeShadow.mesh.visible = treesReady && treeGroup.visible && shadowDaylight;
     heroTreeShadow.mesh.visible = heroReady && heroGroup.visible && shadowDaylight;
-    if (bushShadow.mesh.visible) bushShadow.rebuild();
     if (regularTreeShadow.mesh.visible) regularTreeShadow.rebuild();
     if (heroTreeShadow.mesh.visible) heroTreeShadow.rebuild();
-    if (distance < BUSH_LOAD_DISTANCE) ensureBushes();
     if (distance < TREE_LOAD_DISTANCE) ensureTrees();
     if (heroDistance < HERO_LOAD_DISTANCE) ensureHeroTree();
   }
@@ -473,13 +406,10 @@ export function createOasisVegetation({ field, sunDirection = null, groundGlowUn
   return {
     group,
     update,
-    bushGroup,
     treeGroup,
     heroGroup,
-    bushShadow: bushShadow.mesh,
     regularTreeShadow: regularTreeShadow.mesh,
     heroTreeShadow: heroTreeShadow.mesh,
-    get bushesReady() { return bushesReady; },
     get treesReady() { return treesReady; },
     get heroReady() { return heroReady; },
   };
