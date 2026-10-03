@@ -48,7 +48,8 @@ export function patchNightFill(shader, uniform = nightFill) {
 const PATCHED = Symbol.for('oasis.nightFill');
 
 // Patches the built-in material types once, before anything compiles. A material that sets its own
-// onBeforeCompile (like the swaying reeds) keeps its own and simply does not get the fill.
+// onBeforeCompile keeps its own and does not get the fill unless it chains to the original first, which
+// is what addWindSway (wind.js) does, so swaying plants get both.
 export function installNightFill(types = [THREE.MeshStandardMaterial, THREE.MeshPhysicalMaterial, THREE.MeshLambertMaterial]) {
   for (const type of types) {
     const proto = type.prototype;

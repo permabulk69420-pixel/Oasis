@@ -11,6 +11,7 @@ import { createGroundStones } from './stones.js';
 import { createGroundFruit } from './glow-fruit.js';
 import { createCampfires, campfireSpot, campfireSite } from './campfire.js';
 import { createWindSand, WIND_SAND } from './wind-sand.js';
+import { windTime, windStrength } from './wind.js';
 import { installNightFill } from './night-fill.js';
 import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater } from './survival.js';
 import { pulseHaptics } from './haptics.js';
@@ -109,6 +110,7 @@ if (import.meta.env.DEV) {
 const drawingSize = new THREE.Vector2();
 rig.position.set(SPAWN.x, field.sample(SPAWN.x, SPAWN.z), SPAWN.z);
 
+let devWindTime = null; // dev only: set by ?windtime=
 // Development-only camera fixtures for repeatable visual inspection. No travel shortcuts ship.
 if (import.meta.env.DEV) {
   const view = new URLSearchParams(location.search).get('view');
@@ -157,12 +159,23 @@ if (import.meta.env.DEV) {
     rig.position.set(px, field.sample(px, pz), pz);
     rig.rotation.y = Math.atan2(-0.54, 0.84); camera.rotation.x = -0.05;
   }
-  // Look direction, in degrees: yaw turns the rig (0 faces -z, positive turns left), pitch tilts up.
   const params = new URLSearchParams(location.search);
+  // Stand at ?at=x,z (world metres) and look at ?look=x,z[,metres above the ground].
+  const point = name => {
+    const v = params.has(name) ? params.get(name).split(',').map(Number) : [];
+    return v.length >= 2 && v.every(Number.isFinite) ? v : null;
+  };
+  const at = point('at'), look = point('look');
+  if (at && look) aimAt(at[0], at[1], { x: look[0], y: field.sample(look[0], look[1]) + (look[2] ?? 1.5), z: look[1] }, 1.7);
+  else if (at) rig.position.set(at[0], field.sample(at[0], at[1]), at[1]);
+  // Look direction, in degrees: yaw turns the rig (0 faces -z, positive turns left), pitch tilts up.
   if (params.has('yaw') && Number.isFinite(Number(params.get('yaw')))) rig.rotation.y = Number(params.get('yaw')) * Math.PI / 180;
   if (params.has('pitch') && Number.isFinite(Number(params.get('pitch')))) camera.rotation.x = Number(params.get('pitch')) * Math.PI / 180;
   // Pin the sky clock (seconds), e.g. to catch a shooting star in a screenshot.
   if (params.has('skytime') && Number.isFinite(Number(params.get('skytime')))) dayNight.setCloudTime(Number(params.get('skytime')));
+  // Pin the wind clock (seconds) so two screenshots can be compared, and turn the sway up to see which way it leans.
+  if (params.has('windtime') && Number.isFinite(Number(params.get('windtime')))) devWindTime = Number(params.get('windtime'));
+  if (Number(params.get('windgain')) > 0) windStrength.value = Number(params.get('windgain'));
   const eye = Number(new URLSearchParams(location.search).get('eye'));
   if (new URLSearchParams(location.search).has('eye') && eye > 0) camera.position.y = eye; // low camera for ground-level shots
 }
@@ -438,7 +451,9 @@ function frame(time) {
   hands.update(dt);
   const activeCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
   activeCamera.getWorldPosition(head);
-  windSand.update(time * 0.001, head, renderer.xr.isPresenting ? WIND_SAND.vrViewHeight : renderer.getDrawingBufferSize(drawingSize).y);
+  // One wind clock for the sand and the swaying plants, so their gusts line up.
+  windTime.value = devWindTime ?? time * 0.001;
+  windSand.update(windTime.value, head, renderer.xr.isPresenting ? WIND_SAND.vrViewHeight : renderer.getDrawingBufferSize(drawingSize).y);
   survivorMenu.update();
 
   // local-floor still reports the real headset height while sitting. In seated mode,
