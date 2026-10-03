@@ -3,9 +3,10 @@ import { getInventoryCount, exchangeInventoryItems } from './inventory.js';
 export const ITEMS = Object.freeze({
   stick: { name: 'Stick', category: 'RESOURCE', description: 'Gather loose sticks around the oasis.' },
   stone: { name: 'Stone', category: 'RESOURCE', description: 'Gather loose stones around the oasis.' },
+  wood: { name: 'Wood', category: 'RESOURCE', description: 'Logs split from a felled alien tree.' },
   fibre: { name: 'Fibre', category: 'RESOURCE', description: 'Plant fibres for future recipes.' },
-  axe: { name: 'Stone axe', category: 'TOOL', description: 'A primitive axe. Stored for the future equipment system.' },
-  torch: { name: 'Torch', category: 'TOOL', description: 'A primitive torch. Stored for the future equipment system.' },
+  axe: { name: 'Stone axe', category: 'TOOL', description: 'Fells trees for wood and sticks. Put it on a hip to carry it.', equippable: true },
+  torch: { name: 'Torch', category: 'TOOL', description: 'Light it with B (right hand) or X (left). Put it on a hip to carry it.', equippable: true },
 });
 
 // Use resources that can already be collected. Fibre gathering is not implemented yet.

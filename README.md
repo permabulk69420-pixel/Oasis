@@ -1,6 +1,6 @@
 # Oasis
 
-A small WebXR foundation: one kilometre of desert terrain, a shallow water source, and continuous first-person movement. Built for Meta Quest 3 using Three.js and Vite.
+A VR desert survival game: one kilometre of desert, an oasis to live around, gathering, crafting and chopping, with continuous first-person movement. Built for Meta Quest 3 using Three.js and Vite.
 
 ## Explore
 
@@ -12,10 +12,11 @@ Desktop: **Explore**, WASD / arrow up and down to walk, mouse to look, Shift to 
 
 - The walkable area is 1,000 × 1,000 metres, centred on `(0, 0)`.
 - The pool centre is `(300, -400)`, exactly 500 metres from spawn. It is approximately 80 × 68 metres, with an irregular shoreline and a maximum depth of 0.88 metres.
-- A bare sandy bank surrounds the water, followed by a grass band on a gently sloping shelf. Add your grass texture using the instructions in `public/textures/grass/README.md`; its colour currently uses a lightweight green fallback.
-- Seeded wind-shaped dunes, static terrain lighting, mipmapped sand ripples, wet shore sand, and animated shallow water.
+- A bare sandy bank surrounds the water, followed by a textured grass band on a gently sloping shelf.
+- Seeded wind-shaped dunes, sand ripples, wet shore sand, and animated shallow water with reeds and fireflies.
+- Around the oasis: blue alien trees, the 60 m crimson hero tree, berry bushes, green ferns, alien desert plants, loose sticks and stones.
+- A 10-minute day/night cycle with stars, desert ambience, sand footsteps, and a lightable torch.
 - A coarse continuation of the sand outside the playable square hides the world edge.
-- Only terrain, water, sky, and movement. No props, vegetation, buildings, survival systems, objectives, or audio.
 
 ## Run
 
@@ -38,72 +39,34 @@ Terrain uses 62.5 m chunks with four distance-based geometry levels and skirts t
 
 VR requests a 72 Hz refresh rate when supported, a framebuffer scale of 1, and fixed foveation of 0.65. Actual headset frame rate still needs verification on Quest 3; desktop/browser checks cannot certify hardware performance.
 
-`src/world.js` owns dimensions, deterministic height generation, water placement, and collision. `src/terrain.js` builds the terrain. `src/materials.js` owns the sand, sky, and water shaders. `src/grass-texture.js` configures the optional grass texture and its repeat size. `src/main.js` handles input and rendering. Development-only `?view=shore`, `?view=oasis` (elevated overview), and `?view=wide` camera fixtures support visual QA and are removed by the production build.
+`src/world.js` owns dimensions, deterministic height generation, water and hero tree placement, and collision. `src/terrain.js` builds the terrain. `src/materials.js` owns the sand, sky, and water shaders. `src/grass-texture.js` configures the grass texture and its repeat size. `src/oasis-vegetation.js` places the trees, bushes and hero tree. `src/hands.js` owns the VR hands (models in `public/models/hands`) and the held objects. `src/main.js` handles input and rendering. Development-only `?view=shore`, `?view=oasis` (elevated overview), and `?view=wide` camera fixtures support visual QA and are removed by the production build.
 
-## Inventory and starter crafting
+## Inventory, crafting and hips
 
 Press **Y on the left Quest controller** to open/close the survivor menu. Point either
-controller at a tab, recipe, or button and press its **trigger** to select it. The panel
-stays where it was opened; walking, turning, and jumping inputs are suspended while it
-is open. Head tracking remains active. Close and reopen Y to bring it in front of you.
-Desktop: **Y**, then mouse or Tab/Enter; **Y / Escape** closes the panel. Touch users can
-use the **Inventory / Y** button; the three-column panel scrolls horizontally in portrait.
+controller at something and pull its **trigger** to select it. Walking, turning and jumping
+are paused while it is open. Desktop: **Y**, then mouse or Tab/Enter; **Y / Escape** closes.
 
-- **Left:** inventory and crafting tabs, resource counts, ingredient requirements, and
-  a Craft 1 button that only enables when the full recipe is available.
-- **Middle:** placeholder level, health, stamina, food, water, melee damage, and crafting
-  skill. These preview values do not apply effects. Carry weight below is live.
-- **Right:** reserved equipment box for later armour, weapons, and gear.
+The menu is three glass panels in the style of Ark:
+
+- **Inventory / Crafting:** a 5 × 5 grid. Tiles show the count (top left) and total weight
+  (bottom left). On the crafting tab, a gold edge means you have everything for that recipe.
+- **You:** a left and right hip slot, plus health, stamina, food, water and carry weight.
+  Only carry weight is live; the survival stats don't drain yet.
+- **Details:** whatever is selected, with its actions: craft, put on the left or right hip,
+  or send a hip tool back to the backpack.
 
 | Starter recipe | Materials | Result |
 | --- | --- | --- |
-| Stone axe | 3 sticks + 2 stones | 1 axe in inventory |
-| Torch | 2 sticks + 1 stone | 1 torch in inventory |
+| Stone axe | 3 sticks + 2 stones | 1 axe in the backpack |
+| Torch | 2 sticks + 1 stone | 1 torch in the backpack |
 
-Collect the existing loose sticks and stones around the oasis with grip, then release
-them at your chest to store them. These provisional recipes deliberately use currently
-gatherable resources. Crafting spends all ingredients together and updates carry weight.
-Crafted tools remain in inventory until equipment handling is added; the existing
-physical axe and torch pickups still work as before. Inventory is session-only, as it
-was before this menu; reloading starts with an empty backpack.
+**Tools in the world** (`src/tools.js`): every axe and torch is a real object. Grab one with
+either hand. Let go next to a hip to holster it there, at your chest to pack it in the
+backpack, anywhere else to drop it. Grab it back off the hip whenever you like. Light a held
+torch with **B** (right hand) or **X** (left hand).
 
-The menu uses one canvas texture in VR, repainted only when its contents or hover state
-change. Controller-ray tests run without a headset; final readability and comfort still
-need a Quest check.
-
-## Contact-aware gripping
-
-The existing axe, torch, loose sticks and stones use geometry-fitted hand poses.
-On pickup, a convex contact outline is built from the actual handle or stone mesh.
-The open hand clears that outline, then each finger joint follows the rig's authored
-curl axes until its skin meets the surface. Distal joints can continue wrapping after
-another part of the finger touches. Closing takes about 120 ms.
-Branched sticks use separate outlines for the connected shaft and twig solids, so
-their empty gaps do not incorrectly block a finger.
-Their grasp section avoids twig roots and aligns the estimated local shaft
-direction to the hand's handle axis.
-
-The item stays rigidly anchored to the palm socket. Squeeze/trigger changes do not
-slide it along the handle. A hand holds one item at a time, and scaled sticks retain
-their chosen shaft grip point. The fitted pose is cached for repeat grabs; normal
-held frames only apply joint rotations. Pickup/drop, chest storage, chopping and
-torch controls continue through their existing systems.
-
-The unchanged hand GLBs are stored under `public/models/hands/`, with their pinned
-source recorded there. Regression checks use these actual rigs and tool meshes,
-including complete skin triangles, both hands, movement far from the origin,
-closing animation, resource scale and pickup/release integration. They do not
-certify Quest frame rate or controller alignment on a physical headset.
-
-For development, open `?gripDebug=1` after `npm run dev` to see hand wireframes,
-the green contact outline, and the palm axes. These helpers are disabled in the
-production game and do not occupy a pickup slot.
-
-Future held items can use `setGripSurface(object, { meshes, axis, point })` in
-`src/grip-contact.js`. Names select the contact mesh; optional `axis` crops a handle
-around its model-space `point`. `attachHeldObject` applies that grip point with
-the instance scale and checks hand occupancy. Optional `alignAxis` aligns a curved
-handle's estimated `axis` before attaching it. `compound: true` preserves separate
-connected solids in a branched mesh. Unsupported shapes retain the
-authored grip fallback. This foundation handles grasp fitting; it does not simulate
-hand/world forces or a physical player body.
+**Chopping:** swing the axe into a blue alien tree. Six solid hits fell it; it drops two logs
+(Wood) and three sticks along where it fell, sinks away, and regrows after three minutes.
+Pick up sticks, stones and logs with grip and let go at your chest to pack them.
+Inventory is session-only; reloading starts with an empty backpack.

@@ -212,7 +212,8 @@ test('the real VR-hand path fits on pickup, blocks a second tool and returns to 
   const state = hands.states[0];
   const position = state.objectGrip.getWorldPosition(new THREE.Vector3());
   const axeObject = hands.axe.getObject(); const torchObject = hands.torch.getObject();
-  axeObject.position.copy(position); torchObject.position.copy(position);
+  // Put both tools' pickup points exactly on the hand; the torch is listed first, so it wins the tie.
+  axeObject.position.copy(position).y -= 0.14; torchObject.position.copy(position).y -= 0.22;
   input.gamepad.buttons[1] = { pressed: true, value: 1 };
   hands.update(0.016);
   assert.equal(state.objectGrip.children.length, 1, 'overlapping pickups cannot stack two tools');

@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
-import { createHeldTorch } from './torch.js';
-import { createHeldAxe } from './axe.js';
+import { createTorchKind } from './torch.js';
+import { createAxeKind } from './axe.js';
+import { createTools } from './tools.js';
 import { createHeldSticks } from './sticks.js';
 import { createHeldStones } from './stones.js';
 import { getHeldGripPose } from './grip-poses.js';
@@ -62,7 +63,7 @@ function setPose(state, name, amount) {
   action.time = THREE.MathUtils.clamp(amount, 0, 1);
 }
 
-export function createVRHands({ renderer, scene, parent = null, gripDebug = false, onError = console.warn }) {
+export function createVRHands({ renderer, scene, parent = null, camera = null, gripDebug = false, onError = console.warn }) {
   // Oasis moves/turns a camera rig through the world. Match dumbgame by putting
   // WebXR controller and grip nodes under that rig rather than directly in scene space.
   const controllerParent = parent
@@ -203,8 +204,12 @@ export function createVRHands({ renderer, scene, parent = null, gripDebug = fals
     for (const state of states) attach(state);
   });
 
-  const torch = createHeldTorch({ scene, states, onError });
-  const axe = createHeldAxe({ scene, states, onError });
+  // Torch first so overlapping pickups keep their old priority.
+  const tools = createTools({
+    scene, states, renderer, camera, onError,
+    kinds: [createTorchKind({ scene, onError }), createAxeKind({ scene, onError })],
+  });
+  const firstTool = kind => ({ getObject: () => tools.getInstances(kind)[0]?.root || null });
   const sticks = createHeldSticks({ scene, states, renderer, onError });
   const stones = createHeldStones({ scene, states, renderer, onError });
 
@@ -253,8 +258,7 @@ export function createVRHands({ renderer, scene, parent = null, gripDebug = fals
     const storedSticksBefore = sticks.getStoredCount();
     const storedStonesBefore = stones.getStoredCount();
 
-    torch.update(dt);
-    axe.update(dt);
+    tools.update(dt);
     sticks.update(dt);
     stones.update(dt);
 
@@ -304,8 +308,9 @@ export function createVRHands({ renderer, scene, parent = null, gripDebug = fals
     controllers,
     grips,
     objectGrips: states.map((state) => state.objectGrip),
-    torch,
-    axe,
+    tools,
+    torch: firstTool('torch'),
+    axe: firstTool('axe'),
     sticks,
     stones,
     setVisible,

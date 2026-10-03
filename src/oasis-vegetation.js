@@ -1,25 +1,13 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { WATER, SUN } from './world.js';
+import { WATER, SUN, HERO_TREE } from './world.js';
 
 const BUSH_DRAW_DISTANCE = 180;
 const BUSH_LOAD_DISTANCE = 230;
 const TREE_DRAW_DISTANCE = 240;
 const TREE_LOAD_DISTANCE = 275;
-const FERN_DRAW_DISTANCE = 170;
-const FERN_LOAD_DISTANCE = 210;
 const HERO_DRAW_DISTANCE = 420;
 const HERO_LOAD_DISTANCE = 480;
-
-// One 60 m landmark tree on the east-southeast side of the oasis. Its clearing is deliberately
-// broad so the regular bushes, trees and ferns cannot spawn through the hero canopy/trunk area.
-const HERO_TREE = Object.freeze({
-  x: 372,
-  z: -414,
-  yaw: 0.55,
-  groundInset: 0.55,
-  clearRadius: 40,
-});
 
 // Keep the full tree nearby, then step down aggressively once individual leaves are small in VR.
 const TREE_LODS = [
@@ -27,17 +15,6 @@ const TREE_LODS = [
   { file: 'blue_alien_tree_optimized_code.glb', distance: 18 },
   { file: 'blue_alien_tree_lod3_ultra.glb', distance: 45 },
 ];
-
-// Large ground foliage can step down sooner than the taller trees because the frond detail
-// becomes difficult to resolve quickly at Quest resolution.
-const FERN_LODS = [
-  { file: 'large_purple_alien_fern_v2.glb', distance: 0 },
-  { file: 'large_purple_alien_fern_v2_LOD1.glb', distance: 12 },
-  { file: 'large_purple_alien_fern_v2_LOD2.glb', distance: 30 },
-];
-
-// The fern GLBs are authored Z-up; Three.js is Y-up.
-const FERN_MODEL_X_ROTATION = -Math.PI / 2;
 
 // Hand-placed in normalized shoreline space so the food plants feel discovered rather
 // than evenly distributed. Keep all berry bushes at the model's original scale.
@@ -62,19 +39,19 @@ const TREE_LAYOUT = [
   { angle: 5.57, radius: 1.60, scale: 1.10, yaw: 0.85 },
 ];
 
-// Ferns form a few loose pockets around the oasis instead of an artificial-looking ring.
-// Keep them at authored scale; rotation and spacing provide the variation.
-const FERN_LAYOUT = [
-  { angle: 0.18, radius: 1.24, scale: 1.00, yaw: 0.35 },
-  { angle: 0.52, radius: 1.42, scale: 1.00, yaw: 2.15 },
-  { angle: 0.78, radius: 1.31, scale: 1.00, yaw: 4.50 },
-  { angle: 2.18, radius: 1.29, scale: 1.00, yaw: 1.05 },
-  { angle: 2.48, radius: 1.51, scale: 1.00, yaw: 3.80 },
-  { angle: 3.78, radius: 1.33, scale: 1.00, yaw: 5.55 },
-  { angle: 4.08, radius: 1.57, scale: 1.00, yaw: 2.65 },
-  { angle: 5.22, radius: 1.27, scale: 1.00, yaw: 4.10 },
-  { angle: 5.54, radius: 1.48, scale: 1.00, yaw: 0.90 },
-];
+// A second set of trees on the spots the old purple ferns used, all at 2x scale and unrotated.
+// They deliberately skip the hero clearing filter so the oasis keeps its current layout.
+const SECOND_TREE_LAYOUT = [
+  { angle: 0.18, radius: 1.24 },
+  { angle: 0.52, radius: 1.42 },
+  { angle: 0.78, radius: 1.31 },
+  { angle: 2.18, radius: 1.29 },
+  { angle: 2.48, radius: 1.51 },
+  { angle: 3.78, radius: 1.33 },
+  { angle: 4.08, radius: 1.57 },
+  { angle: 5.22, radius: 1.27 },
+  { angle: 5.54, radius: 1.48 },
+].map(item => ({ ...item, scale: 2.0, yaw: 0 }));
 
 const SHADOW_SEGMENTS = 4;
 const SHADOW_WIDTH_PROFILE = [0.18, 0.70, 1.00, 0.72, 0.18];
@@ -105,17 +82,6 @@ const SHADOW_STYLES = Object.freeze({
     maxLength: 18,
     width: 4.8,
     seedBase: 0.9,
-  }),
-  fern: Object.freeze({
-    materialName: 'Purple fern projected shadows',
-    meshName: 'Purple fern shadows',
-    opacity: 0.42,
-    height: 2.4,
-    footprintLength: 2.2,
-    projectionScale: 0.20,
-    maxLength: 4.8,
-    width: 3.4,
-    seedBase: 2.8,
   }),
   hero: Object.freeze({
     materialName: 'Crimson hero projected shadow',
@@ -240,7 +206,7 @@ function createProjectedVegetationShadow({ field, items, sunDirection, style }) 
       const footprintLength = style.footprintLength * scale;
       const projection = height * horizontal / Math.max(sunY, 0.22) * style.projectionScale;
       const length = Math.min(style.maxLength * scale, footprintLength + projection);
-      const width = style.width * scale * (0.97 + (itemIndex % 3) * 0.025);
+      const width = item.felled ? 0 : style.width * scale * (0.97 + (itemIndex % 3) * 0.025);
       const seed = style.seedBase + itemIndex * 1.618;
       const station = [];
 
@@ -293,8 +259,10 @@ export function createOasisVegetation({ field, sunDirection = null }) {
   group.name = 'Oasis vegetation';
 
   const bushes = clearOfHero(radialPositions(BUSH_LAYOUT));
-  const trees = clearOfHero(radialPositions(TREE_LAYOUT));
-  const ferns = clearOfHero(radialPositions(FERN_LAYOUT));
+  const trees = [
+    ...clearOfHero(radialPositions(TREE_LAYOUT)),
+    ...radialPositions(SECOND_TREE_LAYOUT),
+  ];
   const liveSun = sunDirection || new THREE.Vector3(SUN.x, SUN.y, SUN.z).normalize();
 
   const bushGroup = new THREE.Group();
@@ -304,10 +272,6 @@ export function createOasisVegetation({ field, sunDirection = null }) {
   const treeGroup = new THREE.Group();
   treeGroup.name = 'Alien desert trees';
   group.add(treeGroup);
-
-  const fernGroup = new THREE.Group();
-  fernGroup.name = 'Purple alien ferns';
-  group.add(fernGroup);
 
   const heroGroup = new THREE.Group();
   heroGroup.name = 'Crimson hero tree';
@@ -325,27 +289,19 @@ export function createOasisVegetation({ field, sunDirection = null }) {
     sunDirection: liveSun,
     style: SHADOW_STYLES.tree,
   });
-  const fernShadow = createProjectedVegetationShadow({
-    field,
-    items: ferns,
-    sunDirection: liveSun,
-    style: SHADOW_STYLES.fern,
-  });
   const heroTreeShadow = createProjectedVegetationShadow({
     field,
     items: [HERO_TREE],
     sunDirection: liveSun,
     style: SHADOW_STYLES.hero,
   });
-  group.add(bushShadow.mesh, regularTreeShadow.mesh, fernShadow.mesh, heroTreeShadow.mesh);
+  group.add(bushShadow.mesh, regularTreeShadow.mesh, heroTreeShadow.mesh);
 
   let bushLoadStarted = false;
   let treeLoadStarted = false;
-  let fernLoadStarted = false;
   let heroLoadStarted = false;
   let bushesReady = false;
   let treesReady = false;
-  let fernsReady = false;
   let heroReady = false;
 
   function ensureBushes() {
@@ -395,6 +351,8 @@ export function createOasisVegetation({ field, sunDirection = null }) {
         lod.rotation.y = item.yaw;
         lod.scale.setScalar(item.scale);
         lod.userData.oasisTree = true;
+        // Chopping marks the layout item felled so its projected shadow disappears.
+        lod.userData.layoutItem = item;
 
         for (const level of levels) {
           const model = level.source.clone(true);
@@ -407,43 +365,6 @@ export function createOasisVegetation({ field, sunDirection = null }) {
       treesReady = true;
     }).catch(error => {
       console.warn('[Oasis vegetation] Alien desert tree LOD models unavailable.', error);
-    });
-  }
-
-  function ensureFerns() {
-    if (fernLoadStarted) return;
-    fernLoadStarted = true;
-    const loader = new GLTFLoader();
-    const base = `${import.meta.env.BASE_URL}models/vegetation/purple-alien-fern/`;
-
-    Promise.all(FERN_LODS.map(async level => {
-      const gltf = await loader.loadAsync(`${base}${level.file}`);
-      const source = gltf.scene;
-      source.updateMatrixWorld(true);
-      disableModelShadows(source);
-      return { ...level, source };
-    })).then(levels => {
-      for (let i = 0; i < ferns.length; i++) {
-        const item = ferns[i];
-        const lod = new THREE.LOD();
-        lod.name = `Purple alien fern ${i + 1}`;
-        lod.position.set(item.x, field.sample(item.x, item.z) - 0.015, item.z);
-        lod.rotation.y = item.yaw;
-        lod.scale.setScalar(item.scale);
-        lod.userData.oasisFern = true;
-
-        for (const level of levels) {
-          const model = level.source.clone(true);
-          model.rotation.x = FERN_MODEL_X_ROTATION;
-          model.userData.oasisFern = true;
-          lod.addLevel(model, level.distance);
-        }
-
-        fernGroup.add(lod);
-      }
-      fernsReady = true;
-    }).catch(error => {
-      console.warn('[Oasis vegetation] Purple alien fern LOD models unavailable.', error);
     });
   }
 
@@ -477,19 +398,15 @@ export function createOasisVegetation({ field, sunDirection = null }) {
     const shadowDaylight = liveSun.y > -0.01;
     bushGroup.visible = distance < BUSH_DRAW_DISTANCE;
     treeGroup.visible = distance < TREE_DRAW_DISTANCE;
-    fernGroup.visible = distance < FERN_DRAW_DISTANCE;
     heroGroup.visible = heroDistance < HERO_DRAW_DISTANCE;
     bushShadow.mesh.visible = bushesReady && bushGroup.visible && shadowDaylight;
     regularTreeShadow.mesh.visible = treesReady && treeGroup.visible && shadowDaylight;
-    fernShadow.mesh.visible = fernsReady && fernGroup.visible && shadowDaylight;
     heroTreeShadow.mesh.visible = heroReady && heroGroup.visible && shadowDaylight;
     if (bushShadow.mesh.visible) bushShadow.rebuild();
     if (regularTreeShadow.mesh.visible) regularTreeShadow.rebuild();
-    if (fernShadow.mesh.visible) fernShadow.rebuild();
     if (heroTreeShadow.mesh.visible) heroTreeShadow.rebuild();
     if (distance < BUSH_LOAD_DISTANCE) ensureBushes();
     if (distance < TREE_LOAD_DISTANCE) ensureTrees();
-    if (distance < FERN_LOAD_DISTANCE) ensureFerns();
     if (heroDistance < HERO_LOAD_DISTANCE) ensureHeroTree();
   }
 
@@ -499,15 +416,12 @@ export function createOasisVegetation({ field, sunDirection = null }) {
     update,
     bushGroup,
     treeGroup,
-    fernGroup,
     heroGroup,
     bushShadow: bushShadow.mesh,
     regularTreeShadow: regularTreeShadow.mesh,
-    fernShadow: fernShadow.mesh,
     heroTreeShadow: heroTreeShadow.mesh,
     get bushesReady() { return bushesReady; },
     get treesReady() { return treesReady; },
-    get fernsReady() { return fernsReady; },
     get heroReady() { return heroReady; },
   };
 }

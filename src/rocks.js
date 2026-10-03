@@ -1,12 +1,11 @@
 import * as THREE from 'three';
+import { HERO_TREE } from './world.js';
 
 const ROCK_TEXTURE = `${import.meta.env.BASE_URL}textures/rocks/pickup-rock/pickup_rock_albedo.png`;
 const TOTAL_ROCKS = 128;
 const DRAW_DISTANCE = 150;
 
-// Keep procedural pickup rocks out of the giant hero tree's footprint.
-// These coordinates intentionally match the hero placement in oasis-vegetation.js.
-const HERO_TREE_CLEARING = Object.freeze({ x: 372, z: -414, radius: 40 });
+
 
 function makeRockGeometry() {
   // 320 triangles: intentionally small enough that a separate LOD is not useful yet.
@@ -59,11 +58,11 @@ function seededRandom(seed = 0x51a3d9) {
 function makePlacements(field) {
   const random = seededRandom();
   const placements = [];
-  const heroClearRadiusSq = HERO_TREE_CLEARING.radius * HERO_TREE_CLEARING.radius;
+  const heroClearRadiusSq = HERO_TREE.clearRadius * HERO_TREE.clearRadius;
 
   function insideHeroClearing(x, z) {
-    const dx = x - HERO_TREE_CLEARING.x;
-    const dz = z - HERO_TREE_CLEARING.z;
+    const dx = x - HERO_TREE.x;
+    const dz = z - HERO_TREE.z;
     return dx * dx + dz * dz < heroClearRadiusSq;
   }
 
