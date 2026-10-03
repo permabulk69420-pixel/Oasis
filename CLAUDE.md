@@ -40,7 +40,8 @@ for how the game works. These are standing rules from Kane; they apply to every 
   `gh api repos/permabulk69420-pixel/oasis/pulls -X POST -f title=... -f head=BRANCH -f base=main -F body=@file`
   then `gh api repos/permabulk69420-pixel/oasis/pulls/N/merge -X PUT -f merge_method=squash`.
 - Dev-only URL fixtures (stripped from production): `?view=...`, `?hour=N` (0 night, 14 day),
-  `?camp=lit|unlit`, `?campd=<metres>`, `?bird=perch|fly|flare`, `?view=pack`, `?pack=worn`, `?view=spear`. Add one when a new
+  `?camp=lit|unlit`, `?campd=<metres>`, `?bird=perch|fly|flare`, `?view=pack`, `?pack=worn`, `?view=spear`, `?treelod=0|1|2` (every tree at
+  one level of detail). `?trees=old` also works in production (the first blue trees, for comparison). Add one when a new
   feature needs a repeatable screenshot.
 - `tools/hold-lab/hold-lab.html` (with `npm run dev`; `?item=pack|spear|torch|axe&side=right&player=1`) shows how a hand takes a held
   thing. Probing the real hands in a headless page needs a temporary `window.__oasis` hook in `src/main.js` (fake controllers,
@@ -57,7 +58,7 @@ for how the game works. These are standing rules from Kane; they apply to every 
 
 Campfire (done). Kane is not sure about cold nights or fuel yet, so those are parked until he decides how
 they should work. Visual direction now: dust and sand, fire smoke and heat haze, night sky, plant sway (done), an
-ambient alien bird (done), a physical backpack (done), a spear (done), then newer trees with LODs. Later: first threat (sandworm, titan
+ambient alien bird (done), a physical backpack (done), a spear (done), newer trees with LODs (done). Later: first threat (sandworm, titan
 blocker or boss), building and more crafting. Not yet tested on a real headset: keep reporting that honestly.
 
 Backpack (done, `src/backpack.js`; my call, Kane approved): a physical pack you grab by its handle and put on by letting go
@@ -72,6 +73,15 @@ carried on a hip leaning back about 33 degrees, packed at the chest. One LOD on 
 The little cyan bead on the tassel keeps its brightness at night through `src/glow.js` (shared with the backpack). Oddities to
 tell Kane: the butt end reaches the sand in a deep crouch (the hip hangs from the head position); not tested on a headset.
 
+Blue palms (done, `tools/alien-tree/`, `src/tree-sets.js`; my call on the look, Kane said to make my own visual choices): the sixteen
+regular trees round the pool are now banded blue palms with feathery fronds and a few pale hanging veils, in 3 LODs (4,774, 1,584 and 476
+triangles against the first blue trees' 40,000, 24,000 and 12,500). The axe, the wind sway (found by material name) and the projected
+shadow work as before. The first trees' files are still in the repo and `?trees=old` shows them. LOD distances scale with each tree's
+scale. The materials carry a small flat emissive floor in the model so the shaded side of the crown is teal, not black. Oddities to tell
+Kane: the look is mine (a palm, not the old tiered tree); nothing here is tested on a headset (thin leaflets may shimmer in the headset;
+if so, widen them in `feather()` or lower `pairs`); a felled palm still drops its logs and sticks at the old distances along the fall
+line, so the sticks land a little past where the crown ends.
+
 ## Overnight progress log (3 to 4 Oct 2026)
 
 Merged so far (PR numbers, newest last): #25 campfire, #26 and #27 CLAUDE.md, #28 wind-blown sand and dust, #29 fire
@@ -82,6 +92,6 @@ circles the pond and lands to drink, or just crosses the sky; `src/alien-bird.js
 `src/bird-flight.js`; none of it affects gameplay; dev fixture `?bird=perch|fly|flare`), #34 the backpack's model (one LOD, 3,364 tris, `tools/backpack/`),
 #35 the backpack in the game (grab it by the handle, let go behind your shoulder to wear it, Back slot in the menu, carry limit 40 to 100; `src/backpack.js`;
 dev fixtures `?view=pack`, `?pack=worn`), #36 the spear (model, kind, recipe, menu icon, `?view=spear`; the hold lab moved to `tools/hold-lab/` and
-now shows the pack, spear, torch and axe).
+now shows the pack, spear, torch and axe), #37 the blue palms (new tree models in 3 LODs replacing the first blue trees; `?trees=old` to compare).
 Heat haze was skipped on purpose (it needs a full-screen copy of the scene: too costly on Quest). Tasks left in
-order: newer trees with LODs, perf check.
+order: perf check, then the morning summary.
