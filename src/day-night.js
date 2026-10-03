@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SUN } from './world.js';
 import { installOasisWater } from './oasis-water.js';
 import { createWaterFireflies } from './water-fireflies.js';
+import { nightFill } from './night-fill.js';
 
 // The game leans toward twilight and night: a shorter day, a longer night.
 // Short on purpose while testing; the shipped game will use 30+ minute days.
@@ -218,6 +219,8 @@ export function createDayNightCycle({ scene, renderer, materials }) {
     // punch; the terrain, water and sky add their own faint moonlit fill after tone mapping.
     const baseExposure = THREE.MathUtils.lerp(NIGHT_EXPOSURE, DAY_EXPOSURE, daylight);
     renderer.toneMappingExposure = Math.max(baseExposure, 0.30 * twilight);
+
+    nightFill.value = 1 - daylight; // faint moonlight on the lit (PBR) objects, see night-fill.js
 
     state = {
       phase,
