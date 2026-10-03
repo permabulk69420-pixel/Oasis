@@ -4,6 +4,7 @@ import { WATER, terrainHeight } from './world.js';
 import { addInventoryItem, getInventoryCount } from './inventory.js';
 import { isHandAtChest } from './chest-storage.js';
 import { attachHeldObject, getGripMeshParts, setGripSurface } from './grip-contact.js';
+import { registerDropSpawner } from './resource-drops.js';
 
 const STICK_URL = `${import.meta.env?.BASE_URL ?? '/'}models/stick/dead_ground_stick_vr_thin.glb`;
 const GRIP_BUTTON = 1;
@@ -20,6 +21,40 @@ const localVertex = new THREE.Vector3();
 
 // Sparse placements around the grassy oasis shelf. Radius is in normalized shoreline space,
 // matching the vegetation layout and keeping every stick safely outside the water.
+// Logs from felled trees share the stick pickup/store path: same group, same along-X
+// handle axis, but a thicker grip and their own inventory type.
+const LOG_LENGTH = 0.62;
+const LOG_RADIUS = 0.078;
+const logGeometry = new THREE.CylinderGeometry(LOG_RADIUS * 0.92, LOG_RADIUS, LOG_LENGTH, 10, 1).rotateZ(Math.PI / 2);
+const logMaterials = [
+  new THREE.MeshStandardMaterial({ name: 'Alien log bark', color: 0x2f3a44, roughness: 0.95 }),
+  new THREE.MeshStandardMaterial({ name: 'Alien log heartwood', color: 0x9cc9c0, roughness: 0.8 }),
+  new THREE.MeshStandardMaterial({ name: 'Alien log heartwood', color: 0x9cc9c0, roughness: 0.8 }),
+];
+
+export function createLog() {
+  const log = new THREE.Group();
+  const mesh = new THREE.Mesh(logGeometry, logMaterials);
+  mesh.name = 'LogBark';
+  log.add(mesh);
+  log.name = 'Loose alien log';
+  log.userData.collectibleResource = 'wood';
+  log.userData.looseStick = true;
+  log.userData.sourceBottom = -LOG_RADIUS;
+  log.userData.gripProfile = 'large';
+  log.userData.held = false;
+  setGripSurface(log, { meshes: ['LogBark'], axis: [1, 0, 0], alignAxis: [1, 0, 0], point: [0, 0, 0] });
+  return log;
+}
+
+function placeOnGround(object, x, z, yaw, height = terrainHeight) {
+  const scale = object.scale.x || 1;
+  object.position.set(x, height(x, z) - object.userData.sourceBottom * scale + 0.004, z);
+  object.rotation.set(0, yaw, 0);
+  object.userData.groundYaw = yaw;
+  object.updateMatrixWorld(true);
+}
+
 const STICK_LAYOUT = [
   { angle: 0.42, radius: 1.34, yaw: 0.35, scale: 0.98 },
   { angle: 1.38, radius: 1.48, yaw: 2.10, scale: 1.04 },
@@ -134,6 +169,14 @@ export function createGroundSticks({ field, onError = console.warn }) {
 
   const group = new THREE.Group();
   group.name = 'Loose oasis sticks';
+  // Match the rendered terrain triangles, not the analytic dunes, so nothing floats.
+  const groundHeight = (x, z) => field.sample(x, z);
+  registerDropSpawner('wood', (x, z, yaw) => {
+    const log = createLog();
+    group.add(log);
+    placeOnGround(log, x, z, yaw, groundHeight);
+    return log;
+  });
 
   const loader = new GLTFLoader();
   loader.load(STICK_URL, gltf => {
@@ -151,28 +194,37 @@ export function createGroundSticks({ field, onError = console.warn }) {
     const sourceBottom = bounds.min.y;
     const { point: naturalGripPoint, direction: gripDirection } = findNaturalGripPoint(source, bounds);
 
-    for (let i = 0; i < STICK_LAYOUT.length; i++) {
-      const item = STICK_LAYOUT[i];
+    function makeStick(scale) {
       const stick = source.clone(true);
-      const x = WATER.x + Math.cos(item.angle) * WATER.radiusX * item.radius;
-      const z = WATER.z + Math.sin(item.angle) * WATER.radiusZ * item.radius;
-      stick.name = `Loose oasis stick ${i + 1}`;
-      stick.position.set(
-        x,
-        field.sample(x, z) - sourceBottom * item.scale + 0.004,
-        z,
-      );
-      stick.rotation.y = item.yaw;
-      stick.scale.setScalar(item.scale);
+      stick.scale.setScalar(scale);
       stick.userData.collectibleResource = 'stick';
       stick.userData.looseStick = true;
-      stick.userData.groundYaw = item.yaw;
       stick.userData.sourceBottom = sourceBottom;
       stick.userData.gripPoint = naturalGripPoint.toArray();
       setGripSurface(stick, { meshes: ['DeadStick'], axis: gripDirection.toArray(), alignAxis: [1, 0, 0], point: naturalGripPoint.toArray(), compound: true });
       stick.userData.held = false;
-      group.add(stick);
+      return stick;
     }
+
+    for (let i = 0; i < STICK_LAYOUT.length; i++) {
+      const item = STICK_LAYOUT[i];
+      const stick = makeStick(item.scale);
+      stick.name = `Loose oasis stick ${i + 1}`;
+      group.add(stick);
+      placeOnGround(stick,
+        WATER.x + Math.cos(item.angle) * WATER.radiusX * item.radius,
+        WATER.z + Math.sin(item.angle) * WATER.radiusZ * item.radius,
+        item.yaw, groundHeight);
+    }
+
+    let dropped = 0;
+    registerDropSpawner('stick', (x, z, yaw) => {
+      const stick = makeStick(0.9 + (dropped++ % 3) * 0.08);
+      stick.name = `Dropped stick ${dropped}`;
+      group.add(stick);
+      placeOnGround(stick, x, z, yaw, groundHeight);
+      return stick;
+    });
   }, undefined, error => {
     onError(`[Oasis sticks] Stick model failed to load: ${error?.message || error}`);
   });
@@ -209,7 +261,7 @@ export function createHeldSticks({ scene, states, renderer = null, onError = con
     stick.userData.held = false;
     stick.userData.collected = true;
     heldByState.delete(state);
-    addInventoryItem('stick', 1);
+    addInventoryItem(stick.userData.collectibleResource || 'stick', 1);
     return true;
   }
 
@@ -291,6 +343,6 @@ export function createHeldSticks({ scene, states, renderer = null, onError = con
       const state = states.find(item => item.handedness === handedness);
       return Boolean(state && heldByState.has(state));
     },
-    getStoredCount: () => getInventoryCount('stick'),
+    getStoredCount: () => getInventoryCount('stick') + getInventoryCount('wood'),
   };
 }

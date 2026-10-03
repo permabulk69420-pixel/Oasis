@@ -50,6 +50,7 @@ rig.add(camera); scene.add(rig);
 const hands = createVRHands({
   renderer,
   scene,
+  camera,
   gripDebug: import.meta.env.DEV && new URLSearchParams(location.search).get('gripDebug') === '1',
   onError: (message) => console.warn('[Oasis hands]', message)
 });
