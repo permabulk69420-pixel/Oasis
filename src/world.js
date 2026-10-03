@@ -6,6 +6,8 @@ export const GRID_STEP = WORLD_SIZE / GRID_SEGMENTS;
 export const WATER = Object.freeze({ x: 300, z: -400, y: 3.1, radiusX: 40, radiusZ: 34 });
 // Start on a nearby dune crest so iteration happens around the oasis instead of a 500 m walk away.
 export const SPAWN = Object.freeze({ x: 319, z: -292 });
+// The 60 m crimson landmark tree, and the clearing kept free of other plants and rocks.
+export const HERO_TREE = Object.freeze({ x: 372, z: -414, yaw: 0.55, groundInset: 0.55, clearRadius: 40 });
 export const SUN = Object.freeze({ x: -0.728, y: 0.469, z: -0.499 });
 export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const mix = (a, b, t) => a + (b - a) * t;

@@ -1,6 +1,6 @@
 # Oasis
 
-A small WebXR foundation: one kilometre of desert terrain, a shallow water source, and continuous first-person movement. Built for Meta Quest 3 using Three.js and Vite.
+A VR desert survival game: one kilometre of desert, an oasis to live around, gathering, crafting and chopping, with continuous first-person movement. Built for Meta Quest 3 using Three.js and Vite.
 
 ## Explore
 
@@ -12,10 +12,11 @@ Desktop: **Explore**, WASD / arrow up and down to walk, mouse to look, Shift to 
 
 - The walkable area is 1,000 × 1,000 metres, centred on `(0, 0)`.
 - The pool centre is `(300, -400)`, exactly 500 metres from spawn. It is approximately 80 × 68 metres, with an irregular shoreline and a maximum depth of 0.88 metres.
-- A bare sandy bank surrounds the water, followed by a grass band on a gently sloping shelf. Add your grass texture using the instructions in `public/textures/grass/README.md`; its colour currently uses a lightweight green fallback.
-- Seeded wind-shaped dunes, static terrain lighting, mipmapped sand ripples, wet shore sand, and animated shallow water.
+- A bare sandy bank surrounds the water, followed by a textured grass band on a gently sloping shelf.
+- Seeded wind-shaped dunes, sand ripples, wet shore sand, and animated shallow water with reeds and fireflies.
+- Around the oasis: blue alien trees, the 60 m crimson hero tree, berry bushes, green ferns, alien desert plants, loose sticks and stones.
+- A 10-minute day/night cycle with stars, desert ambience, sand footsteps, and a lightable torch.
 - A coarse continuation of the sand outside the playable square hides the world edge.
-- Only terrain, water, sky, and movement. No props, vegetation, buildings, survival systems, objectives, or audio.
 
 ## Run
 
@@ -38,7 +39,7 @@ Terrain uses 62.5 m chunks with four distance-based geometry levels and skirts t
 
 VR requests a 72 Hz refresh rate when supported, a framebuffer scale of 1, and fixed foveation of 0.65. Actual headset frame rate still needs verification on Quest 3; desktop/browser checks cannot certify hardware performance.
 
-`src/world.js` owns dimensions, deterministic height generation, water placement, and collision. `src/terrain.js` builds the terrain. `src/materials.js` owns the sand, sky, and water shaders. `src/grass-texture.js` configures the optional grass texture and its repeat size. `src/main.js` handles input and rendering. Development-only `?view=shore`, `?view=oasis` (elevated overview), and `?view=wide` camera fixtures support visual QA and are removed by the production build.
+`src/world.js` owns dimensions, deterministic height generation, water and hero tree placement, and collision. `src/terrain.js` builds the terrain. `src/materials.js` owns the sand, sky, and water shaders. `src/grass-texture.js` configures the grass texture and its repeat size. `src/oasis-vegetation.js` places the trees, bushes and hero tree. `src/hands.js` owns the VR hands (models in `public/models/hands`) and the held objects. `src/main.js` handles input and rendering. Development-only `?view=shore`, `?view=oasis` (elevated overview), and `?view=wide` camera fixtures support visual QA and are removed by the production build.
 
 ## Inventory and starter crafting
 
