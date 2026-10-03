@@ -18,5 +18,6 @@ Glowing fruit are separate islands in the `Glow_Pods` mesh (`clusters`, `POD_M`/
 size range `D` in `build_tree.py`; their emissive gradient lives in the pod region of
 `make_atlas.py`). The game adds a soft night halo to every island automatically
 (`src/glow-halos.js` finds the pods in the loaded model), so changing how many or how big the pods
-are needs no game code change. After editing `make_atlas.py`, run it to refresh `veil_atlas.png`
+are needs no game code change. The same pod positions are grouped into 8 clusters that cast soft cyan
+pools onto the ground at night (terrain shader, `uPodLights`; tune `POD_LIGHT_COLOR` in `materials.js`). After editing `make_atlas.py`, run it to refresh `veil_atlas.png`
 (`--out` is optional) before building.
