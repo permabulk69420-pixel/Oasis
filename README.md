@@ -100,3 +100,21 @@ Development-only camera fixtures: `?view=fruit`, `?view=orchard`, `?view=glade`,
 `?view=wade`, `?view=gust` (across the wind on a dune crest), `?eye=<metres>` (a lower camera), `?yaw=<deg>` and `?pitch=<deg>` (look direction), `?skytime=<seconds>` (pin the sky clock, e.g. to catch a shooting star), `?sandgain=<n>` (exaggerate the blowing sand), `?windtime=<seconds>` (pin the wind clock so two screenshots can be compared), `?windgain=<n>` (exaggerate the sway), `?at=x,z` and `?look=x,z[,height]` (stand at a world position and look at a point), `?camp=lit` or `?camp=unlit` (puts a campfire on the flattest ground near spawn, with
 `?campd=<metres>` for the distance), plus `?hour=N` to fix the time of day.
 
+## Alien bird (model and poses)
+
+A slender heron-like alien bird: midnight-blue back, teal wings, a cream belly, a coral crest, two long streamers with cyan
+paddles for a tail, and a few glowing cyan details (the wing-tip dots and the eye). It is a single skinned mesh with one
+colour per vertex and a tiny second material for the glow: no textures, two draw calls.
+
+- Three levels of detail, all on the same 19-bone skeleton: `public/models/creatures/alien_bird_lod0.glb` (2172
+  triangles, close up), `lod1` (880) and `lod2` (300, far away). The wings are built spread and the legs hanging.
+- No baked animation. `src/bird-pose.js` turns a handful of numbers (`fold`, `flap`, `flex`, `sweep`, `legs`, `stretch`,
+  `dip`, `crest`, `crouch`, ...) into bone rotations, so flapping, gliding, banking, drinking and folding the wings away are all
+  the same code, and the game can blend between them. Folding also shortens the wing and squeezes the hand (a scale on the two
+  wing bones) so the finger feathers lie nearly parallel on the flank. The numbers to tune are in `JOINTS`.
+- Built headless in Blender from one parametric script: `python3 tools/bird/build_bird.py --out-dir
+  public/models/creatures`, then `python3 tools/bird/check_mesh.py` (closed solids, no inside-out shells, skin weights,
+  one skeleton) and `python3 tools/bird/render_preview.py` for Cycles previews.
+- A pose lab for judging the poses in the browser, never shipped: with `npm run dev` open
+  `/tools/bird/lab.html?poses=rest,drink,glide,flapUp,flapDown,land&lod=0&yaw=135` (also `view=under|top`, `zoom=`, and
+  `j=foldShoulder.sweep:1.4,foldHand.scaleZ:0.4` to try joint numbers).
