@@ -3,6 +3,7 @@ import { SUN } from './world.js';
 import { installOasisWater } from './oasis-water.js';
 import { createWaterFireflies } from './water-fireflies.js';
 import { nightFill } from './night-fill.js';
+import { milkyWayPoint } from './night-sky.js';
 
 // The game leans toward twilight and night: a shorter day, a longer night.
 // Short on purpose while testing; the shipped game will use 30+ minute days.
@@ -45,10 +46,11 @@ function elapsedFromPhase(phase) {
   return DAY_SECONDS + (wrapped - 0.5) * 2 * NIGHT_SECONDS;
 }
 
-function createNightStars(sunUniform) {
+function createNightStars(sunUniform, timeUniform) {
   // One tiny points draw call: enough stars to make the desert night read clearly in VR,
   // without a sky texture or thousands of individual meshes.
-  const STAR_COUNT = 1100;
+  const STAR_COUNT = 2400;
+  const BAND_STARS = 1000; // thicker along the Milky Way, which the sky shader paints (see night-sky.js)
   const STAR_RADIUS = 5000;
   const positions = new Float32Array(STAR_COUNT * 3);
   const sizes = new Float32Array(STAR_COUNT);
@@ -62,18 +64,28 @@ function createNightStars(sunUniform) {
     return ((seed ^ (seed >>> 14)) >>> 0) / 4294967296;
   };
 
+  const bandPoint = new THREE.Vector3();
   for (let i = 0; i < STAR_COUNT; i++) {
-    const y = random() * 2 - 1;
-    const angle = random() * TAU;
-    const horizontal = Math.sqrt(Math.max(0, 1 - y * y));
     const p = i * 3;
-    positions[p] = Math.cos(angle) * horizontal * STAR_RADIUS;
-    positions[p + 1] = y * STAR_RADIUS;
-    positions[p + 2] = Math.sin(angle) * horizontal * STAR_RADIUS;
+    const inBand = i < BAND_STARS;
+    if (inBand) {
+      // roughly a bell curve across the band: the sum of a few random numbers
+      milkyWayPoint(random() * TAU, (random() + random() + random() - 1.5) * 0.30, bandPoint);
+      positions[p] = bandPoint.x * STAR_RADIUS;
+      positions[p + 1] = bandPoint.y * STAR_RADIUS;
+      positions[p + 2] = bandPoint.z * STAR_RADIUS;
+    } else {
+      const y = random() * 2 - 1;
+      const angle = random() * TAU;
+      const horizontal = Math.sqrt(Math.max(0, 1 - y * y));
+      positions[p] = Math.cos(angle) * horizontal * STAR_RADIUS;
+      positions[p + 1] = y * STAR_RADIUS;
+      positions[p + 2] = Math.sin(angle) * horizontal * STAR_RADIUS;
+    }
 
     const sparkle = random();
-    sizes[i] = sparkle > 0.965 ? 3.0 + random() * 1.8 : 1.25 + random() * 1.15;
-    brightness[i] = 0.42 + Math.pow(random(), 2.2) * 0.58;
+    sizes[i] = inBand ? 1.15 + random() * 0.8 : sparkle > 0.965 ? 3.0 + random() * 1.8 : 1.25 + random() * 1.15;
+    brightness[i] = (inBand ? 0.30 : 0.42) + Math.pow(random(), 2.2) * (inBand ? 0.50 : 0.58);
 
     const tint = random();
     if (tint < 0.12) {
@@ -93,7 +105,7 @@ function createNightStars(sunUniform) {
   geometry.computeBoundingSphere();
 
   const material = new THREE.ShaderMaterial({
-    uniforms: { uSun: sunUniform },
+    uniforms: { uSun: sunUniform, uTime: timeUniform || { value: 0 } },
     transparent: true,
     depthTest: true,
     depthWrite: false,
@@ -103,10 +115,12 @@ function createNightStars(sunUniform) {
       attribute float starSize;
       attribute float starBrightness;
       attribute vec3 starColor;
+      uniform float uTime;
       varying float vBrightness;
       varying vec3 vColor;
       void main() {
-        vBrightness = starBrightness;
+        // a slow, slight twinkle, different for every star
+        vBrightness = starBrightness * (0.84 + 0.16 * sin(uTime * (1.1 + starSize * 0.5) + position.x * 0.0173 + position.z * 0.0091));
         vColor = starColor;
         // Keep the stars infinitely distant: head rotation changes the view, translation does not.
         vec4 p = projectionMatrix * mat4(mat3(viewMatrix)) * vec4(position, 1.0);
@@ -152,7 +166,7 @@ export function createDayNightCycle({ scene, renderer, materials }) {
   // createMaterials shares the same uSun/uCloudTime uniform objects across sand, sky and water.
   const sunDirection = materials.sand.uniforms.uSun.value;
   const cloudTime = materials.sand.uniforms.uCloudTime || null;
-  const stars = createNightStars(materials.sand.uniforms.uSun);
+  const stars = createNightStars(materials.sand.uniforms.uSun, materials.sand.uniforms.uCloudTime);
   scene.add(stars);
 
   // Standard PBR assets (hands now; props/buildings later) use real scene lights.
@@ -178,6 +192,7 @@ export function createDayNightCycle({ scene, renderer, materials }) {
 
   let elapsedSeconds = elapsedFromPhase(INITIAL_PHASE);
   let cloudSeconds = 0;
+  let cloudFrozen = false;
   let paused = false;
   let state = null;
 
@@ -237,7 +252,7 @@ export function createDayNightCycle({ scene, renderer, materials }) {
       if (!paused) elapsedSeconds = (elapsedSeconds + dt) % CYCLE_SECONDS;
       // Cloud drift is environmental motion, so pausing the accelerated sun cycle does not
       // freeze the wind. Wrap occasionally to keep the uniform numerically tidy.
-      cloudSeconds = (cloudSeconds + dt) % 100000;
+      if (!cloudFrozen) cloudSeconds = (cloudSeconds + dt) % 100000;
       if (cloudTime) cloudTime.value = cloudSeconds;
     }
     apply();
@@ -255,6 +270,14 @@ export function createDayNightCycle({ scene, renderer, materials }) {
     return state;
   }
 
+  // Dev fixtures: pin the cloud clock (it also times the shooting stars) so a screenshot can catch one.
+  function setCloudTime(seconds, frozen = true) {
+    cloudSeconds = Number.isFinite(seconds) ? seconds : 0;
+    cloudFrozen = Boolean(frozen);
+    if (cloudTime) cloudTime.value = cloudSeconds;
+    return cloudSeconds;
+  }
+
   function setPaused(value) {
     paused = Boolean(value);
     return paused;
@@ -266,6 +289,7 @@ export function createDayNightCycle({ scene, renderer, materials }) {
   return {
     update,
     setTimeOfDay,
+    setCloudTime,
     setPaused,
     isPaused: () => paused,
     getState: () => ({ ...state }),

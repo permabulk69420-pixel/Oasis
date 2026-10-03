@@ -222,7 +222,7 @@ const FRAGMENT = /* glsl */`
     vec3 ray = normalize(vWorld - cameraPosition);
     float backlit = pow(max(dot(ray, uSun), 0.0), 4.0); // dust glows when the sun is behind it
     vec3 sand = mix(vec3(0.80, 0.58, 0.35), vec3(0.96, 0.82, 0.60), vTone); // a little paler than the ground
-    sand = mix(sand, vec3(0.93, 0.82, 0.66), uHaze); // big soft clouds are paler and greyer: dust haze
+    sand = mix(sand, vec3(0.88, 0.72, 0.52), uHaze); // big soft clouds are paler and greyer: dust haze
     vec3 ambient = mix(vec3(0.006, 0.009, 0.015), vec3(0.28, 0.34, 0.42), day);
     vec3 sun = vec3(1.23, 1.09, 0.86) * (0.55 + 0.9 * backlit) * day;
     // a few grains catch the light and flash
@@ -230,7 +230,7 @@ const FRAGMENT = /* glsl */`
     gl_FragColor = vec4(sand * (ambient + sun) * (1.15 + 1.3 * glint * (1.0 - uHaze) * day), min(1.0, a * (1.0 + 0.8 * glint)));
     #include <tonemapping_fragment>
     // Faint moonlit dust at night, added after tone mapping like the terrain's own fill.
-    gl_FragColor.rgb += sand * vec3(0.0110, 0.0165, 0.0300) * (1.0 - day);
+    gl_FragColor.rgb += sand * vec3(0.0060, 0.0090, 0.0165) * (1.0 - day);
     #include <colorspace_fragment>
   }
 `;
