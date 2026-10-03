@@ -18,6 +18,7 @@ const ITEM_WEIGHTS = Object.freeze({
   fibre: 1,
   axe: 10,
   torch: 5,
+  spear: 10,
   campfire: 25,
 });
 
