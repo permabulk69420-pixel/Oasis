@@ -10,8 +10,14 @@ const PICKUP_RADIUS = 0.52;
 
 // Six clean axe impacts fells one of the regular blue alien trees.
 export const TREE_HITS_TO_FELL = 6;
-const TREE_TRUNK_RADIUS = 0.72;
-const TREE_CHOP_HEIGHT = 4.8;
+// Chop zone, measured from the tree model at scale 1: the trunk is ~0.12 m in radius and
+// runs from the ground to ~1.5 m, where the canopy starts. The trunk part scales with the
+// tree; the reach allowance (how close the axe head has to get) does not, or a 2x tree
+// would be choppable from over a metre away, through thin air.
+export const TREE_TRUNK_RADIUS = 0.12;
+export const TREE_CHOP_REACH = 0.40;
+export const TREE_CHOP_MIN_HEIGHT = 0.05;
+export const TREE_CHOP_TOP = 1.9;
 const MIN_CHOP_SWING_SPEED = 1.25;
 const HIT_COOLDOWN = 0.16;
 const HIT_SHAKE_TIME = 0.22;
@@ -112,11 +118,11 @@ export function createAxeKind({ scene, onError = console.warn }) {
       tree.getWorldPosition(treePosition);
       const scale = Math.max(tree.scale.x, 0.001);
       const dy = axeHeadPosition.y - treePosition.y;
-      if (dy < 0.08 || dy > TREE_CHOP_HEIGHT * scale) continue;
+      if (dy < TREE_CHOP_MIN_HEIGHT * scale || dy > TREE_CHOP_TOP * scale) continue;
       const dx = axeHeadPosition.x - treePosition.x;
       const dz = axeHeadPosition.z - treePosition.z;
       const distanceSq = dx * dx + dz * dz;
-      const radius = TREE_TRUNK_RADIUS * scale;
+      const radius = TREE_TRUNK_RADIUS * scale + TREE_CHOP_REACH;
       if (distanceSq <= radius * radius && distanceSq < bestDistanceSq) {
         best = tree;
         bestDistanceSq = distanceSq;
