@@ -19,6 +19,9 @@ const HERO_MODEL = HERO_MODELS[new URLSearchParams(globalThis.location?.search |
 // The veil tree's Glow material (pods and veins) is calm by day and brighter after dark.
 const GLOW_DAY = 1.0;
 const GLOW_NIGHT = 8;
+// The veil tree's leaves sit in their own shade and read near-black under the game's lighting, so
+// they get a daylight-only fill (their own texture, emissive) that fades out completely after dark.
+const LEAF_FILL_DAY = 0.38;
 
 // Keep the full tree nearby, then step down aggressively once individual leaves are small in VR.
 const TREE_LODS = [
@@ -320,6 +323,7 @@ export function createOasisVegetation({ field, sunDirection = null }) {
   group.add(bushShadow.mesh, regularTreeShadow.mesh, heroTreeShadow.mesh);
 
   const glowMaterials = new Set();
+  const leafMaterials = new Set();
   let bushLoadStarted = false;
   let treeLoadStarted = false;
   let heroLoadStarted = false;
@@ -409,7 +413,15 @@ export function createOasisVegetation({ field, sunDirection = null }) {
       disableModelShadows(hero);
       hero.traverse(object => {
         const materials = Array.isArray(object.material) ? object.material : [object.material];
-        for (const material of materials) if (material?.name === 'Glow') glowMaterials.add(material);
+        for (const material of materials) {
+          if (material?.name === 'Glow') glowMaterials.add(material);
+          if (material?.name === 'Leaves' && material.map) {
+            material.emissive.set(0xffffff);
+            material.emissiveMap = material.map;
+            material.needsUpdate = true;
+            leafMaterials.add(material);
+          }
+        }
       });
       heroGroup.add(hero);
       heroReady = true;
@@ -425,6 +437,10 @@ export function createOasisVegetation({ field, sunDirection = null }) {
     bushGroup.visible = distance < BUSH_DRAW_DISTANCE;
     treeGroup.visible = distance < TREE_DRAW_DISTANCE;
     heroGroup.visible = heroDistance < HERO_DRAW_DISTANCE;
+    if (leafMaterials.size) {
+      const fill = LEAF_FILL_DAY * smoothstep(0.02, 0.35, liveSun.y);
+      for (const material of leafMaterials) material.emissiveIntensity = fill;
+    }
     if (glowMaterials.size) {
       const intensity = THREE.MathUtils.lerp(GLOW_NIGHT, GLOW_DAY, smoothstep(-0.05, 0.25, liveSun.y));
       for (const material of glowMaterials) material.emissiveIntensity = intensity;
