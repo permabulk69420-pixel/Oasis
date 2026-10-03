@@ -11,6 +11,7 @@ import { createGroundStones } from './stones.js';
 import { createGroundFruit } from './glow-fruit.js';
 import { createCampfires, campfireSpot, campfireSite } from './campfire.js';
 import { createWindSand, WIND_SAND } from './wind-sand.js';
+import { createAlienBirds } from './alien-bird.js';
 import { windTime, windStrength } from './wind.js';
 import { installNightFill } from './night-fill.js';
 import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater } from './survival.js';
@@ -213,6 +214,20 @@ const campfires = createCampfires({
       return { position: new THREE.Vector3().setFromMatrixPosition(torch.state.flameAnchor.matrixWorld), heldBy: torch.heldBy };
     }),
 });
+// Alien birds: now and then one flies in, circles the pond and lands to drink, or just crosses the sky.
+const alienBirds = createAlienBirds({
+  scene, renderer, camera, field,
+  sunDirection: materials.sand.uniforms.uSun.value,
+  getAvoid: () => campfires.list().map(fire => ({ x: fire.x, z: fire.z, r: 6 })),
+  onError: message => console.warn(message),
+});
+// Development-only: ?bird=perch|fly|flare puts a bird in view and stops time for it (?birdfreeze=0 lets it move),
+// ?birdd=<metres> sets how far ahead, ?birdseed=<n> makes the bird's choices repeatable.
+const devBirdParams = import.meta.env.DEV ? new URLSearchParams(location.search) : null;
+let devBird = devBirdParams?.get('bird') ?? null;
+if (devBirdParams?.has('birdseed')) alienBirds.debug.seed(Number(devBirdParams.get('birdseed')));
+// ?birdwait=<seconds>: with no fixture, the next bird turns up that many seconds into the day (instead of 12 to 22)
+if (devBirdParams?.has('birdwait')) alienBirds.debug.wait(Number(devBirdParams.get('birdwait')) || 0);
 const placeHead = new THREE.Vector3(), placeForward = new THREE.Vector3();
 function placeFromMenu(type) {
   if (type !== 'campfire') return { ok: false, message: 'You can’t place that.' };
@@ -454,6 +469,39 @@ function frame(time) {
   // One wind clock for the sand and the swaying plants, so their gusts line up.
   windTime.value = devWindTime ?? time * 0.001;
   windSand.update(windTime.value, head, renderer.xr.isPresenting ? WIND_SAND.vrViewHeight : renderer.getDrawingBufferSize(drawingSize).y);
+  alienBirds.update(dt, head);
+  if (devBird && alienBirds.ready) {
+    const params = devBirdParams;
+    const spot = Number(params.get('birdd')) || (devBird === 'perch' ? 9 : 20);
+    const ahead = { x: -Math.sin(rig.rotation.y), z: -Math.cos(rig.rotation.y) };
+    const x = head.x + ahead.x * spot, z = head.z + ahead.z * spot;
+    if (devBird === 'perch') {
+      // side on to the camera, so the whole bird shows
+      alienBirds.debug.perch({ x, z, yaw: Math.atan2(ahead.x, ahead.z) + Math.PI / 2 });
+    } else if (devBird === 'fly') {
+      alienBirds.debug.fly({ x, z, altitude: Number(params.get('birdalt')) || 12, radius: 14, t: Number(params.get('birdt')) || 0 });
+    } else if (devBird === 'flare') {
+      // coming in to land: stand `spot` metres to one side of the bird (the dry side) and look at it
+      const landing = alienBirds.debug.visit({ t: 'flare' });
+      const bird = landing ? alienBirds.list()[0] : null;
+      if (bird) {
+        const along = Math.atan2(landing.x - bird.x, landing.z - bird.z);
+        let side = 1, best = -1;
+        for (const s of [1, -1]) {
+          const d = Math.hypot(bird.x + s * Math.cos(along) * spot - WATER.x, bird.z - s * Math.sin(along) * spot - WATER.z);
+          if (d > best) { best = d; side = s; }
+        }
+        const px = bird.x + side * Math.cos(along) * spot, pz = bird.z - side * Math.sin(along) * spot;
+        const gy = field.sample(px, pz);
+        rig.position.set(px, gy, pz); groundY = gy;
+        const dx = bird.x - px, dz = bird.z - pz;
+        rig.rotation.y = Math.atan2(-dx, -dz);
+        camera.rotation.x = Math.atan2(bird.y - (gy + STANDING_EYE_HEIGHT), Math.hypot(dx, dz));
+      }
+    }
+    if (params.get('birdfreeze') !== '0') alienBirds.debug.freeze(true);
+    devBird = null;
+  }
   survivorMenu.update();
 
   // local-floor still reports the real headset height while sitting. In seated mode,
@@ -557,6 +605,7 @@ function frame(time) {
   if (import.meta.env.DEV && time - telemetryTime > 1000) {
     canvas.dataset.position = JSON.stringify({ x: +head.x.toFixed(2), z: +head.z.toFixed(2), ground: +field.sample(head.x, head.z).toFixed(2), yaw: +rig.rotation.y.toFixed(3) });
     canvas.dataset.render = JSON.stringify({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures });
+    canvas.dataset.birds = JSON.stringify(alienBirds.list());
     canvas.dataset.campfires = JSON.stringify(campfires.list().map(fire => ({ x: +fire.x.toFixed(1), z: +fire.z.toFixed(1), lit: fire.lit })));
     canvas.dataset.survival = JSON.stringify(Object.fromEntries(Object.entries(getSurvivalStats()).map(([k, v]) => [k, +v.toFixed(1)])));
     canvas.dataset.inventory = JSON.stringify({ weight: getInventoryWeight(), speedMultiplier: getCarrySpeedMultiplier() });
