@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WATER, SUN, HERO_TREE } from './world.js';
 import { createPodHalos, buildGroundLights, applyGroundLights } from './glow-halos.js';
+import { addWindSwayToModel, SWAY } from './wind.js';
 
 const TREE_DRAW_DISTANCE = 240;
 const TREE_LOAD_DISTANCE = 275;
@@ -307,6 +308,8 @@ export function createOasisVegetation({ field, sunDirection = null, groundGlowUn
       const source = gltf.scene;
       source.updateMatrixWorld(true);
       disableModelShadows(source);
+      // The crown sways in the wind and the leaves tremble; the hero tree below is left alone.
+      addWindSwayToModel(source, material => (material.name === 'Waxy blue leaf tissue' ? SWAY.foliage : SWAY.trunk));
       return { ...level, source };
     })).then(levels => {
       for (let i = 0; i < trees.length; i++) {

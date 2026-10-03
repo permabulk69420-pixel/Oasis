@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { WIND, WIND_GLSL } from './wind.js';
 
 // Wind-blown sand: the desert's constant, quiet motion.
 //
@@ -14,7 +15,7 @@ import * as THREE from 'three';
 // calm, and nothing blows over the pond. Heights come from the same elevation texture the water uses.
 
 export const WIND_SAND = Object.freeze({
-  wind: [0.84, 0.54], // x, z: the direction the dunes were built for (see terrainHeight)
+  wind: WIND.direction, // x, z: the direction the dunes were built for (see terrainHeight)
   layers: Object.freeze({
     // Close in, where grains cross your feet and are big enough to see: a small box with plenty of them.
     near: Object.freeze({
@@ -134,6 +135,7 @@ const VERTEX = /* glsl */`
   varying float vAlpha;
   varying float vTone;
   varying vec3 vWorld;
+  ${WIND_GLSL}
 
   float groundAt(vec2 p) {
     vec2 rg = texture2D(uElevation, ((p + 500.0) / 1000.0 * 512.0 + 0.5) / 513.0).rg;
@@ -147,10 +149,8 @@ const VERTEX = /* glsl */`
     vec2 rel = mod(start + uWind * speed * uTime - uCenter.xz + uRadius, box) - uRadius;
     vec2 xz = uCenter.xz + rel;
 
-    // A slow wave of stronger wind rolls across the dunes.
-    vec2 side = vec2(-uWind.y, uWind.x);
-    float gust = 0.5 + 0.5 * sin(dot(xz, uWind) * 0.045 - uTime * 0.85 + 1.8 * sin(dot(xz, side) * 0.028 + uTime * 0.11));
-    gust = gust * gust * (3.0 - 2.0 * gust);
+    // A slow wave of stronger wind rolls across the dunes (the plants lean into the same gusts: wind.js).
+    float gust = windGust(xz, uWind, uTime);
 
     // Sand lifts off where the ground turns over: a dune crest.
     float ground = groundAt(xz);
