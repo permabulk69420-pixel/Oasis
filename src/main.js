@@ -121,7 +121,7 @@ let crouchOffset = 0, crouchActive = false, crouchButtonDown = false;
 let sprintActive = false, sprintButtonDown = false;
 
 const survivorMenu = createSurvivorMenu({
-  scene, renderer, states: hands.states,
+  scene, renderer, states: hands.states, tools: hands.tools,
   onToggle(open) {
     keys.clear(); touchMove = { x: 0, z: 0 }; touchMoveId = null; touchLookId = null; mouseDragging = false;
     velocity.set(0, 0, 0); footsteps.reset(); movePad.firstElementChild.style.transform = '';
