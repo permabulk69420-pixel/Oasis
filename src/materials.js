@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SUN, WATER, GRID_STEP, HALF_WORLD } from './world.js';
 import { attachSandPBR } from './sand-pbr.js';
 import { attachGrassTexture, GRASS_TILE_METRES } from './grass-texture.js';
+import { NIGHT_SKY_GLSL } from './night-sky.js';
 
 const CLOUD_TEXTURE_SIZE = 256;
 const POD_LIGHT_SLOTS = 8; // ground-light pools under the veil tree's pods
@@ -397,6 +398,7 @@ export function createMaterials(renderer, field) {
     fragmentShader: /* glsl */`
       varying vec3 vRay;
       ${atmosphere}
+      ${NIGHT_SKY_GLSL}
       void main() {
         vec3 ray = normalize(vRay);
         float daylight = daylightLevel();
@@ -426,6 +428,12 @@ export function createMaterials(renderer, field) {
         #include <tonemapping_fragment>
         // Faint night-sky glow, brighter toward the horizon, so silhouettes read against it.
         gl_FragColor.rgb += mix(SKY_NIGHT_HORIZON, SKY_NIGHT_ZENITH, pow(max(ray.y, 0.0), 0.5)) * (1.0 - daylight);
+        // The moon, the Milky Way and now and then a shooting star (see night-sky.js). The moon shows a bit
+        // earlier than the stars, in the twilight.
+        float starNight = 1.0 - smoothstep(-0.22, 0.025, uSun.y);
+        float moonNight = 1.0 - smoothstep(-0.12, 0.10, uSun.y);
+        if (moonNight > 0.01) gl_FragColor.rgb += moonLight(ray) * moonNight;
+        if (starNight > 0.01) gl_FragColor.rgb += (milkyWayLight(ray) + shootingStarLight(ray, uCloudTime)) * starNight;
         #include <colorspace_fragment>
       }
     `,
