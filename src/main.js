@@ -13,6 +13,7 @@ import { createCampfires, campfireSpot, campfireSite } from './campfire.js';
 import { createWindSand, WIND_SAND } from './wind-sand.js';
 import { createAlienBirds } from './alien-bird.js';
 import { createBackpack, PACK } from './backpack.js';
+import { SPEAR } from './spear.js';
 import { windTime, windStrength } from './wind.js';
 import { installNightFill } from './night-fill.js';
 import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater } from './survival.js';
@@ -146,6 +147,7 @@ if (import.meta.env.DEV) {
   if (view === 'glade') aimAt(HERO_TREE.x - 11, HERO_TREE.z + 12, { x: HERO_TREE.x + 3, y: heroY + 1.2, z: HERO_TREE.z - 4 }, 1.7);
   const fruit0 = glowFruit.slots[0];
   if (view === 'pack') aimAt(PACK.spawn.x - 0.9, PACK.spawn.z + 1.5, { x: PACK.spawn.x, y: field.sample(PACK.spawn.x, PACK.spawn.z) + 0.3, z: PACK.spawn.z }, 1.2);
+  if (view === 'spear') aimAt(SPEAR.spawn.x - 0.7, SPEAR.spawn.z + 1.5, { x: SPEAR.spawn.x, y: field.sample(SPEAR.spawn.x, SPEAR.spawn.z) + 0.55, z: SPEAR.spawn.z }, 1.3);
   if (view === 'fruit' && fruit0) aimAt(fruit0.x + 1.1, fruit0.z + 0.8, { x: fruit0.x, y: field.sample(fruit0.x, fruit0.z) + 0.06, z: fruit0.z }, 1.2);
   if (view === 'orchard') aimAt(HERO_TREE.x - 34, HERO_TREE.z + 22, { x: HERO_TREE.x - 8, y: heroY + 0.2, z: HERO_TREE.z + 2 }, 1.7);
   if (view === 'base') aimAt(HERO_TREE.x - 16, HERO_TREE.z + 17, { x: HERO_TREE.x - 2, y: heroY + 1.5, z: HERO_TREE.z + 2 }, 1.3);

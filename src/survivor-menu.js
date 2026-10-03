@@ -163,6 +163,22 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
       ctx.fillStyle = '#4a3a2c'; ctx.fillRect(2, -18, 14, 14);
       ctx.fillStyle = C.gold; ctx.beginPath(); ctx.moveTo(4, -16); ctx.quadraticCurveTo(-6, -32, 14, -48); ctx.quadraticCurveTo(10, -30, 24, -28); ctx.quadraticCurveTo(24, -16, 4, -16); ctx.fill();
       ctx.fillStyle = '#fff1c4'; ctx.beginPath(); ctx.moveTo(8, -18); ctx.quadraticCurveTo(4, -28, 13, -36); ctx.quadraticCurveTo(13, -26, 18, -22); ctx.quadraticCurveTo(16, -17, 8, -18); ctx.fill();
+    } else if (type === 'spear') {
+      // a long shaft leaning right: stone point, cream lashing with a coral band, a tassel of two feathers and a cyan bead
+      ctx.rotate(0.5);
+      ctx.fillStyle = '#8fb0b4'; ctx.strokeStyle = '#35545c'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(-5, -22); ctx.lineTo(-9.5, -32); ctx.lineTo(0, -52); ctx.lineTo(9.5, -32); ctx.lineTo(5, -22); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#cfe2e0'; ctx.beginPath(); ctx.moveTo(0, -52); ctx.lineTo(9.5, -32); ctx.lineTo(5, -22); ctx.lineTo(0, -22); ctx.closePath(); ctx.fill();
+      handle(0, 42, 0, -20, 6);
+      ctx.fillStyle = '#e3d5ac'; ctx.strokeStyle = '#8c7d52'; ctx.lineWidth = 2;
+      ctx.fillRect(-6, -26, 12, 15); ctx.strokeRect(-6, -26, 12, 15);
+      ctx.strokeStyle = '#e5603b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-6, -18.5); ctx.lineTo(6, -18.5); ctx.stroke();
+      ctx.strokeStyle = '#e5603b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-3.5, 35); ctx.lineTo(3.5, 35); ctx.stroke();
+      ctx.fillStyle = '#2fa3a8'; ctx.strokeStyle = '#1b6468'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-3, 0); ctx.quadraticCurveTo(-17, 6, -19, 27); ctx.quadraticCurveTo(-6, 20, -3, 8); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#e5603b'; ctx.strokeStyle = '#9b3a22';
+      ctx.beginPath(); ctx.moveTo(3, 2); ctx.quadraticCurveTo(15, 9, 16, 26); ctx.quadraticCurveTo(5, 20, 3, 10); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(0, 5, 3.2, 0, Math.PI * 2); ctx.fill();
     } else if (type === 'stone') {
       ctx.fillStyle = '#a9b6b3'; ctx.beginPath(); ctx.moveTo(-30, 10); ctx.lineTo(-16, -22); ctx.lineTo(14, -28); ctx.lineTo(32, -2); ctx.lineTo(20, 22); ctx.lineTo(-10, 27); ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#74898a'; ctx.beginPath(); ctx.moveTo(-16, -22); ctx.lineTo(-4, 10); ctx.lineTo(20, 22); ctx.lineTo(-10, 27); ctx.lineTo(-30, 10); ctx.closePath(); ctx.fill();
