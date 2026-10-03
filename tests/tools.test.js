@@ -192,7 +192,7 @@ test('hips stay put while you look around, and face where you look once you star
   state.handedness = 'left';
   const stick = state.inputSource.gamepad.axes = [0, 0, 0, 0];
   const hip = () => tools.belt.right.getWorldPosition(new THREE.Vector3());
-  const settle = () => { for (let i = 0; i < 40; i++) tools.update(0.016); };
+  const settle = () => { for (let i = 0; i < 150; i++) tools.update(0.016); };
   const start = hip();
   xrCamera.rotation.y = Math.PI / 2; // turn the head to the left
   xrCamera.updateMatrixWorld(true);
