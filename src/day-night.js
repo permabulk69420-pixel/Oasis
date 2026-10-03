@@ -3,14 +3,21 @@ import { SUN } from './world.js';
 import { installOasisWater } from './oasis-water.js';
 import { createWaterFireflies } from './water-fireflies.js';
 
-export const DAY_SECONDS = 5 * 60;
-export const NIGHT_SECONDS = 5 * 60;
+// The game leans toward twilight and night: a shorter day, a longer night.
+export const DAY_SECONDS = 4 * 60;
+export const NIGHT_SECONDS = 6 * 60;
 export const CYCLE_SECONDS = DAY_SECONDS + NIGHT_SECONDS;
+
+const NIGHT_EXPOSURE = 0.035;
+const DAY_EXPOSURE = 0.82;
 
 const TAU = Math.PI * 2;
 const INITIAL_SUN = new THREE.Vector3(SUN.x, SUN.y, SUN.z).normalize();
 const SUN_PATH_AZIMUTH = Math.atan2(INITIAL_SUN.z, INITIAL_SUN.x);
-const INITIAL_PHASE = Math.asin(THREE.MathUtils.clamp(INITIAL_SUN.y, -1, 1)) / TAU;
+// The sun never climbs high: its arc tops out at about 58 degrees instead of passing straight
+// overhead. Days stay softer and low, and the golden twilight around each horizon crossing lasts longer.
+const SUN_ARC = 0.65;
+const INITIAL_PHASE = Math.min(Math.asin(THREE.MathUtils.clamp(INITIAL_SUN.y, -1, 1)) / SUN_ARC, Math.PI / 2) / TAU;
 
 const DAY_SKY_LIGHT = new THREE.Color(0xc4ddf0);
 const NIGHT_SKY_LIGHT = new THREE.Color(0x02050a);
@@ -175,11 +182,12 @@ export function createDayNightCycle({ scene, renderer, materials }) {
   function apply() {
     const phase = phaseFromElapsed(elapsedSeconds);
     const angle = phase * TAU;
-    const horizontal = Math.cos(angle);
+    const elevation = Math.asin(Math.sin(angle)) * SUN_ARC;
+    const horizontal = Math.cos(elevation) * (Math.cos(angle) >= 0 ? 1 : -1);
 
     sunDirection.set(
       Math.cos(SUN_PATH_AZIMUTH) * horizontal,
-      Math.sin(angle),
+      Math.sin(elevation),
       Math.sin(SUN_PATH_AZIMUTH) * horizontal
     ).normalize();
     moonDirection.copy(sunDirection).multiplyScalar(-1);
@@ -195,7 +203,7 @@ export function createDayNightCycle({ scene, renderer, materials }) {
     sunlight.color.copy(SUNRISE_LIGHT).lerp(NOON_LIGHT, warmToWhite);
 
     moonlight.position.copy(moonDirection).multiplyScalar(1000);
-    moonlight.intensity = 0.10 * moonAmount;
+    moonlight.intensity = 0.14 * moonAmount;
 
     tempSky.copy(NIGHT_SKY_LIGHT).lerp(DAY_SKY_LIGHT, daylight);
     tempGround.copy(NIGHT_GROUND_LIGHT).lerp(DAY_GROUND_LIGHT, daylight);
@@ -205,7 +213,9 @@ export function createDayNightCycle({ scene, renderer, materials }) {
 
     // Twilight remains readable, but once it has passed, unaided night vision should be poor.
     // This is intentional survival-game darkness: practical navigation should want a torch.
-    const baseExposure = THREE.MathUtils.lerp(0.035, 1.05, daylight);
+    // Day never gets glaring (ceiling 0.82). Night exposure stays very low so the torch keeps its
+    // punch; the terrain, water and sky add their own faint moonlit fill after tone mapping.
+    const baseExposure = THREE.MathUtils.lerp(NIGHT_EXPOSURE, DAY_EXPOSURE, daylight);
     renderer.toneMappingExposure = Math.max(baseExposure, 0.30 * twilight);
 
     state = {
