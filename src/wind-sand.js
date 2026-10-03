@@ -19,15 +19,15 @@ export const WIND_SAND = Object.freeze({
     // Close in, where grains cross your feet and are big enough to see: a small box with plenty of them.
     near: Object.freeze({
       radius: 8, // metres: the box around the player; grains fade out toward its edge
-      count: 520,
+      count: 560,
       speed: [1.9, 4.6],
-      length: [0.18, 0.70],
-      width: [0.008, 0.018],
+      length: [0.07, 0.30],
+      width: [0.004, 0.010],
       height: 0.50, // the highest grains rise this far above the ground
       hop: 0.07, // how far a grain bounces
-      alpha: 0.90,
+      alpha: 0.50,
       near: [0.35, 1.1], // fades out this close to the eye
-      foreshorten: 0.22, // how short a streak looks when it points at you
+      round: 0.0, // 0 = a thin line, 1 = a round puff when seen end-on
       crest: 0.6, // extra lift and density on dune crests
       haze: 0.0, // 0 = sand coloured, 1 = pale dust haze
       soft: 1.1,
@@ -35,15 +35,15 @@ export const WIND_SAND = Object.freeze({
     }),
     streaks: Object.freeze({
       radius: 26,
-      count: 700,
+      count: 520,
       speed: [1.7, 4.8],
-      length: [0.40, 1.40],
-      width: [0.010, 0.025],
+      length: [0.16, 0.65],
+      width: [0.006, 0.015],
       height: 0.70,
       hop: 0.10,
-      alpha: 0.80,
+      alpha: 0.50,
       near: [0.5, 1.6],
-      foreshorten: 0.22,
+      round: 0.0,
       crest: 0.9,
       haze: 0.1,
       soft: 1.15,
@@ -52,15 +52,15 @@ export const WIND_SAND = Object.freeze({
     // Soft veils hugging the ground and spilling over the crests: the part you see at a glance.
     veils: Object.freeze({
       radius: 24,
-      count: 170,
+      count: 220,
       speed: [2.2, 4.4],
       length: [1.6, 4.5],
       width: [0.16, 0.42],
       height: 0.55,
       hop: 0.0,
-      alpha: 0.45,
+      alpha: 0.60,
       near: [1.5, 4.0],
-      foreshorten: 0.40,
+      round: 0.35,
       crest: 1.4,
       haze: 0.35,
       soft: 1.3,
@@ -75,9 +75,9 @@ export const WIND_SAND = Object.freeze({
       width: [1.2, 2.4],
       height: 1.2,
       hop: 0.0,
-      alpha: 0.16,
+      alpha: 0.20,
       near: [2.5, 7.0],
-      foreshorten: 0.55,
+      round: 0.9,
       crest: 1.6,
       haze: 0.55,
       soft: 1.8,
@@ -128,7 +128,7 @@ const VERTEX = /* glsl */`
   uniform float uHeight;
   uniform float uHop;
   uniform float uAlpha;
-  uniform float uFore;
+  uniform float uRound;
   uniform float uCrest;
   varying vec2 vUv;
   varying float vAlpha;
@@ -162,19 +162,32 @@ const VERTEX = /* glsl */`
     vec3 world = vec3(xz.x, ground + rise, xz.y);
     vWorld = world;
 
-    // Camera-facing quad stretched along the wind as it appears on screen.
+    // The streak is a line in the world along the wind: project both of its ends, so it points the way real
+    // perspective says it should (toward the vanishing point of the wind), then draw a quad around that line.
     vec4 mv = viewMatrix * vec4(world, 1.0);
     float depth = max(-mv.z, 0.05);
     vec3 windView = mat3(viewMatrix) * vec3(uWind.x, 0.0, uWind.y);
-    float across = length(windView.xy);
-    vec2 dir = across > 0.001 ? windView.xy / across : vec2(1.0, 0.0);
-    float pixel = depth * 2.0 / (projectionMatrix[1][1] * uViewHeight);
     float len = (uLength.x + uLength.y * aSeedB.x) * (0.75 + 0.5 * gust);
     float wid = uWidth.x + uWidth.y * aSeedB.y;
-    float shownLen = max(len * mix(uFore, 1.0, across / max(length(windView), 0.001)), pixel * 1.6);
-    float shownWid = max(wid, pixel * 1.2);
-    mv.xy += dir * position.x * shownLen * 0.5 + vec2(-dir.y, dir.x) * position.y * shownWid * 0.5;
-    gl_Position = projectionMatrix * mv;
+    // keep both ends in front of the camera
+    float reach = abs(windView.z) > 0.001 ? (depth - 0.08) / abs(windView.z) : 10000.0;
+    float halfLen = min(len * 0.5, max(reach, 0.0));
+    vec4 clipA = projectionMatrix * vec4(mv.xyz - windView * halfLen, 1.0);
+    vec4 clipB = projectionMatrix * vec4(mv.xyz + windView * halfLen, 1.0);
+    vec4 clipC = projectionMatrix * mv;
+    float aspect = projectionMatrix[1][1] / projectionMatrix[0][0];
+    vec2 ndcA = clipA.xy / clipA.w;
+    vec2 ndcB = clipB.xy / clipB.w;
+    vec2 along = vec2((ndcB.x - ndcA.x) * aspect, ndcB.y - ndcA.y); // on screen, with square units
+    float screenLen = length(along);
+    vec2 dir = screenLen > 1e-6 ? along / screenLen : vec2(1.0, 0.0);
+    float pixel = 2.0 / uViewHeight; // one pixel, in the same units
+    float widthNdc = wid * projectionMatrix[1][1] / depth;
+    float shownWid = max(widthNdc, pixel * 1.2);
+    float shownLen = max(max(screenLen, pixel * 1.6), shownWid * uRound);
+    vec2 offset = dir * (position.x * 0.5 * shownLen) + vec2(-dir.y, dir.x) * (position.y * 0.5 * shownWid);
+    vec2 ndc = clipC.xy / clipC.w + vec2(offset.x / aspect, offset.y);
+    gl_Position = vec4(ndc * clipC.w, clipC.z, clipC.w);
     vUv = position.xy;
 
     float edge = 1.0 - smoothstep(uRadius * 0.5, uRadius, length(rel));
@@ -182,7 +195,7 @@ const VERTEX = /* glsl */`
     float pond = length((xz - uWater.xz) / uWaterRadii);
     float calm = mix(0.10, 1.0, smoothstep(1.15, 2.6, pond));
     float dry = smoothstep(0.05, 0.5, ground - uWater.y);
-    float thin = clamp(wid / shownWid, 0.0, 1.0);
+    float thin = clamp(widthNdc / shownWid, 0.0, 1.0) * clamp(screenLen / shownLen, 0.0, 1.0);
     vAlpha = uGain * uAlpha * (0.45 + 0.55 * aSeedB.w) * (0.3 + 0.7 * gust) * (1.0 + 0.8 * crest)
       * edge * nearFade * calm * dry * thin;
     vTone = aSeedB.w;
@@ -193,6 +206,7 @@ const FRAGMENT = /* glsl */`
   uniform vec3 uSun;
   uniform float uSoft;
   uniform float uHaze;
+  uniform float uTime;
   varying vec2 vUv;
   varying float vAlpha;
   varying float vTone;
@@ -207,11 +221,13 @@ const FRAGMENT = /* glsl */`
     float day = smoothstep(-0.07, 0.16, uSun.y);
     vec3 ray = normalize(vWorld - cameraPosition);
     float backlit = pow(max(dot(ray, uSun), 0.0), 4.0); // dust glows when the sun is behind it
-    vec3 sand = mix(vec3(0.84, 0.62, 0.38), vec3(1.0, 0.90, 0.68), vTone); // paler than the ground so it shows
+    vec3 sand = mix(vec3(0.80, 0.58, 0.35), vec3(0.96, 0.82, 0.60), vTone); // a little paler than the ground
     sand = mix(sand, vec3(0.93, 0.82, 0.66), uHaze); // big soft clouds are paler and greyer: dust haze
     vec3 ambient = mix(vec3(0.006, 0.009, 0.015), vec3(0.28, 0.34, 0.42), day);
     vec3 sun = vec3(1.23, 1.09, 0.86) * (0.55 + 0.9 * backlit) * day;
-    gl_FragColor = vec4(sand * (ambient + sun) * 1.3, a);
+    // a few grains catch the light and flash
+    float glint = smoothstep(0.86, 1.0, vTone) * (0.5 + 0.5 * sin(uTime * 13.0 + vWorld.x * 7.0 + vWorld.z * 3.0));
+    gl_FragColor = vec4(sand * (ambient + sun) * (1.15 + 1.3 * glint * (1.0 - uHaze) * day), min(1.0, a * (1.0 + 0.8 * glint)));
     #include <tonemapping_fragment>
     // Faint moonlit dust at night, added after tone mapping like the terrain's own fill.
     gl_FragColor.rgb += sand * vec3(0.0110, 0.0165, 0.0300) * (1.0 - day);
@@ -240,7 +256,7 @@ function buildLayer(name, layer, shared, center) {
       uHeight: { value: layer.height },
       uHop: { value: layer.hop },
       uAlpha: { value: layer.alpha },
-      uFore: { value: layer.foreshorten },
+      uRound: { value: layer.round },
       uCrest: { value: layer.crest },
       uSoft: { value: layer.soft },
       uHaze: { value: layer.haze },
