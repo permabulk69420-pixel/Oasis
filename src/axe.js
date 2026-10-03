@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SPAWN } from './world.js';
 import { pulseHaptics } from './haptics.js';
 import { setGripSurface } from './grip-contact.js';
+import { createClips } from './audio.js';
 import { spawnDrop } from './resource-drops.js';
 
 const AXE_URL = `${import.meta.env?.BASE_URL ?? '/'}models/axe/stone_survival_axe.glb`;
@@ -59,16 +60,6 @@ const heldFlip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0,
 const bladeForwardTwist = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2);
 const axeHeadLocal = new THREE.Vector3(0, 0.55, 0);
 
-function makeChopAudio() {
-  if (typeof Audio === 'undefined') return [];
-  return CHOP_AUDIO_URLS.map(url => {
-    const audio = new Audio(url);
-    audio.preload = 'auto';
-    audio.volume = CHOP_VOLUME;
-    audio.playsInline = true;
-    return audio;
-  });
-}
 
 function ensureTreeChopState(tree) {
   if (tree.userData.chopState) return tree.userData.chopState;
@@ -88,17 +79,11 @@ function ensureTreeChopState(tree) {
 }
 
 export function createAxeKind({ scene, onError = console.warn }) {
-  const chopAudio = makeChopAudio();
-  let chopAudioIndex = 0;
+  const chopAudio = createClips(CHOP_AUDIO_URLS, { volume: CHOP_VOLUME, onError });
   let treeGroup = null;
 
   function playChopSound() {
-    const audio = chopAudio[chopAudioIndex++ % Math.max(chopAudio.length, 1)];
-    if (!audio) return;
-    audio.currentTime = 0;
-    audio.play().catch(error => {
-      if (error?.name !== 'NotAllowedError') onError(`[Oasis axe] Could not play chop audio: ${error?.message || error}`);
-    });
+    chopAudio.play();
   }
 
   function getTreeGroup() {
