@@ -52,25 +52,28 @@ The menu is three glass panels in the style of Ark:
 
 - **Inventory / Crafting:** a 5 × 5 grid. Tiles show the count (top left) and total weight
   (bottom left). On the crafting tab, a gold edge means you have everything for that recipe.
-- **You:** a left and right hip slot, plus health, stamina, food, water and carry weight (all live).
+- **You:** a left and right hip slot, a Back slot for the backpack, plus health, stamina, food, water and carry
+  weight against your carry limit (all live).
 - **Details:** whatever is selected, with its actions: craft, put on the left or right hip,
-  or send a hip tool back to the backpack.
+  send a hip tool back to your inventory, or take the backpack off.
 
 | Starter recipe | Materials | Result |
 | --- | --- | --- |
-| Stone axe | 3 sticks + 2 stones | 1 axe in the backpack |
-| Torch | 2 sticks + 1 stone | 1 torch in the backpack |
-| Campfire | 6 sticks + 5 stones | 1 campfire in the backpack (placeable) |
+| Stone axe | 3 sticks + 2 stones | 1 axe in your inventory |
+| Torch | 2 sticks + 1 stone | 1 torch in your inventory |
+| Campfire | 6 sticks + 5 stones | 1 campfire in your inventory (placeable) |
 
 **Tools in the world** (`src/tools.js`): every axe and torch is a real object. Grab one with
-either hand. Let go next to a hip to holster it there, at your chest to pack it in the
-backpack, anywhere else to drop it. Grab it back off the hip whenever you like. Light a held
+either hand. Let go next to a hip to holster it there, at your chest to pack it away in your
+inventory, anywhere else to drop it. Grab it back off the hip whenever you like. Light a held
 torch with **B** (right hand) or **X** (left hand).
 
 **Chopping:** swing the axe into a blue alien tree. Six solid hits fell it; it drops two logs
 (Wood) and three sticks along where it fell, sinks away, and regrows after three minutes.
 Pick up sticks, stones and logs with grip and let go at your chest to pack them.
-Inventory is session-only; reloading starts with an empty backpack.
+Everything you carry is one shared pool with a weight per item (stick 4, stone 8, wood 6, axe 10, torch 5, campfire 25).
+Your pockets carry 40; past the limit you walk at half speed, easing off to a standstill at twice the limit. Wearing the
+backpack lifts the limit to 100 (see The backpack). Inventory is session-only; reloading starts with an empty inventory.
 
 ## Survival
 
@@ -99,7 +102,7 @@ vertices, open edges and inside-out faces. `tools/campfire/render_preview.py` re
 
 Development-only camera fixtures: `?view=fruit`, `?view=orchard`, `?view=glade`, `?view=approach`,
 `?view=wade`, `?view=gust` (across the wind on a dune crest), `?eye=<metres>` (a lower camera), `?yaw=<deg>` and `?pitch=<deg>` (look direction), `?skytime=<seconds>` (pin the sky clock, e.g. to catch a shooting star), `?sandgain=<n>` (exaggerate the blowing sand), `?windtime=<seconds>` (pin the wind clock so two screenshots can be compared), `?windgain=<n>` (exaggerate the sway), `?at=x,z` and `?look=x,z[,height]` (stand at a world position and look at a point), `?camp=lit` or `?camp=unlit` (puts a campfire on the flattest ground near spawn, with
-`?campd=<metres>` for the distance), `?bird=perch|fly|flare` (see Alien birds in the game), plus `?hour=N` to fix the time of day.
+`?campd=<metres>` for the distance), `?bird=perch|fly|flare` (see Alien birds in the game), `?view=pack` (beside the backpack) and `?pack=worn` (start wearing it, see The backpack), plus `?hour=N` to fix the time of day.
 
 ## Alien birds in the game
 
@@ -151,10 +154,38 @@ colour per vertex and a tiny second material for the glow: no textures, two draw
 
 ## The backpack
 
-A rucksack the player can pick up and wear, which makes the menu inventory bigger (the game side lands in the next change; this
-section covers the model). It is a stylised alien-expedition pack: teal canvas gone dusty at the base, a darker flap with a
-coral band and a pale cyan glowing trim, a cream bedroll held on by two leather straps with brass buckles, two side pockets and a
-leather carry handle on top. The trim and the little diamond mark on the flap are emissive, so you can find the pack at night.
+A rucksack you pick up and put on, which raises how much you can carry before it slows you down. It lies in the sand a couple of
+metres from where you start, beside the axe and the torch. It is a stylised alien-expedition pack: teal canvas gone dusty at the
+base, a darker flap with a coral band and a pale cyan glowing trim, a cream bedroll held on by two leather straps with brass
+buckles, two side pockets and a leather carry handle on top. The trim and the little diamond mark on the flap are emissive, so you
+can find the pack at night.
+
+### In the game
+
+`src/backpack.js` is the pack as a thing in the world. The numbers to tune (where it lies, the reach, the back zone, the pulses)
+are in one table, `PACK`, at the top; the carry limits are in `src/inventory.js`.
+
+- **Pick it up:** squeeze grip with an empty hand at the handle (within half a metre). The hand closes round the strap and the
+  pack hangs from it, upright, front facing out. Sliding into reach with grip already held is not a grab: it has to be a fresh squeeze.
+- **Put it on:** carry it behind your shoulder (the hand ticks once when it reaches the spot, which is behind and a little below
+  your head, well clear of your chest) and let go. It leaves your hand: you are wearing it. Nothing is drawn on your back, because
+  in VR there is no body to hang it on; the menu is where you see it.
+- **Take it off:** reach behind you with an empty hand and squeeze grip, and it comes off into that hand. Or open the menu, pick
+  the **Back** slot and press **Take off**, and it is set down three quarters of a metre in front of you, facing you. It only comes
+  off when everything you carry fits in your pockets (40), so taking it off never leaves you stuck; if it does not fit, the hand gives a
+  short buzz and the menu button is greyed.
+- Let go anywhere else and it drops upright where it is, front towards you. A controller that disconnects while holding it drops it.
+- **Carry limit:** 40 in your pockets, 100 with the pack on. The menu shows the weight against the limit, and a Back slot that says whether
+  the pack is on.
+- **Cost:** 3 draw calls and 3,364 triangles while it is lying in the world or in a hand, none once it is on you; nothing is created
+  per frame (the grip, the back zone and the glow are all plain arithmetic on a few reused vectors). Like everything you pick up,
+  it needs the VR hands: on desktop it just lies there.
+- A hold lab for judging how a hand takes the handle, never shipped: with `npm run dev` open
+  `/tools/backpack/hold-lab.html?side=right&pitch=-90` (`side=left`, `roll=`, `close=1` for close-ups, `debug=1` for the contact
+  outline, `map=%2By,%2Bz` to try another way round).
+- Development-only fixtures: `?view=pack` (stand beside the pack, looking at it) and `?pack=worn` (start with it on).
+
+### The model
 
 - `public/models/backpack/backpack.glb`: 3,364 triangles, 116 KB, no textures (one colour per vertex, two single-sided
   materials: `Pack` and `Glow`), one level of detail on purpose (it is held at arm's length or lying in the sand, a

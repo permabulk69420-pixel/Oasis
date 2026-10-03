@@ -40,7 +40,8 @@ for how the game works. These are standing rules from Kane; they apply to every 
   `gh api repos/permabulk69420-pixel/oasis/pulls -X POST -f title=... -f head=BRANCH -f base=main -F body=@file`
   then `gh api repos/permabulk69420-pixel/oasis/pulls/N/merge -X PUT -f merge_method=squash`.
 - Dev-only URL fixtures (stripped from production): `?view=...`, `?hour=N` (0 night, 14 day),
-  `?camp=lit|unlit`, `?campd=<metres>`, `?bird=perch|fly|flare`. Add one when a new feature needs a repeatable screenshot.
+  `?camp=lit|unlit`, `?campd=<metres>`, `?bird=perch|fly|flare`, `?view=pack`, `?pack=worn`. Add one when a new feature needs a
+  repeatable screenshot.
 - Screenshots: Playwright with Chromium (SwiftShader) against `npm run dev`. Look at them; do not assume.
 - Day/night uses ACES tone mapping with very low night exposure (~0.035 vs day 0.82). Emissive and light
   levels must compensate for exposure, and night visibility relies on additive fills after tone mapping.
@@ -52,12 +53,14 @@ for how the game works. These are standing rules from Kane; they apply to every 
 
 Campfire (done). Kane is not sure about cold nights or fuel yet, so those are parked until he decides how
 they should work. Visual direction now: dust and sand, fire smoke and heat haze, night sky, plant sway (done), an
-ambient alien bird (done), a physical backpack, then newer trees with LODs. Later: first threat (sandworm, titan
+ambient alien bird (done), a physical backpack (done), a spear, then newer trees with LODs. Later: first threat (sandworm, titan
 blocker or boss), building and more crafting. Not yet tested on a real headset: keep reporting that honestly.
 
-Backpack design (my call, Kane approved): a physical pack you grab (reaching behind your back is the VR habit)
-and put on; it then disappears into the normal menu and expands the menu inventory. Keep it simple and note
-anything odd for him.
+Backpack (done, `src/backpack.js`; my call, Kane approved): a physical pack you grab by its handle and put on by letting go
+behind your shoulder (reaching behind your back is the VR habit); it then disappears into the normal menu (a Back slot) and
+raises the carry limit from 40 (pockets) to 100. It only comes off when everything fits in your pockets. Oddities to tell
+Kane: the 40 pocket limit is my number and slows you to half speed over it; nothing is drawn on your back; no sound; not
+tested on a headset.
 
 ## Overnight progress log (3 to 4 Oct 2026)
 
@@ -66,7 +69,9 @@ smoke plus a moonlit fill/rim for lit objects at night, #30 the night sky (moon,
 sway (grass, ferns, reeds, desert plants and the alien trees lean with the same gusts as the sand; `src/wind.js`;
 the hero tree is left still), #32 the alien bird's model (3 LODs, 19 bones), pose code and pose lab, #33 the alien bird in the game (by day one flies in,
 circles the pond and lands to drink, or just crosses the sky; `src/alien-bird.js`, `src/bird-brain.js`,
-`src/bird-flight.js`; none of it affects gameplay; dev fixture `?bird=perch|fly|flare`), #34 the backpack's model (one LOD, 3,364 tris, `tools/backpack/`; not in the game yet).
+`src/bird-flight.js`; none of it affects gameplay; dev fixture `?bird=perch|fly|flare`), #34 the backpack's model (one LOD, 3,364 tris, `tools/backpack/`),
+#35 the backpack in the game (grab it by the handle, let go behind your shoulder to wear it, Back slot in the menu, carry limit 40 to 100; `src/backpack.js`;
+dev fixtures `?view=pack`, `?pack=worn`; hold lab in `tools/backpack/`).
 Kane also asked (while asleep) for a spear, if there is time: a held tool like the axe and torch, my call on the
 design, no combat mechanics. Heat haze was skipped on purpose (it needs a full-screen copy of the scene: too costly on Quest). Tasks left in
-order: backpack, spear, newer trees with LODs, perf check.
+order: spear, newer trees with LODs, perf check.

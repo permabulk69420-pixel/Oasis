@@ -7,7 +7,7 @@ import { addInventoryItem, getInventoryCount, removeInventoryItem } from './inve
 import { pulseHaptics } from './haptics.js';
 
 // Hand tools (axe, torch) as real objects that can be on the ground, in a hand, on a hip
-// or packed in the backpack. Each tool type ("kind") supplies its model and behaviour;
+// or packed in the inventory. Each tool type ("kind") supplies its model and behaviour;
 // this module owns where every copy is and moves it between those places.
 
 const GRIP_BUTTON = 1;
@@ -393,7 +393,7 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     for (const instance of instances) instance.kind.update?.(instance, safeDt, { states });
   }
 
-  // Menu actions: move a tool between the backpack and a hip.
+  // Menu actions: move a tool between the inventory and a hip.
   function equip(id, side) {
     if (!HIP_SIDES.includes(side) || !kindById.get(id)?.template) return false;
     if (getInventoryCount(id) < 1) return false;
@@ -413,10 +413,21 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     return true;
   }
 
+  // Where the body is, for things that hang off it besides the hips (the pack on your back): the point the belt hangs
+  // from under the head, in the rig's space, and the way the body faces. out is { center: Vector3, yaw }. False until
+  // the first frame in VR (there is no body on desktop).
+  function getBodyFrame(out) {
+    if (!bodyCenter) return false;
+    out.center.copy(bodyCenter);
+    out.yaw = bodyYaw;
+    return true;
+  }
+
   return {
     update,
     equip,
     unequip,
+    getBodyFrame,
     getHipSlots: () => ({ left: slots.left?.kind.id ?? null, right: slots.right?.kind.id ?? null }),
     canEquip: id => Boolean(kindById.get(id)),
     getInstances: kind => instances.filter(instance => !kind || instance.kind.id === kind),

@@ -1,9 +1,14 @@
 const counts = new Map();
 
-// Abstract carry-weight units for now. The backpack/slot system can be layered on later
-// without changing how resources are stored in this shared inventory pool.
-export const BASE_CARRY_WEIGHT = 100;
-export const MAX_ENCUMBERED_WEIGHT = 200;
+// Abstract carry-weight units. Everything you carry is one shared pool; what changes is how much of it you can
+// carry before it slows you down. Your pockets take a little. A backpack you have put on (src/backpack.js)
+// adds a lot, so with the pack the limit is the old flat 100.
+export const POCKET_CARRY_WEIGHT = 40;
+export const PACK_CARRY_BONUS = 60;
+// Over the limit you walk at half speed, easing off to a standstill at this many times the limit.
+export const ENCUMBERED_FACTOR = 2;
+
+let packWorn = false;
 
 const DEFAULT_ITEM_WEIGHT = 1;
 const ITEM_WEIGHTS = Object.freeze({
@@ -28,7 +33,7 @@ export function addInventoryItem(type, amount = 1) {
   return next;
 }
 
-// Take items out of the backpack (e.g. a tool moving to a hip slot). All or nothing.
+// Take items out of the inventory (e.g. a tool moving to a hip slot). All or nothing.
 export function removeInventoryItem(type, amount = 1) {
   const value = Number(amount);
   if (typeof type !== 'string' || !Number.isSafeInteger(value) || value <= 0) return false;
@@ -55,15 +60,42 @@ export function getInventoryWeight() {
   return total;
 }
 
-export function getCarrySpeedMultiplier(weight = getInventoryWeight()) {
-  const carried = Math.max(0, Number(weight) || 0);
-  if (carried <= BASE_CARRY_WEIGHT) return 1;
-  if (carried >= MAX_ENCUMBERED_WEIGHT) return 0;
+// Whether the backpack is on your back. Only src/backpack.js and the tests change it.
+export function setPackWorn(value) {
+  packWorn = Boolean(value);
+  return packWorn;
+}
 
-  // Crossing 100 units immediately halves locomotion speed, then the penalty
-  // increases linearly until the player can no longer walk at 200 units.
-  const overload = (carried - BASE_CARRY_WEIGHT)
-    / (MAX_ENCUMBERED_WEIGHT - BASE_CARRY_WEIGHT);
+export function isPackWorn() {
+  return packWorn;
+}
+
+// How much you can carry before it slows you down.
+export function getCarryCapacity(worn = packWorn) {
+  return POCKET_CARRY_WEIGHT + (worn ? PACK_CARRY_BONUS : 0);
+}
+
+// At this much you cannot walk at all.
+export function getMaxCarryWeight(worn = packWorn) {
+  return getCarryCapacity(worn) * ENCUMBERED_FACTOR;
+}
+
+// The pack can only come off when everything in the inventory fits in your pockets, so taking it off never
+// leaves you slowed or stuck.
+export function canTakeOffPack() {
+  return getInventoryWeight() <= getCarryCapacity(false);
+}
+
+export function getCarrySpeedMultiplier(weight = getInventoryWeight(), capacity = getCarryCapacity()) {
+  const carried = Math.max(0, Number(weight) || 0);
+  const limit = Math.max(1, Number(capacity) || 1);
+  if (carried <= limit) return 1;
+  const most = limit * ENCUMBERED_FACTOR;
+  if (carried >= most) return 0;
+
+  // Crossing the limit immediately halves locomotion speed, then the penalty
+  // increases linearly until the player can no longer walk at twice the limit.
+  const overload = (carried - limit) / (most - limit);
   return 0.5 * (1 - overload);
 }
 
