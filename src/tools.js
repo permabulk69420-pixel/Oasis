@@ -18,7 +18,7 @@ export const HIP_SIDES = Object.freeze(['left', 'right']);
 // Where a relaxed arm hangs, not the belt line: a hand at your side sits well below your waist.
 const HIP_DROP = 0.80;
 const HIP_SIDE = 0.20;
-const HIP_FORWARD = 0.03;
+const HIP_FORWARD = -0.10;
 const BODY_DEADZONE = 0.9; // ~50 degrees of head turn before the body follows
 const BODY_DRIFT_RATE = 0.2;
 const HIP_GRAB_RADIUS = 0.24;
