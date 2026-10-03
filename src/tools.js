@@ -13,15 +13,27 @@ import { pulseHaptics } from './haptics.js';
 const GRIP_BUTTON = 1;
 export const HIP_SIDES = Object.freeze(['left', 'right']);
 
-// The belt follows the headset: a fixed drop below the eyes, so it also works seated or
-// crouched. Body yaw trails head yaw so glancing sideways doesn't swing the belt round.
-const HIP_DROP = 0.70;
-const HIP_SIDE = 0.20;
-const HIP_FORWARD = 0.03;
-const BODY_TURN_RATE = 2.4;
-const HIP_GRAB_RADIUS = 0.22;
-const HOLSTER_RADIUS = 0.24;
+// The belt follows the headset's position (a fixed drop below the eyes, so it also works
+// seated or crouched) but never its facing.
+// Where a relaxed arm hangs, not the belt line: a hand at your side sits well below your waist.
+const HIP_DROP = 0.80;
+const HIP_SIDE = 0.26;
+// The body faces wherever the head looked when you start walking, so you can turn on the
+// spot and then push the stick; looking around while standing never moves the hips.
+const WALK_START = 0.35;
+const FACE_TURN_MIN = 0.80; // ~45 degrees: smaller differences are ignored, so it rarely fires
+const FACE_TURN_RATE = 4;
+const BODY_DEADZONE = 0.22;
+const BODY_DEADZONE_Y = 0.10;
+const BODY_SETTLE_RATE = 0.3;
+const HIP_FORWARD = -0.10;
+const HIP_GRAB_RADIUS = 0.24;
+// Holster zone: a tall, forgiving ellipsoid around each hip. Wide enough to hit without
+// looking, tall enough that a hand hanging at your side or lifted to your waist both count.
+export const HOLSTER_RADIUS = 0.32;
+export const HOLSTER_HALF_HEIGHT = 0.40;
 const HOLSTER_HAPTIC = [0.32, 40];
+const ZONE_ENTER_HAPTIC = [0.14, 14];
 const STORE_HAPTIC = [0.34, 45];
 
 const loader = new GLTFLoader();
@@ -31,23 +43,45 @@ const anchorPosition = new THREE.Vector3();
 const headPosition = new THREE.Vector3();
 const headForward = new THREE.Vector3();
 const headRotation = new THREE.Matrix4();
-const X_AXIS = new THREE.Vector3(1, 0, 0);
-const Z_AXIS = new THREE.Vector3(0, 0, 1);
+const inverseParent = new THREE.Matrix4();
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+const FORWARD = new THREE.Vector3(0, 0, -1);
 
 function wrapAngle(angle) {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
 }
 
-// Lower end tilted out from the leg, then leaned forward/back. Mirrored per side.
-export function holsterQuaternion(holster = {}, side = 'right') {
-  const sign = side === 'left' ? -1 : 1;
-  const q = new THREE.Quaternion().setFromAxisAngle(Z_AXIS, sign * (holster.outward ?? 0.2));
-  q.multiply(new THREE.Quaternion().setFromAxisAngle(X_AXIS, holster.pitch ?? 0));
-  if (holster.flip) q.multiply(new THREE.Quaternion().setFromAxisAngle(X_AXIS, Math.PI));
-  return q;
+// Is a hand position inside a hip's holster zone? Horizontal distance and height are
+// judged separately, so the zone is tall and narrow rather than a ball.
+export function inHolsterZone(hand, anchor) {
+  return Math.hypot(hand.x - anchor.x, hand.z - anchor.z) <= HOLSTER_RADIUS
+    && Math.abs(hand.y - anchor.y) <= HOLSTER_HALF_HEIGHT;
 }
 
-export function createTools({ scene, states, kinds, renderer = null, camera = null, onError = console.warn }) {
+// Hip pose, described by what you see rather than by Euler angles:
+//   dir   where the tool's long axis (model +Y) points, in the belt frame as
+//         [outward, up, backward] (outward is away from the body, mirrored per side)
+//   edge  optional model-space direction (a blade) to roll the tool so it faces forward
+//   along the model-Y point that sits on the hip anchor, so long tools hang from a sensible spot
+export function holsterPose(holster = {}, side = 'right') {
+  const sign = side === 'left' ? -1 : 1;
+  const [out, up, back] = holster.dir || [0, 1, 0];
+  const axis = new THREE.Vector3(sign * out, up, back).normalize();
+  const quaternion = new THREE.Quaternion().setFromUnitVectors(Y_AXIS, axis);
+  if (holster.edge) {
+    const edge = new THREE.Vector3().fromArray(holster.edge).normalize().applyQuaternion(quaternion);
+    const forward = FORWARD.clone().addScaledVector(axis, -FORWARD.dot(axis));
+    if (forward.lengthSq() > 1e-6) {
+      forward.normalize();
+      const roll = Math.atan2(forward.dot(new THREE.Vector3().crossVectors(axis, edge)), forward.dot(edge));
+      quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(axis, roll));
+    }
+  }
+  const position = new THREE.Vector3(0, holster.along ?? 0, 0).applyQuaternion(quaternion).negate();
+  return { position, quaternion };
+}
+
+export function createTools({ scene, states, kinds, renderer = null, camera = null, rig = null, onError = console.warn }) {
   if (!scene || !Array.isArray(states) || !Array.isArray(kinds)) throw new Error('Tools require the scene, VR hand states and tool kinds.');
 
   const kindById = new Map(kinds.map(kind => [kind.id, kind]));
@@ -58,10 +92,46 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
   for (const side of HIP_SIDES) {
     const anchor = new THREE.Group();
     anchor.name = `${side}-hip-slot`;
-    scene.add(anchor);
+    (rig || scene).add(anchor);
     belt[side] = anchor;
   }
-  let bodyYaw = null;
+  let bodyYaw = 0;
+  let bodyYawTarget = null;
+  let wasWalking = false;
+  let bodyCenter = null;
+
+  // Empty hips get a small soft dot while a hand holds a tool. When that hand is in the
+  // zone a faint ghost of the held tool shows exactly how it will sit on the hip.
+  const dotTexture = typeof document === 'undefined' ? null : (() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gradient.addColorStop(0, 'rgba(255,255,255,0.95)');
+    gradient.addColorStop(0.35, 'rgba(255,255,255,0.35)');
+    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(canvas);
+  })();
+  const ghostMaterial = new THREE.MeshBasicMaterial({
+    color: 0xbfeff5, transparent: true, opacity: 0.35, depthWrite: false, toneMapped: false,
+  });
+  const markers = {};
+  const ghosts = {};
+  for (const side of HIP_SIDES) {
+    const marker = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: dotTexture, color: 0xdff8fb, transparent: true, opacity: 0.2, depthTest: false, depthWrite: false, toneMapped: false,
+    }));
+    marker.scale.setScalar(0.09);
+    marker.name = `${side}-hip-marker`;
+    marker.renderOrder = 25;
+    marker.visible = false;
+    belt[side].add(marker);
+    markers[side] = marker;
+    ghosts[side] = { kind: null, object: null };
+  }
+  const wasInZone = new Map();
 
   for (const kind of kinds) {
     kind.template = null;
@@ -108,10 +178,10 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
 
   function toHip(instance, side) {
     if (!instance || slots[side]) return false;
-    const holster = instance.kind.holster || {};
+    const pose = holsterPose(instance.kind.holster, side);
     belt[side].add(instance.root);
-    instance.root.position.set(0, holster.lift ?? 0, 0);
-    instance.root.quaternion.copy(holsterQuaternion(holster, side));
+    instance.root.position.copy(pose.position);
+    instance.root.quaternion.copy(pose.quaternion);
     instance.root.scale.set(1, 1, 1);
     instance.slot = side;
     slots[side] = instance;
@@ -127,16 +197,60 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
   }
 
   function nearestEmptyHip(state) {
-    let best = null, bestDistance = HOLSTER_RADIUS;
+    let best = null, bestDistance = Infinity;
     state.grip.updateWorldMatrix(true, false);
     handPosition.setFromMatrixPosition(state.grip.matrixWorld);
     for (const side of HIP_SIDES) {
       if (slots[side] || !belt[side].visible) continue;
       belt[side].getWorldPosition(anchorPosition);
+      if (!inHolsterZone(handPosition, anchorPosition)) continue;
       const distance = handPosition.distanceTo(anchorPosition);
-      if (distance <= bestDistance) { best = side; bestDistance = distance; }
+      if (distance < bestDistance) { best = side; bestDistance = distance; }
     }
     return best;
+  }
+
+  function showGhost(side, kind) {
+    for (const other of HIP_SIDES) {
+      const ghost = ghosts[other];
+      if (other !== side || !kind?.template) { if (ghost.object) ghost.object.visible = false; continue; }
+      if (ghost.kind !== kind) {
+        ghost.object?.removeFromParent();
+        const object = kind.template.clone(true);
+        object.traverse(node => {
+          if (node.isMesh) { node.material = ghostMaterial; node.castShadow = false; node.receiveShadow = false; node.renderOrder = 24; }
+          if (node.isLight || node.isPositionalAudio) node.visible = false;
+        });
+        const pose = holsterPose(kind.holster, other);
+        object.position.copy(pose.position);
+        object.quaternion.copy(pose.quaternion);
+        belt[other].add(object);
+        ghost.kind = kind;
+        ghost.object = object;
+      }
+      ghost.object.visible = true;
+    }
+  }
+
+  function updateMarkers() {
+    for (const side of HIP_SIDES) markers[side].visible = false;
+    if (!states.some(state => instances.some(instance => instance.heldBy === state))) showGhost(null, null);
+    for (const state of states) {
+      const held = instances.find(instance => instance.heldBy === state);
+      if (!held || !state.inputSource) { wasInZone.set(state, null); continue; }
+      const target = nearestEmptyHip(state);
+      for (const side of HIP_SIDES) {
+        if (slots[side] || !belt[side].visible) continue;
+        const marker = markers[side];
+        const near = side === target;
+        marker.visible = true;
+        marker.material.opacity = near ? 0.7 : 0.2;
+        marker.scale.setScalar(near ? 0.13 : 0.09);
+      }
+      showGhost(target, held.kind);
+      if (target && wasInZone.get(state) !== target) pulseHaptics(state, ...ZONE_ENTER_HAPTIC);
+      wasInZone.set(state, target);
+    }
   }
 
   function release(instance) {
@@ -170,8 +284,11 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
       if (instance.heldBy) continue;
       const onHip = Boolean(instance.slot);
       if (onHip && !belt[instance.slot].visible) continue;
-      instance.root.updateWorldMatrix(true, false);
-      instance.root.getWorldPosition(toolPosition);
+      if (onHip) belt[instance.slot].getWorldPosition(toolPosition);
+      else {
+        instance.root.updateWorldMatrix(true, false);
+        instance.root.getWorldPosition(toolPosition);
+      }
       if (!onHip) toolPosition.y += instance.kind.pickupLift || 0;
       const radius = onHip ? HIP_GRAB_RADIUS : instance.kind.pickupRadius || 0.5;
       const distance = handPosition.distanceTo(toolPosition);
@@ -180,31 +297,74 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     return best;
   }
 
+  function isWalking() {
+    for (const state of states) {
+      if (state.handedness !== 'left') continue;
+      const axes = state.inputSource?.gamepad?.axes || [];
+      if (axes.length < 2) continue;
+      const index = axes.length >= 4 ? axes.length - 2 : 0;
+      if (Math.hypot(axes[index] || 0, axes[index + 1] || 0) > WALK_START) return true;
+    }
+    return false;
+  }
+
   function updateBelt(dt) {
     const presenting = Boolean(renderer?.xr?.isPresenting);
     const view = presenting ? renderer.xr.getCamera() : camera;
     // No body on desktop, so nothing floats under the camera there.
     for (const side of HIP_SIDES) belt[side].visible = presenting;
+    if (!presenting) { bodyCenter = null; bodyYawTarget = null; }
     if (!view) return;
     // WebXR prepares the XR camera's world matrix; do not recompute it (see chest-storage.js).
     if (!presenting) view.updateWorldMatrix(true, false);
     headPosition.setFromMatrixPosition(view.matrixWorld);
+    // Work in the rig's space, so the belt rides along with walking and stick-turning.
+    const parent = belt.left.parent;
+    parent.updateWorldMatrix(true, false);
+    inverseParent.copy(parent.matrixWorld).invert();
+    headPosition.applyMatrix4(inverseParent);
     headRotation.extractRotation(view.matrixWorld);
-    headForward.set(0, 0, -1).applyMatrix4(headRotation);
-    if (Math.hypot(headForward.x, headForward.z) > 0.15) {
-      const headYaw = Math.atan2(-headForward.x, -headForward.z);
-      if (bodyYaw === null || !(dt > 0)) bodyYaw = headYaw;
-      else bodyYaw += wrapAngle(headYaw - bodyYaw) * (1 - Math.exp(-dt * BODY_TURN_RATE));
+    headForward.set(0, 0, -1).applyMatrix4(headRotation).transformDirection(inverseParent);
+    // The belt never turns with the head: it keeps the rig's facing and only follows where
+    // the head is. Stick-turning the rig carries it round.
+    const walking = isWalking();
+    if (bodyYawTarget === null || !(dt > 0)) {
+      bodyYaw = bodyYawTarget = 0;
+      if (Math.hypot(headForward.x, headForward.z) > 0.15) bodyYaw = bodyYawTarget = Math.atan2(-headForward.x, -headForward.z);
+    } else {
+      if (walking && !wasWalking && Math.hypot(headForward.x, headForward.z) > 0.15) {
+        const headYaw = Math.atan2(-headForward.x, -headForward.z);
+        if (Math.abs(wrapAngle(headYaw - bodyYawTarget)) > FACE_TURN_MIN) bodyYawTarget = headYaw;
+      }
+      bodyYaw += wrapAngle(bodyYawTarget - bodyYaw) * (1 - Math.exp(-dt * FACE_TURN_RATE));
     }
-    if (bodyYaw === null) return;
+    wasWalking = walking;
+    // The body only moves when the head really travels: turning or tilting your head swings
+    // the headset a few centimetres, and leaning a little shouldn't drag the hips with it.
+    if (!bodyCenter || !(dt > 0)) bodyCenter = (bodyCenter || new THREE.Vector3()).copy(headPosition);
+    else {
+      const dx = headPosition.x - bodyCenter.x, dz = headPosition.z - bodyCenter.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance > BODY_DEADZONE) {
+        const pull = (distance - BODY_DEADZONE) / distance;
+        bodyCenter.x += dx * pull;
+        bodyCenter.z += dz * pull;
+      }
+      const dy = headPosition.y - bodyCenter.y;
+      if (Math.abs(dy) > BODY_DEADZONE_Y) bodyCenter.y += dy - Math.sign(dy) * BODY_DEADZONE_Y;
+      const settle = 1 - Math.exp(-dt * BODY_SETTLE_RATE);
+      bodyCenter.x += (headPosition.x - bodyCenter.x) * settle;
+      bodyCenter.z += (headPosition.z - bodyCenter.z) * settle;
+      bodyCenter.y += (headPosition.y - bodyCenter.y) * settle;
+    }
     const fx = -Math.sin(bodyYaw), fz = -Math.cos(bodyYaw);
     const rx = Math.cos(bodyYaw), rz = -Math.sin(bodyYaw);
     for (const side of HIP_SIDES) {
       const sign = side === 'left' ? -1 : 1;
       belt[side].position.set(
-        headPosition.x + rx * HIP_SIDE * sign + fx * HIP_FORWARD,
-        headPosition.y - HIP_DROP,
-        headPosition.z + rz * HIP_SIDE * sign + fz * HIP_FORWARD,
+        bodyCenter.x + rx * HIP_SIDE * sign + fx * HIP_FORWARD,
+        bodyCenter.y - HIP_DROP,
+        bodyCenter.z + rz * HIP_SIDE * sign + fz * HIP_FORWARD,
       );
       belt[side].rotation.set(0, bodyYaw, 0);
       belt[side].updateMatrixWorld(true);
@@ -226,6 +386,8 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
       }
       gripDown.set(state, grip);
     }
+
+    updateMarkers();
 
     for (const kind of kinds) kind.updateShared?.(safeDt, instances.filter(instance => instance.kind === kind));
     for (const instance of instances) instance.kind.update?.(instance, safeDt, { states });
@@ -260,5 +422,6 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     getInstances: kind => instances.filter(instance => !kind || instance.kind.id === kind),
     isHolding: handedness => instances.some(instance => instance.heldBy?.handedness === handedness),
     belt,
+    markers,
   };
 }

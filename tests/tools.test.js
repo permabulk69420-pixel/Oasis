@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { createTools, holsterQuaternion } from '../src/tools.js';
+import { createTools, holsterPose, inHolsterZone, HOLSTER_RADIUS, HOLSTER_HALF_HEIGHT } from '../src/tools.js';
 import { createAxeKind, TREE_DROPS, TREE_HITS_TO_FELL, TREE_TRUNK_RADIUS, TREE_CHOP_REACH, TREE_CHOP_TOP } from '../src/axe.js';
 import { createTorchKind } from '../src/torch.js';
 import { registerDropSpawner } from '../src/resource-drops.js';
@@ -37,7 +37,7 @@ function fixture(t) {
   const buttons = Array.from({ length: 6 }, () => ({ pressed: false, value: 0 }));
   const state = { handedness: 'right', grip, objectGrip, inputSource: { gamepad: { buttons } } };
   const tools = createTools({
-    scene, states: [state], renderer, onError: () => {},
+    scene, rig, states: [state], renderer, onError: () => {},
     kinds: [createTorchKind({ scene, onError: () => {} }), createAxeKind({ scene, onError: () => {} })],
   });
   const handTo = world => { rig.updateMatrixWorld(true); grip.position.copy(rig.worldToLocal(world.clone())); grip.updateMatrixWorld(true); };
@@ -58,7 +58,7 @@ test('tools move between backpack and hips from the menu, all or nothing', t => 
   assert.equal(tools.equip('axe', 'left'), true);
   assert.equal(getInventoryCount('axe'), 1);
   assert.deepEqual(tools.getHipSlots(), { left: 'axe', right: null });
-  assert.equal(tools.belt.left.children.length, 1, 'the axe is physically on the left hip');
+  assert.equal(tools.belt.left.children.filter(child => child.userData.toolKind).length, 1, 'the axe is physically on the left hip');
 
   addInventoryItem('torch', 1);
   assert.equal(tools.equip('torch', 'left'), true, 'equipping an occupied hip swaps');
@@ -106,10 +106,10 @@ test('a tool drawn from one hip can be put on the other, dropped, or packed at t
 });
 
 test('holsters mirror left and right', () => {
-  const holster = { outward: 0.2, pitch: 0.3, flip: true };
-  const down = new THREE.Vector3(0, 1, 0);
-  const left = down.clone().applyQuaternion(holsterQuaternion(holster, 'left'));
-  const right = down.clone().applyQuaternion(holsterQuaternion(holster, 'right'));
+  const holster = { dir: [0.3, 1, 0.2], along: 0.2 };
+  const up = new THREE.Vector3(0, 1, 0);
+  const left = up.clone().applyQuaternion(holsterPose(holster, 'left').quaternion);
+  const right = up.clone().applyQuaternion(holsterPose(holster, 'right').quaternion);
   assert.ok(Math.abs(left.x + right.x) < 1e-6 && Math.abs(left.y - right.y) < 1e-6);
 });
 
@@ -183,4 +183,60 @@ test('the chop zone follows the real trunk: a 2x tree is not choppable through t
     assert.equal(hits(scale, 0.1, 0.0), false, `scale ${scale}: below the ground`);
   }
   assert.ok(reach(2) < 0.75, 'a 2x tree can be chopped from under 75 cm away (it used to be 1.44 m)');
+});
+
+test('the holster zone is tall and forgiving, and a glow marks empty hips while you hold a tool', t => {
+  const anchor = new THREE.Vector3(1, 1, 1);
+  const at = (dx, dy, dz) => new THREE.Vector3(1 + dx, 1 + dy, 1 + dz);
+  assert.equal(inHolsterZone(at(0, 0, 0), anchor), true);
+  assert.equal(inHolsterZone(at(0, -(HOLSTER_HALF_HEIGHT - 0.02), 0), anchor), true, 'a hand hanging low at your side counts');
+  assert.equal(inHolsterZone(at(0, HOLSTER_HALF_HEIGHT - 0.02, 0), anchor), true, 'so does one lifted to your waist');
+  assert.equal(inHolsterZone(at(0, HOLSTER_HALF_HEIGHT + 0.05, 0), anchor), false);
+  assert.equal(inHolsterZone(at(HOLSTER_RADIUS - 0.02, 0, 0), anchor), true);
+  assert.equal(inHolsterZone(at(HOLSTER_RADIUS * 0.8, 0, HOLSTER_RADIUS * 0.8), anchor), false, 'horizontal distance is a circle, not a square');
+
+  const { tools, state, handTo, squeeze } = fixture(t);
+  addInventoryItem('axe', 1);
+  tools.equip('axe', 'left');
+  const axe = tools.getInstances('axe').find(instance => instance.slot === 'left');
+  assert.ok(Object.values(tools.markers).every(marker => !marker.visible), 'no glow when nothing is held');
+
+  handTo(tools.belt.left.getWorldPosition(new THREE.Vector3()));
+  squeeze(true);
+  assert.equal(axe.heldBy, state);
+  assert.equal(tools.markers.left.visible, true, 'the hip you drew from is empty again, so it glows');
+  assert.equal(tools.markers.right.visible, true, 'the other empty hip glows too');
+  assert.ok(tools.markers.left.material.opacity > 0.5, 'bright where your hand is');
+  assert.ok(tools.markers.right.material.opacity < 0.5, 'dim where it is not');
+
+  const right = tools.belt.right.getWorldPosition(new THREE.Vector3());
+  handTo(right.clone().add(new THREE.Vector3(0.05, -0.35, 0)));
+  tools.update(0.016);
+  assert.ok(tools.markers.right.material.opacity > 0.5, 'brighter when your hand is in the zone');
+  assert.ok(tools.markers.left.material.opacity < 0.5, 'and the one you left dims again');
+  squeeze(false);
+  assert.equal(axe.slot, 'right', 'letting go with a hand hanging low by your side holsters it');
+  assert.ok(Object.values(tools.markers).every(marker => !marker.visible), 'glow gone once nothing is held');
+  clearInventory('axe');
+});
+
+test('hips stay put while you look around, and face where you look once you start walking', t => {
+  const { tools, state, xrCamera } = fixture(t);
+  state.handedness = 'left';
+  const stick = state.inputSource.gamepad.axes = [0, 0, 0, 0];
+  const hip = () => tools.belt.right.getWorldPosition(new THREE.Vector3());
+  const settle = () => { for (let i = 0; i < 150; i++) tools.update(0.016); };
+  const start = hip();
+  xrCamera.rotation.y = Math.PI / 2; // turn the head to the left
+  xrCamera.updateMatrixWorld(true);
+  settle();
+  assert.ok(hip().distanceTo(start) < 0.01, 'turning your head on the spot does not move the hips');
+  stick[3] = -1; // push forward
+  settle();
+  const after = hip();
+  assert.ok(after.distanceTo(start) > 0.3, 'the body turns to face the head when you start walking');
+  xrCamera.rotation.y = 0;
+  xrCamera.updateMatrixWorld(true);
+  settle();
+  assert.ok(hip().distanceTo(after) < 0.01, 'and then stays put while you keep walking and glance around');
 });

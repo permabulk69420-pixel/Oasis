@@ -191,8 +191,8 @@ export function createTorchKind({ scene, onError = console.warn }) {
     pickupRadius: PICKUP_RADIUS,
     // The authored +Y torch axis points opposite the Quest hand socket's held-up direction.
     heldRotation,
-    // Rides upright on the belt, leaned back so a lit flame stays clear of your face.
-    holster: { flip: false, lift: -0.06, outward: 0.16, pitch: 0.55 },
+    // Rides at the hip, leaning back and out so a lit flame stays clear of your face.
+    holster: { dir: [0.04, -1, 0], along: 0 },
     spawns: [{ x: SPAWN.x + 0.75, z: SPAWN.z - 1.05 }],
 
     prepare(instance) {
