@@ -37,7 +37,9 @@ export function hitMenuControl(controls, x, y) {
   return controls.find(control => x >= control.x && x <= control.x + control.w && y >= control.y && y <= control.y + control.h) || null;
 }
 
-export function createSurvivorMenu({ scene, renderer, states, tools = null, onToggle = () => {} }) {
+// onPlace(type) puts a placeable item (the campfire) in the world in front of the player and
+// returns { ok, message }. The menu closes on success so the player sees it appear.
+export function createSurvivorMenu({ scene, renderer, states, tools = null, onToggle = () => {}, onPlace = null }) {
   const controllers = states.map(state => state.controller);
   const surface = document.createElement('canvas');
   surface.width = WIDTH; surface.height = HEIGHT;
@@ -158,6 +160,15 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
     } else if (type === 'stone') {
       ctx.fillStyle = '#a9b6b3'; ctx.beginPath(); ctx.moveTo(-30, 10); ctx.lineTo(-16, -22); ctx.lineTo(14, -28); ctx.lineTo(32, -2); ctx.lineTo(20, 22); ctx.lineTo(-10, 27); ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#74898a'; ctx.beginPath(); ctx.moveTo(-16, -22); ctx.lineTo(-4, 10); ctx.lineTo(20, 22); ctx.lineTo(-10, 27); ctx.lineTo(-30, 10); ctx.closePath(); ctx.fill();
+    } else if (type === 'campfire') {
+      // stone ring, crossed logs, a flame
+      ctx.fillStyle = '#8fa09d'; ctx.strokeStyle = '#5b6d6b'; ctx.lineWidth = 2;
+      for (const [sx, sy] of [[-30, 20], [-14, 28], [8, 30], [28, 22], [34, 8], [-36, 6]]) {
+        ctx.beginPath(); ctx.ellipse(sx, sy, 10, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      }
+      handle(-24, 22, 18, -2, 8); handle(24, 22, -18, -2, 8);
+      ctx.fillStyle = C.gold; ctx.beginPath(); ctx.moveTo(-10, 0); ctx.quadraticCurveTo(-18, -22, 0, -44); ctx.quadraticCurveTo(0, -26, 14, -22); ctx.quadraticCurveTo(20, -8, 10, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fff1c4'; ctx.beginPath(); ctx.moveTo(-3, -1); ctx.quadraticCurveTo(-7, -14, 1, -24); ctx.quadraticCurveTo(3, -14, 7, -10); ctx.quadraticCurveTo(6, -2, -3, -1); ctx.fill();
     } else if (type === 'wood') {
       ctx.save(); ctx.rotate(-0.35);
       ctx.fillStyle = '#2f3a44'; ctx.fillRect(-30, -13, 50, 26);
@@ -313,7 +324,7 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
     }
 
     text(status ? status.recipe.name : item.name, left, 84, 34, C.ink, 700);
-    text(item.category === 'TOOL' ? 'Tool' : 'Resource', left, 120, 21, C.muted);
+    text(item.category === 'TOOL' ? 'Tool' : item.category === 'STRUCTURE' ? 'Structure' : 'Resource', left, 120, 21, C.muted);
     tile(null, '', left, 148, 176, {});
     icon(type, left + 88, 238, 1.6);
     const facts = [
@@ -346,6 +357,10 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
         button(`equip:${side}`, taken === type ? `On ${side} hip` : `${HIPS[side].label}${taken ? ' (swap)' : ''}`, left + i * (half + 12), 712, half, 72, { primary: true, disabled: taken === type && getInventoryCount(type) < 1 });
       }
       text('Close the menu and grab it from your hip.', left, 822, 20, C.dim);
+    } else if (item.placeable && onPlace) {
+      const have = getInventoryCount(type) > 0;
+      button('place', have ? `Place ${item.name.toLowerCase()}` : `No ${item.name.toLowerCase()} in backpack`, left, 776, width, 72, { primary: have, disabled: !have });
+      text('It goes on the ground in front of you.', left, 872, 20, C.dim);
     }
     footer();
   }
@@ -415,6 +430,12 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
     if (id === 'craft') {
       const name = getRecipeStatus(selected.id)?.recipe.name;
       say(craftItem(selected.id) ? `Crafted: ${name}. It’s in your backpack.` : 'Not enough materials.');
+    }
+    if (id === 'place' && onPlace) {
+      const type = selected.kind === 'item' ? selected.id : getRecipeStatus(selected.id)?.recipe.output;
+      const result = type && getInventoryCount(type) > 0 ? onPlace(type) : null;
+      if (result?.ok) { dirty = true; setOpen(false); return; }
+      say(result?.message || `No ${ITEMS[type]?.name.toLowerCase() || 'item'} to place.`);
     }
     dirty = true;
   }

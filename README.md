@@ -59,6 +59,7 @@ The menu is three glass panels in the style of Ark:
 | --- | --- | --- |
 | Stone axe | 3 sticks + 2 stones | 1 axe in the backpack |
 | Torch | 2 sticks + 1 stone | 1 torch in the backpack |
+| Campfire | 6 sticks + 5 stones | 1 campfire in the backpack (placeable) |
 
 **Tools in the world** (`src/tools.js`): every axe and torch is a real object. Grab one with
 either hand. Let go next to a hip to holster it there, at your chest to pack it in the
@@ -82,6 +83,20 @@ Deliberately light (`src/survival.js`, rates in one table at the top):
 - **Health** only slides down if food or water hit zero, and recovers when both are comfortable.
   There is no death yet: health stops at a low floor.
 
+## Campfire
+
+Craft a campfire, select it in the menu and press **Place campfire**: it goes down about 1.6 m in
+front of you. It refuses water, steep dune slopes and anywhere within 2.5 m of another fire, and you
+can have up to three. Hold a lit torch to the fire (within about half a metre) to light it. A lit
+fire has billboarded flames, sparks, a crackle that fades with distance, and lights the ground and
+water around it (`src/campfire.js`, `src/fire-effect.js`). By day the light fades out so the stones
+don't bleach. For now a lit fire burns forever; fuel, warmth and putting it out come later.
+
+The model is generated headless in Blender: `python3 tools/campfire/build_campfire.py --out
+public/models/campfire/campfire.glb`, then `python3 tools/campfire/check_mesh.py` to check for loose
+vertices, open edges and inside-out faces. `tools/campfire/render_preview.py` renders previews.
+
 Development-only camera fixtures: `?view=fruit`, `?view=orchard`, `?view=glade`, `?view=approach`,
-`?view=wade`, plus `?hour=N` to fix the time of day.
+`?view=wade`, `?camp=lit` or `?camp=unlit` (puts a campfire on the flattest ground near spawn, with
+`?campd=<metres>` for the distance), plus `?hour=N` to fix the time of day.
 

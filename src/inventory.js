@@ -13,6 +13,7 @@ const ITEM_WEIGHTS = Object.freeze({
   fibre: 1,
   axe: 10,
   torch: 5,
+  campfire: 25,
 });
 
 export function addInventoryItem(type, amount = 1) {
