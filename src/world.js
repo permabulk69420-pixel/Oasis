@@ -74,6 +74,13 @@ export function terrainHeight(x, z) {
   return height;
 }
 
+// True when ground at (x, z) sits under the pond's still water by enough to be wading, not just
+// at the wet edge. `ground` is the terrain height there (pass field.sample for the live one).
+export const WADE_DEPTH = 0.06;
+export function isInPond(x, z, ground = terrainHeight(x, z)) {
+  return basinRadius(x, z) < 1.4 && WATER.y - ground > WADE_DEPTH;
+}
+
 export function createHeightField() {
   const side = GRID_SEGMENTS + 1;
   const heights = new Float32Array(side * side);

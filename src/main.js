@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import './style.css';
-import { createHeightField, clamp, stickAxis, stickVector, pivotRig, SPAWN, WATER, HERO_TREE } from './world.js';
+import { createHeightField, clamp, stickAxis, stickVector, pivotRig, isInPond, SPAWN, WATER, HERO_TREE } from './world.js';
 import { createTerrain } from './terrain.js';
 import { createMaterials, createWater } from './materials.js';
 import { createVRHands } from './hands.js';
@@ -8,6 +8,9 @@ import { createDayNightCycle } from './day-night.js';
 import { createSandFootsteps } from './footsteps.js';
 import { createGroundSticks } from './sticks.js';
 import { createGroundStones } from './stones.js';
+import { createGroundFruit } from './glow-fruit.js';
+import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater } from './survival.js';
+import { pulseHaptics } from './haptics.js';
 import { createSurvivorMenu } from './survivor-menu.js';
 import { getInventoryWeight, getCarrySpeedMultiplier } from './inventory.js';
 
@@ -52,6 +55,7 @@ const hands = createVRHands({
   scene,
   camera,
   gripDebug: import.meta.env.DEV && new URLSearchParams(location.search).get('gripDebug') === '1',
+  onEat: ({ food, water }) => { restoreFood(food); restoreWater(water); },
   onError: (message) => console.warn('[Oasis hands]', message)
 });
 const footsteps = createSandFootsteps({
@@ -78,6 +82,9 @@ scene.add(createGroundStones({
   renderer,
   onError: (message) => console.warn(message)
 }));
+// Glow fruit around the veil tree. They follow the live sun vector for their night glow.
+const glowFruit = createGroundFruit({ field, sunDirection: materials.sand.uniforms.uSun.value });
+scene.add(glowFruit.group);
 const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), materials.sky);
 sky.frustumCulled = false; sky.renderOrder = -10; sky.name = 'Sky'; scene.add(sky);
 const dayNight = createDayNightCycle({ scene, renderer, materials });
@@ -97,6 +104,7 @@ if (import.meta.env.DEV) {
     rig.position.set(WATER.x - dx, field.sample(WATER.x - dx, WATER.z + dz), WATER.z + dz);
     rig.rotation.y = -Math.atan2(dx, dz); camera.rotation.x = -0.62;
   }
+  if (view === 'wade') { rig.position.set(WATER.x, field.sample(WATER.x, WATER.z), WATER.z); camera.rotation.x = -0.1; }
   if (view === 'oasis') {
     rig.position.set(WATER.x - 88, WATER.y + 76, WATER.z + 86);
     rig.rotation.y = -Math.atan2(88, 86); camera.rotation.x = -0.58;
@@ -113,6 +121,9 @@ if (import.meta.env.DEV) {
   if (view === 'hero') aimAt(HERO_TREE.x - 150, HERO_TREE.z + 150, { x: HERO_TREE.x, y: heroY + 38, z: HERO_TREE.z });
   if (view === 'approach') aimAt(HERO_TREE.x - 80, HERO_TREE.z + 80, { x: HERO_TREE.x, y: heroY + 22, z: HERO_TREE.z }, 1.7);
   if (view === 'glade') aimAt(HERO_TREE.x - 11, HERO_TREE.z + 12, { x: HERO_TREE.x + 3, y: heroY + 1.2, z: HERO_TREE.z - 4 }, 1.7);
+  const fruit0 = glowFruit.slots[0];
+  if (view === 'fruit' && fruit0) aimAt(fruit0.x + 1.1, fruit0.z + 0.8, { x: fruit0.x, y: field.sample(fruit0.x, fruit0.z) + 0.06, z: fruit0.z }, 1.2);
+  if (view === 'orchard') aimAt(HERO_TREE.x - 34, HERO_TREE.z + 22, { x: HERO_TREE.x - 8, y: heroY + 0.2, z: HERO_TREE.z + 2 }, 1.7);
   if (view === 'base') aimAt(HERO_TREE.x - 16, HERO_TREE.z + 17, { x: HERO_TREE.x - 2, y: heroY + 1.5, z: HERO_TREE.z + 2 }, 1.3);
   if (view === 'under') aimAt(HERO_TREE.x - 30, HERO_TREE.z + 30, { x: HERO_TREE.x, y: heroY + 22, z: HERO_TREE.z });
   const hour = Number(new URLSearchParams(location.search).get('hour'));
@@ -141,6 +152,7 @@ let seatedOffset = 0, seatedCalibrationPending = false;
 let jumpHeight = 0, jumpVelocity = 0, jumpHeld = false;
 let crouchOffset = 0, crouchActive = false, crouchButtonDown = false;
 let sprintActive = false, sprintButtonDown = false;
+let drinkTick = 0;
 
 const survivorMenu = createSurvivorMenu({
   scene, renderer, states: hands.states, tools: hands.tools,
@@ -338,6 +350,7 @@ function frame(time) {
   const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0;
   lastTime = time;
   dayNight.update(dt);
+  glowFruit.update(dt);
   rig.updateMatrixWorld(true);
   if (renderer.xr.isPresenting) renderer.xr.updateCamera(camera);
   // Resource storage compares controller and headset WORLD positions. Refresh
@@ -408,7 +421,9 @@ function frame(time) {
     target.copy(right).multiplyScalar(input.x).addScaledVector(movementForward, -input.z);
     if (target.lengthSq() > 1) target.normalize();
     const carrySpeedMultiplier = getCarrySpeedMultiplier();
-    const sprinting = renderer.xr.isPresenting ? sprintActive : input.fast;
+    // Out of stamina cancels the sprint toggle; it returns once stamina has recovered a little.
+    if (sprintActive && !canSprint()) sprintActive = false;
+    const sprinting = (renderer.xr.isPresenting ? sprintActive : input.fast) && canSprint();
     target.multiplyScalar((sprinting ? FAST_SPEED : WALK_SPEED) * carrySpeedMultiplier);
     velocity.lerp(target, 1 - Math.exp(-dt * (target.lengthSq() ? 18 : 28)));
     const dx = velocity.x * dt, dz = velocity.z * dt;
@@ -421,6 +436,17 @@ function frame(time) {
     const ground = field.sample(head.x, head.z);
     groundY += (ground - groundY) * (1 - Math.exp(-dt * 24));
     rig.position.y = groundY + seatedOffset + crouchOffset + jumpHeight;
+
+    // Survival: slow drain, sprint costs stamina, wading into the pond refills water.
+    const wading = isInPond(head.x, head.z, ground);
+    updateSurvival(dt, { sprinting: sprinting && Math.hypot(velocity.x, velocity.z) > 0.6, inWater: wading });
+    if (wading && getSurvivalStats().water < 99.5) {
+      drinkTick -= dt;
+      if (drinkTick <= 0) {
+        for (const state of hands.states) pulseHaptics(state, 0.12, 25);
+        drinkTick = 0.7;
+      }
+    } else drinkTick = 0;
 
     footsteps.update({
       distance: Math.hypot(movedX, movedZ),
@@ -435,6 +461,7 @@ function frame(time) {
   if (import.meta.env.DEV && time - telemetryTime > 1000) {
     canvas.dataset.position = JSON.stringify({ x: +head.x.toFixed(2), z: +head.z.toFixed(2), ground: +field.sample(head.x, head.z).toFixed(2), yaw: +rig.rotation.y.toFixed(3) });
     canvas.dataset.render = JSON.stringify({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures });
+    canvas.dataset.survival = JSON.stringify(Object.fromEntries(Object.entries(getSurvivalStats()).map(([k, v]) => [k, +v.toFixed(1)])));
     canvas.dataset.inventory = JSON.stringify({ weight: getInventoryWeight(), speedMultiplier: getCarrySpeedMultiplier() });
     telemetryTime = time;
   }

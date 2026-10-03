@@ -6,6 +6,7 @@ import { createAxeKind } from './axe.js';
 import { createTools } from './tools.js';
 import { createHeldSticks } from './sticks.js';
 import { createHeldStones } from './stones.js';
+import { createHeldFruit } from './glow-fruit.js';
 import { getHeldGripPose } from './grip-poses.js';
 import { createAdaptiveGrip } from './adaptive-grip.js';
 import { pulseHaptics } from './haptics.js';
@@ -63,7 +64,7 @@ function setPose(state, name, amount) {
   action.time = THREE.MathUtils.clamp(amount, 0, 1);
 }
 
-export function createVRHands({ renderer, scene, parent = null, camera = null, gripDebug = false, onError = console.warn }) {
+export function createVRHands({ renderer, scene, parent = null, camera = null, gripDebug = false, onEat = null, onError = console.warn }) {
   // Oasis moves/turns a camera rig through the world. Match dumbgame by putting
   // WebXR controller and grip nodes under that rig rather than directly in scene space.
   const controllerParent = parent
@@ -212,6 +213,7 @@ export function createVRHands({ renderer, scene, parent = null, camera = null, g
   const firstTool = kind => ({ getObject: () => tools.getInstances(kind)[0]?.root || null });
   const sticks = createHeldSticks({ scene, states, renderer, onError });
   const stones = createHeldStones({ scene, states, renderer, onError });
+  const fruit = createHeldFruit({ scene, states, renderer, camera, onEat });
 
   function updateHandPose(state, dt) {
     if (!state.mixerState) return;
@@ -261,6 +263,7 @@ export function createVRHands({ renderer, scene, parent = null, camera = null, g
     tools.update(dt);
     sticks.update(dt);
     stones.update(dt);
+    fruit.update(dt);
 
     const storedSticksAfter = sticks.getStoredCount();
     const storedStonesAfter = stones.getStoredCount();
@@ -313,6 +316,7 @@ export function createVRHands({ renderer, scene, parent = null, camera = null, g
     axe: firstTool('axe'),
     sticks,
     stones,
+    fruit,
     setVisible,
     isVisible: () => visible,
     getIndexTipWorldPosition

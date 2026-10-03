@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ITEMS, RECIPES, getRecipeStatus, craftItem } from './crafting.js';
 import { BASE_CARRY_WEIGHT, getInventoryItems, getInventoryWeight, getInventoryItemWeight, getInventoryCount } from './inventory.js';
+import { getSurvivalStats } from './survival.js';
 
 // Ark-style survivor menu: three floating glass panels (inventory/crafting, you, details)
 // drawn into one canvas. The same canvas is a texture in VR and an overlay on desktop.
@@ -273,8 +274,11 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
     }
 
     const weight = getInventoryWeight();
+    const live = getSurvivalStats();
     const stats = [
-      ['Health', 100, 100], ['Stamina', 100, 100], ['Food', 100, 100], ['Water', 100, 100], ['Weight', weight, BASE_CARRY_WEIGHT],
+      ['Health', Math.round(live.health), 100], ['Stamina', Math.round(live.stamina), 100],
+      ['Food', Math.round(live.food), 100], ['Water', Math.round(live.water), 100],
+      ['Weight', weight, BASE_CARRY_WEIGHT],
     ];
     stats.forEach(([name, value, max], i) => {
       const y = 600 + i * 58;
@@ -282,7 +286,8 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
       text(`${value} / ${max}`, 1044, y, 22, name === 'Weight' && value > max ? C.warn : C.ink, 600, 'right');
       bar(672, y + 14, 372, value / max, name === 'Weight' && value > max ? C.warn : C.bar);
     });
-    text('Health, food and water don’t drain yet.', 672, 900, 19, C.dim);
+    text('Eat glow fruit from the veil tree.', 672, 886, 19, C.dim);
+    text('Wade into the pond to drink.', 672, 910, 19, C.dim);
   }
 
   function drawDetail() {
@@ -487,7 +492,7 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
     if (pendingAction) activate(pendingAction);
     if (renderer.xr.isPresenting) setHover(hover);
     if (open) {
-      const current = JSON.stringify([getInventoryItems(), tools?.getHipSlots?.()]);
+      const current = JSON.stringify([getInventoryItems(), tools?.getHipSlots?.(), Object.values(getSurvivalStats()).map(Math.round)]);
       if (current !== snapshot) { snapshot = current; dirty = true; }
       if (dirty) draw();
     }
