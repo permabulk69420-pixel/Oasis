@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { createTools, holsterQuaternion } from '../src/tools.js';
+import { createTools, holsterQuaternion, inHolsterZone, HOLSTER_RADIUS, HOLSTER_HALF_HEIGHT } from '../src/tools.js';
 import { createAxeKind, TREE_DROPS, TREE_HITS_TO_FELL } from '../src/axe.js';
 import { createTorchKind } from '../src/torch.js';
 import { registerDropSpawner } from '../src/resource-drops.js';
@@ -58,7 +58,7 @@ test('tools move between backpack and hips from the menu, all or nothing', t => 
   assert.equal(tools.equip('axe', 'left'), true);
   assert.equal(getInventoryCount('axe'), 1);
   assert.deepEqual(tools.getHipSlots(), { left: 'axe', right: null });
-  assert.equal(tools.belt.left.children.length, 1, 'the axe is physically on the left hip');
+  assert.equal(tools.belt.left.children.filter(child => child.userData.toolKind).length, 1, 'the axe is physically on the left hip');
 
   addInventoryItem('torch', 1);
   assert.equal(tools.equip('torch', 'left'), true, 'equipping an occupied hip swaps');
@@ -150,4 +150,39 @@ test('six real swings fell a tree, which drops logs and sticks along where it fe
   assert.ok(drops.every(drop => drop.z < -2), 'drops land on the far side, away from the swing');
   for (let i = 0; i < 400; i++) kind.updateShared(0.016);
   assert.equal(tree.visible, false, 'the felled trunk sinks away');
+});
+
+test('the holster zone is tall and forgiving, and a glow marks empty hips while you hold a tool', t => {
+  const anchor = new THREE.Vector3(1, 1, 1);
+  const at = (dx, dy, dz) => new THREE.Vector3(1 + dx, 1 + dy, 1 + dz);
+  assert.equal(inHolsterZone(at(0, 0, 0), anchor), true);
+  assert.equal(inHolsterZone(at(0, -(HOLSTER_HALF_HEIGHT - 0.02), 0), anchor), true, 'a hand hanging low at your side counts');
+  assert.equal(inHolsterZone(at(0, HOLSTER_HALF_HEIGHT - 0.02, 0), anchor), true, 'so does one lifted to your waist');
+  assert.equal(inHolsterZone(at(0, HOLSTER_HALF_HEIGHT + 0.05, 0), anchor), false);
+  assert.equal(inHolsterZone(at(HOLSTER_RADIUS - 0.02, 0, 0), anchor), true);
+  assert.equal(inHolsterZone(at(HOLSTER_RADIUS * 0.8, 0, HOLSTER_RADIUS * 0.8), anchor), false, 'horizontal distance is a circle, not a square');
+
+  const { tools, state, handTo, squeeze } = fixture(t);
+  addInventoryItem('axe', 1);
+  tools.equip('axe', 'left');
+  const axe = tools.getInstances('axe').find(instance => instance.slot === 'left');
+  assert.ok(Object.values(tools.markers).every(marker => !marker.visible), 'no glow when nothing is held');
+
+  handTo(tools.belt.left.getWorldPosition(new THREE.Vector3()));
+  squeeze(true);
+  assert.equal(axe.heldBy, state);
+  assert.equal(tools.markers.left.visible, true, 'the hip you drew from is empty again, so it glows');
+  assert.equal(tools.markers.right.visible, true, 'the other empty hip glows too');
+  assert.ok(tools.markers.left.material.opacity > 0.5, 'bright where your hand is');
+  assert.ok(tools.markers.right.material.opacity < 0.5, 'dim where it is not');
+
+  const right = tools.belt.right.getWorldPosition(new THREE.Vector3());
+  handTo(right.clone().add(new THREE.Vector3(0.05, -0.35, 0)));
+  tools.update(0.016);
+  assert.ok(tools.markers.right.material.opacity > 0.5, 'brighter when your hand is in the zone');
+  assert.ok(tools.markers.left.material.opacity < 0.5, 'and the one you left dims again');
+  squeeze(false);
+  assert.equal(axe.slot, 'right', 'letting go with a hand hanging low by your side holsters it');
+  assert.ok(Object.values(tools.markers).every(marker => !marker.visible), 'glow gone once nothing is held');
+  clearInventory('axe');
 });

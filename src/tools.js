@@ -15,13 +15,18 @@ export const HIP_SIDES = Object.freeze(['left', 'right']);
 
 // The belt follows the headset: a fixed drop below the eyes, so it also works seated or
 // crouched. Body yaw trails head yaw so glancing sideways doesn't swing the belt round.
-const HIP_DROP = 0.70;
+// Where a relaxed arm hangs, not the belt line: a hand at your side sits well below your waist.
+const HIP_DROP = 0.80;
 const HIP_SIDE = 0.20;
 const HIP_FORWARD = 0.03;
 const BODY_TURN_RATE = 2.4;
-const HIP_GRAB_RADIUS = 0.22;
-const HOLSTER_RADIUS = 0.24;
+const HIP_GRAB_RADIUS = 0.24;
+// Holster zone: a tall, forgiving ellipsoid around each hip. Wide enough to hit without
+// looking, tall enough that a hand hanging at your side or lifted to your waist both count.
+export const HOLSTER_RADIUS = 0.32;
+export const HOLSTER_HALF_HEIGHT = 0.40;
 const HOLSTER_HAPTIC = [0.32, 40];
+const ZONE_ENTER_HAPTIC = [0.14, 14];
 const STORE_HAPTIC = [0.34, 45];
 
 const loader = new GLTFLoader();
@@ -33,6 +38,13 @@ const headForward = new THREE.Vector3();
 const headRotation = new THREE.Matrix4();
 const X_AXIS = new THREE.Vector3(1, 0, 0);
 const Z_AXIS = new THREE.Vector3(0, 0, 1);
+
+// Is a hand position inside a hip's holster zone? Horizontal distance and height are
+// judged separately, so the zone is tall and narrow rather than a ball.
+export function inHolsterZone(hand, anchor) {
+  return Math.hypot(hand.x - anchor.x, hand.z - anchor.z) <= HOLSTER_RADIUS
+    && Math.abs(hand.y - anchor.y) <= HOLSTER_HALF_HEIGHT;
+}
 
 function wrapAngle(angle) {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
@@ -62,6 +74,22 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     belt[side] = anchor;
   }
   let bodyYaw = null;
+
+  // A soft glowing marker on each empty hip while a hand is holding a tool; it brightens
+  // when that hand is in the zone, so you can see where to let go.
+  const markerGeometry = new THREE.SphereGeometry(0.1, 16, 12);
+  const markers = {};
+  for (const side of HIP_SIDES) {
+    const marker = new THREE.Mesh(markerGeometry, new THREE.MeshBasicMaterial({
+      color: 0x7fe6f2, transparent: true, opacity: 0.25, depthTest: false, depthWrite: false, toneMapped: false,
+    }));
+    marker.name = `${side}-hip-marker`;
+    marker.renderOrder = 25;
+    marker.visible = false;
+    belt[side].add(marker);
+    markers[side] = marker;
+  }
+  const wasInZone = new Map();
 
   for (const kind of kinds) {
     kind.template = null;
@@ -127,16 +155,36 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
   }
 
   function nearestEmptyHip(state) {
-    let best = null, bestDistance = HOLSTER_RADIUS;
+    let best = null, bestDistance = Infinity;
     state.grip.updateWorldMatrix(true, false);
     handPosition.setFromMatrixPosition(state.grip.matrixWorld);
     for (const side of HIP_SIDES) {
       if (slots[side] || !belt[side].visible) continue;
       belt[side].getWorldPosition(anchorPosition);
+      if (!inHolsterZone(handPosition, anchorPosition)) continue;
       const distance = handPosition.distanceTo(anchorPosition);
-      if (distance <= bestDistance) { best = side; bestDistance = distance; }
+      if (distance < bestDistance) { best = side; bestDistance = distance; }
     }
     return best;
+  }
+
+  function updateMarkers() {
+    for (const side of HIP_SIDES) markers[side].visible = false;
+    for (const state of states) {
+      const held = instances.find(instance => instance.heldBy === state);
+      if (!held || !state.inputSource) { wasInZone.set(state, null); continue; }
+      const target = nearestEmptyHip(state);
+      for (const side of HIP_SIDES) {
+        if (slots[side] || !belt[side].visible) continue;
+        const marker = markers[side];
+        const near = side === target;
+        marker.visible = true;
+        marker.material.opacity = near ? 0.7 : 0.25;
+        marker.scale.setScalar(near ? 1.35 : 1);
+      }
+      if (target && wasInZone.get(state) !== target) pulseHaptics(state, ...ZONE_ENTER_HAPTIC);
+      wasInZone.set(state, target);
+    }
   }
 
   function release(instance) {
@@ -227,6 +275,8 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
       gripDown.set(state, grip);
     }
 
+    updateMarkers();
+
     for (const kind of kinds) kind.updateShared?.(safeDt, instances.filter(instance => instance.kind === kind));
     for (const instance of instances) instance.kind.update?.(instance, safeDt, { states });
   }
@@ -260,5 +310,6 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     getInstances: kind => instances.filter(instance => !kind || instance.kind.id === kind),
     isHolding: handedness => instances.some(instance => instance.heldBy?.handedness === handedness),
     belt,
+    markers,
   };
 }
