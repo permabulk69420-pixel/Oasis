@@ -66,7 +66,7 @@ smoke plus a moonlit fill/rim for lit objects at night, #30 the night sky (moon,
 sway (grass, ferns, reeds, desert plants and the alien trees lean with the same gusts as the sand; `src/wind.js`;
 the hero tree is left still), #32 the alien bird's model (3 LODs, 19 bones), pose code and pose lab, #33 the alien bird in the game (by day one flies in,
 circles the pond and lands to drink, or just crosses the sky; `src/alien-bird.js`, `src/bird-brain.js`,
-`src/bird-flight.js`; none of it affects gameplay; dev fixture `?bird=perch|fly|flare`).
+`src/bird-flight.js`; none of it affects gameplay; dev fixture `?bird=perch|fly|flare`), #34 the backpack's model (one LOD, 3,364 tris, `tools/backpack/`; not in the game yet).
 Kane also asked (while asleep) for a spear, if there is time: a held tool like the axe and torch, my call on the
 design, no combat mechanics. Heat haze was skipped on purpose (it needs a full-screen copy of the scene: too costly on Quest). Tasks left in
 order: backpack, spear, newer trees with LODs, perf check.
