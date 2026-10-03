@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { WATER, SUN } from './world.js';
+import { WATER, SUN, HERO_TREE } from './world.js';
 
 const BUSH_DRAW_DISTANCE = 180;
 const BUSH_LOAD_DISTANCE = 230;
@@ -8,16 +8,6 @@ const TREE_DRAW_DISTANCE = 240;
 const TREE_LOAD_DISTANCE = 275;
 const HERO_DRAW_DISTANCE = 420;
 const HERO_LOAD_DISTANCE = 480;
-
-// One 60 m landmark tree on the east-southeast side of the oasis. Its clearing is deliberately
-// broad so the regular bushes and trees cannot spawn through the hero canopy/trunk area.
-const HERO_TREE = Object.freeze({
-  x: 372,
-  z: -414,
-  yaw: 0.55,
-  groundInset: 0.55,
-  clearRadius: 40,
-});
 
 // Keep the full tree nearby, then step down aggressively once individual leaves are small in VR.
 const TREE_LODS = [
