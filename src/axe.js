@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SPAWN, terrainHeight } from './world.js';
 import { pulseHaptics } from './haptics.js';
+import { attachHeldObject, setGripSurface } from './grip-contact.js';
 
-const AXE_URL = `${import.meta.env.BASE_URL}models/axe/stone_survival_axe.glb`;
-const CHOP_AUDIO_URLS = [1, 2, 3].map(index => `${import.meta.env.BASE_URL}audio/chopping/axe_chop_0${index}.mp3`);
+const AXE_URL = `${import.meta.env?.BASE_URL ?? '/'}models/axe/stone_survival_axe.glb`;
+const CHOP_AUDIO_URLS = [1, 2, 3].map(index => `${import.meta.env?.BASE_URL ?? '/'}audio/chopping/axe_chop_0${index}.mp3`);
 const RIGHT_HAND = 'right';
 const GRIP_BUTTON = 1;
 const PICKUP_RADIUS = 0.52;
@@ -47,6 +48,7 @@ const bladeForwardTwist = new THREE.Quaternion().setFromAxisAngle(new THREE.Vect
 const axeHeadLocal = new THREE.Vector3(0, 0.55, 0);
 
 function prepareAxe(root) {
+  setGripSurface(root, { meshes: ['WoodenHandle'], axis: [0, 1, 0], point: [0, 0, 0] });
   root.traverse((object) => {
     if (!object.isMesh) return;
     object.castShadow = false;
@@ -128,14 +130,10 @@ export function createHeldAxe({ scene, states, onError = console.warn }) {
   }
 
   function grab(state) {
-    if (!root || !state?.objectGrip) return false;
-    state.objectGrip.add(root);
-    root.position.set(0, 0, 0);
-
     // Keep the proven vertical flip, then twist 90 degrees around the axe's own handle
     // so the blade faces forward instead of left when the controller points forward.
-    root.quaternion.copy(heldFlip).multiply(bladeForwardTwist);
-    root.scale.set(1, 1, 1);
+    temporaryQuaternion.copy(heldFlip).multiply(bladeForwardTwist);
+    if (!attachHeldObject(state, root, temporaryQuaternion)) return false;
     heldBy = state;
     previousGripReady = false;
     hitRearmed = true;
@@ -285,7 +283,7 @@ export function createHeldAxe({ scene, states, onError = console.warn }) {
       if (handPosition.distanceTo(axePosition) <= PICKUP_RADIUS) grab(right);
     }
 
-    if (heldBy && !grip) drop();
+    if (heldBy && (!heldBy.inputSource || !grip)) drop();
     gripDown = grip;
 
     if (!heldBy || !root || safeDt <= 0) {
