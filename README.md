@@ -70,3 +70,40 @@ was before this menu; reloading starts with an empty backpack.
 The menu uses one canvas texture in VR, repainted only when its contents or hover state
 change. Controller-ray tests run without a headset; final readability and comfort still
 need a Quest check.
+
+## Contact-aware gripping
+
+The existing axe, torch, loose sticks and stones use geometry-fitted hand poses.
+On pickup, a convex contact outline is built from the actual handle or stone mesh.
+The open hand clears that outline, then each finger joint follows the rig's authored
+curl axes until its skin meets the surface. Distal joints can continue wrapping after
+another part of the finger touches. Closing takes about 120 ms.
+Branched sticks use separate outlines for the connected shaft and twig solids, so
+their empty gaps do not incorrectly block a finger.
+Their grasp section avoids twig roots and aligns the estimated local shaft
+direction to the hand's handle axis.
+
+The item stays rigidly anchored to the palm socket. Squeeze/trigger changes do not
+slide it along the handle. A hand holds one item at a time, and scaled sticks retain
+their chosen shaft grip point. The fitted pose is cached for repeat grabs; normal
+held frames only apply joint rotations. Pickup/drop, chest storage, chopping and
+torch controls continue through their existing systems.
+
+The unchanged hand GLBs are stored under `public/models/hands/`, with their pinned
+source recorded there. Regression checks use these actual rigs and tool meshes,
+including complete skin triangles, both hands, movement far from the origin,
+closing animation, resource scale and pickup/release integration. They do not
+certify Quest frame rate or controller alignment on a physical headset.
+
+For development, open `?gripDebug=1` after `npm run dev` to see hand wireframes,
+the green contact outline, and the palm axes. These helpers are disabled in the
+production game and do not occupy a pickup slot.
+
+Future held items can use `setGripSurface(object, { meshes, axis, point })` in
+`src/grip-contact.js`. Names select the contact mesh; optional `axis` crops a handle
+around its model-space `point`. `attachHeldObject` applies that grip point with
+the instance scale and checks hand occupancy. Optional `alignAxis` aligns a curved
+handle's estimated `axis` before attaching it. `compound: true` preserves separate
+connected solids in a branched mesh. Unsupported shapes retain the
+authored grip fallback. This foundation handles grasp fitting; it does not simulate
+hand/world forces or a physical player body.

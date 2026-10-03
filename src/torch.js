@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SPAWN, terrainHeight } from './world.js';
 import { pulseHaptics } from './haptics.js';
+import { attachHeldObject, setGripSurface } from './grip-contact.js';
 
-const TORCH_URL = `${import.meta.env.BASE_URL}models/torch/handheld_fire_torch.glb`;
-const TORCH_AUDIO_URL = `${import.meta.env.BASE_URL}audio/fire/torch_fire_crackle_loop.mp3`;
+const TORCH_URL = `${import.meta.env?.BASE_URL ?? '/'}models/torch/handheld_fire_torch.glb`;
+const TORCH_AUDIO_URL = `${import.meta.env?.BASE_URL ?? '/'}audio/fire/torch_fire_crackle_loop.mp3`;
 const TORCH_AUDIO_VOLUME = 0.65;
 const RIGHT_HAND = 'right';
 const GRIP_BUTTON = 1;
@@ -16,8 +17,10 @@ const loader = new GLTFLoader();
 const handPosition = new THREE.Vector3();
 const torchPosition = new THREE.Vector3();
 const flamePosition = new THREE.Vector3();
+const heldRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
 
 function prepareTorch(root) {
+  setGripSurface(root, { meshes: ['WoodenShaft'], axis: [0, 1, 0], point: [0, 0, 0] });
   root.traverse((object) => {
     if (!object.isMesh) return;
     object.castShadow = false;
@@ -223,12 +226,8 @@ export function createHeldTorch({ scene, states, onError = console.warn }) {
   }
 
   function grab(state) {
-    if (!root || !state?.objectGrip) return false;
-    state.objectGrip.add(root);
-    root.position.set(0, 0, 0);
     // The authored +Y torch axis points opposite the Quest hand socket's held-up direction.
-    root.rotation.set(Math.PI, 0, 0);
-    root.scale.set(1, 1, 1);
+    if (!attachHeldObject(state, root, heldRotation)) return false;
     heldBy = state;
     return true;
   }
@@ -281,7 +280,7 @@ export function createHeldTorch({ scene, states, onError = console.warn }) {
       torchPosition.y += 0.22;
       if (handPosition.distanceTo(torchPosition) <= PICKUP_RADIUS) grab(right);
     }
-    if (heldBy && !grip) drop();
+    if (heldBy && (!heldBy.inputSource || !grip)) drop();
 
     if (heldBy === right && b && !bDown) {
       const turningOn = !lit;

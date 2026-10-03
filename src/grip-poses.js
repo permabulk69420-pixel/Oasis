@@ -7,9 +7,9 @@ export const GRIP_PROFILE = Object.freeze({
 });
 
 const GRIP_POSES = Object.freeze({
-  thin: Object.freeze({ animation: 'Grip', amount: 0.58 }),
+  thin: Object.freeze({ animation: 'Grip', amount: 0.86 }),
   medium: Object.freeze({ animation: 'Grip', amount: 0.72 }),
-  large: Object.freeze({ animation: 'Grip', amount: 0.86 }),
+  large: Object.freeze({ animation: 'Grip', amount: 0.58 }),
 });
 
 export function setHeldGripProfile(state, profile = GRIP_PROFILE.MEDIUM) {

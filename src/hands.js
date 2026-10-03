@@ -6,13 +6,14 @@ import { createHeldAxe } from './axe.js';
 import { createHeldSticks } from './sticks.js';
 import { createHeldStones } from './stones.js';
 import { getHeldGripPose } from './grip-poses.js';
+import { createAdaptiveGrip } from './adaptive-grip.js';
 import { pulseHaptics } from './haptics.js';
 
-// Exact hand assets from dumbgame, pinned to the source commit so Oasis always
-// receives the same meshes/rig/animations even if dumbgame changes later.
+// The exact pinned dumbgame rigs, stored locally so contact geometry and tests
+// use the same bones/skin without depending on a second host during VR startup.
 const HAND_ASSETS = Object.freeze({
-  left: 'https://raw.githubusercontent.com/permabulk69420-pixel/dumbgame/be12b76764264438e33879b3a05406f16d37c194/assets/models/hands/LeftHand.glb',
-  right: 'https://raw.githubusercontent.com/permabulk69420-pixel/dumbgame/be12b76764264438e33879b3a05406f16d37c194/assets/models/hands/RightHand.glb'
+  left: `${import.meta.env?.BASE_URL ?? '/'}models/hands/LeftHand.glb`,
+  right: `${import.meta.env?.BASE_URL ?? '/'}models/hands/RightHand.glb`
 });
 
 // The meshes are authored with fingers along -Z and palms along -Y. These are
@@ -61,7 +62,7 @@ function setPose(state, name, amount) {
   action.time = THREE.MathUtils.clamp(amount, 0, 1);
 }
 
-export function createVRHands({ renderer, scene, parent = null, onError = console.warn }) {
+export function createVRHands({ renderer, scene, parent = null, gripDebug = false, onError = console.warn }) {
   // Oasis moves/turns a camera rig through the world. Match dumbgame by putting
   // WebXR controller and grip nodes under that rig rather than directly in scene space.
   const controllerParent = parent
@@ -96,7 +97,8 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
       handRoot: null,
       gripSocket: null,
       indexTip: null,
-      mixerState: null
+      mixerState: null,
+      adaptiveGrip: null
     };
   });
 
@@ -121,6 +123,8 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
   }
 
   function detach(state) {
+    state.adaptiveGrip?.dispose();
+    state.adaptiveGrip = null;
     resetObjectGrip(state);
     state.heldGripProfile = null;
     if (state.handAnchor) state.grip.remove(state.handAnchor);
@@ -162,6 +166,7 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
     state.gripSocket = gripSocket || null;
     state.indexTip = indexTip || null;
     state.mixerState = createActions(root, gltf.animations);
+    state.adaptiveGrip = createAdaptiveGrip({ root, clips: gltf.animations, objectGrip: state.objectGrip, handedness, debug: gripDebug });
     setPose(state.mixerState, 'Open', 0);
     syncObjectGrip(state);
   }
@@ -203,6 +208,33 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
   const sticks = createHeldSticks({ scene, states, renderer, onError });
   const stones = createHeldStones({ scene, states, renderer, onError });
 
+  function updateHandPose(state, dt) {
+    if (!state.mixerState) return;
+    const buttons = state.inputSource?.gamepad?.buttons || [];
+    const trigger = buttons[0]?.value ?? 0;
+    const squeeze = buttons[1]?.value ?? 0;
+    const heldGripPose = getHeldGripPose(state);
+
+    // Keep authored poses for free hands and unsupported future items. Supported
+    // held objects receive their cached, per-joint contact pose after pickup/drop.
+    if (heldGripPose && squeeze > 0.08) {
+      setPose(state.mixerState, heldGripPose.animation, heldGripPose.amount);
+    } else if (squeeze > 0.08 && trigger > 0.08) {
+      setPose(state.mixerState, 'Fist', Math.max(trigger, squeeze));
+    } else if (squeeze > 0.08) {
+      setPose(state.mixerState, 'Grip', squeeze);
+    } else if (state.pointing && trigger <= 0.08) {
+      setPose(state.mixerState, 'Point', 1);
+    } else if (trigger > 0.08) {
+      setPose(state.mixerState, 'Pinch', trigger);
+    } else {
+      setPose(state.mixerState, 'Open', 0);
+    }
+
+    state.mixerState.mixer.update(dt);
+    state.adaptiveGrip?.update(state.objectGrip.children[0] || null, dt);
+  }
+
   function update(dt) {
     for (const state of states) {
       const buttons = state.inputSource?.gamepad?.buttons || [];
@@ -210,30 +242,6 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
       // Keep the old point toggle on left X only. Right A is gameplay jump now.
       if (state.handedness === 'left' && primary && !state.primaryDown) state.pointing = !state.pointing;
       state.primaryDown = primary;
-
-      if (!state.mixerState) continue;
-      const trigger = buttons[0]?.value ?? 0;
-      const squeeze = buttons[1]?.value ?? 0;
-      const heldGripPose = getHeldGripPose(state);
-
-      // Conventional game-style authored grip: while an object is held, its chosen
-      // hand pose wins over the generic squeeze/fist animation so fingers do not keep
-      // closing through the handle just because the controller is squeezed harder.
-      if (heldGripPose && squeeze > 0.08) {
-        setPose(state.mixerState, heldGripPose.animation, heldGripPose.amount);
-      } else if (squeeze > 0.08 && trigger > 0.08) {
-        setPose(state.mixerState, 'Fist', Math.max(trigger, squeeze));
-      } else if (squeeze > 0.08) {
-        setPose(state.mixerState, 'Grip', squeeze);
-      } else if (state.pointing && trigger <= 0.08) {
-        setPose(state.mixerState, 'Point', 1);
-      } else if (trigger > 0.08) {
-        setPose(state.mixerState, 'Pinch', trigger);
-      } else {
-        setPose(state.mixerState, 'Open', 0);
-      }
-
-      state.mixerState.mixer.update(dt);
       syncObjectGrip(state);
     }
 
@@ -253,6 +261,9 @@ export function createVRHands({ renderer, scene, parent = null, onError = consol
     const storedSticksAfter = sticks.getStoredCount();
     const storedStonesAfter = stones.getStoredCount();
     for (const state of states) {
+      // Run after object systems so the first pickup frame is already fitted and a
+      // dropped/stored object immediately returns to the normal input animations.
+      updateHandPose(state, dt);
       const before = heldCountsBefore.get(state) || 0;
       const after = state.objectGrip.children.length;
       if (before === 0 && after > 0) {

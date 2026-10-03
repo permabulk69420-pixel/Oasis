@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WATER, terrainHeight } from './world.js';
 import { addInventoryItem, getInventoryCount } from './inventory.js';
 import { isHandAtChest } from './chest-storage.js';
+import { attachHeldObject, setGripSurface } from './grip-contact.js';
 
 const STONE_URL = `${import.meta.env?.BASE_URL ?? '/'}models/stone/vr_pickup_stone_uv_200.glb`;
 const ROCK_TEXTURE = `${import.meta.env?.BASE_URL ?? '/'}textures/rocks/pickup-rock/rock1.png`;
@@ -95,6 +96,8 @@ export function createGroundStones({ field, renderer = null, onError = console.w
       stone.userData.looseStone = true;
       stone.userData.groundYaw = item.yaw;
       stone.userData.sourceBottom = sourceBottom;
+      stone.userData.gripProfile = 'large';
+      setGripSurface(stone, { meshes: ['Stone'], point: [0, 0, 0] });
       stone.userData.held = false;
       group.add(stone);
     }
@@ -121,11 +124,7 @@ export function createHeldStones({ scene, states, renderer = null, onError = con
 
   function grab(state, stone) {
     if (!state?.objectGrip || !stone || stone.userData.held) return false;
-    if (state.objectGrip.children.length > 0) return false;
-
-    state.objectGrip.add(stone);
-    stone.position.set(0, 0, 0);
-    stone.quaternion.identity();
+    if (!attachHeldObject(state, stone)) return false;
     stone.userData.held = true;
     heldByState.set(state, stone);
     return true;
