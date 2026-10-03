@@ -91,6 +91,12 @@ if (import.meta.env.DEV) {
     rig.position.set(WATER.x - dx, field.sample(WATER.x - dx, WATER.z + dz), WATER.z + dz);
     rig.rotation.y = -Math.atan2(dx, dz); camera.rotation.x = -0.13;
   }
+  if (view === 'turf') {
+    // Looking down at the grass band just outside the water, for checking the ground texture.
+    const dx = WATER.radiusX * 1.18, dz = WATER.radiusZ * 0.80;
+    rig.position.set(WATER.x - dx, field.sample(WATER.x - dx, WATER.z + dz), WATER.z + dz);
+    rig.rotation.y = -Math.atan2(dx, dz); camera.rotation.x = -0.62;
+  }
   if (view === 'oasis') {
     rig.position.set(WATER.x - 88, WATER.y + 76, WATER.z + 86);
     rig.rotation.y = -Math.atan2(88, 86); camera.rotation.x = -0.58;

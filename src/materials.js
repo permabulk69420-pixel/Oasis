@@ -71,6 +71,7 @@ export const atmosphere = /* glsl */`
   // Night fill (linear light, added after tone mapping). Tuned so the ground reads as a few
   // percent grey-blue under a moon: dark and tense, but not pitch black.
   const vec3 MOON_FILL = vec3(0.0042, 0.0062, 0.0105);
+  const vec3 GRASS_NIGHT_FLOOR = vec3(0.16, 0.24, 0.30);
   const vec3 SKY_NIGHT_HORIZON = vec3(0.0030, 0.0046, 0.0085);
   const vec3 SKY_NIGHT_ZENITH = vec3(0.0006, 0.0013, 0.0032);
   const vec3 WATER_NIGHT_FILL = vec3(0.0016, 0.0030, 0.0052);
@@ -315,8 +316,14 @@ export function createMaterials(renderer, field) {
         vec3 base = mix(proceduralBase, textureBase, uHasPbrBase);
         if (grass > 0.001) {
           vec3 grassBase = mix(vec3(0.10, 0.15, 0.028), vec3(0.19, 0.25, 0.065), vData.g);
-          if (uHasGrassBase > 0.5) grassBase = texture2D(uGrassBase, grassUv).rgb;
-          base = mix(base, grassBase, grass);
+          if (uHasGrassBase > 0.5) {
+            grassBase = texture2D(uGrassBase, grassUv).rgb;
+            // The tile repeats every few metres; broad world-space colour drift hides the grid.
+            grassBase *= mix(vec3(0.92, 0.98, 1.03), vec3(1.05, 1.04, 0.97), vData.g);
+          }
+          // Commit to turf colour a little earlier than the geometry cover so the sand-to-grass
+          // transition is not a muddy brown mix.
+          base = mix(base, grassBase, smoothstep(0.08, 0.65, grass));
         }
 
         float roughnessMap = texture2D(uPbrRoughness, pbrUv).r;
@@ -343,7 +350,9 @@ export function createMaterials(renderer, field) {
         #include <tonemapping_fragment>
         // Faint moonlit fill, added after tone mapping (the film curve crushes anything this dim
         // to pure black). It keeps dunes and shapes readable at night without touching the torch.
-        gl_FragColor.rgb += base * MOON_FILL * mix(0.55, 1.0, max(n.y, 0.0)) * (1.0 - environmentDay);
+        // Turf is far darker than sand, so it gets a moonlit floor (cool blue-green) to stay readable.
+        vec3 fillBase = mix(base, max(base, GRASS_NIGHT_FLOOR), grass);
+        gl_FragColor.rgb += fillBase * MOON_FILL * mix(0.55, 1.0, max(n.y, 0.0)) * (1.0 - environmentDay);
         #include <colorspace_fragment>
       }
     `,
