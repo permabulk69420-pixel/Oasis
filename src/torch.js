@@ -16,7 +16,11 @@ const TORCH_BOTTOM_BELOW_GRIP = 0.151;
 const flamePosition = new THREE.Vector3();
 const heldRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
 
-function createFlameEffect() {
+// The torch flame, reusable at other sizes (the campfire draws a bigger one). Defaults are the
+// torch's own numbers. `light: false` skips the point light so a caller can share one.
+export function createFlameEffect({
+  width = 0.125, height = 0.24, lift = 0.14, yaws = [0, Math.PI / 3, Math.PI * 2 / 3], light: withLight = true,
+} = {}) {
   const group = new THREE.Group();
   group.name = 'Torch runtime flame';
 
@@ -63,10 +67,10 @@ function createFlameEffect() {
     `,
   });
 
-  const geometry = new THREE.PlaneGeometry(0.125, 0.24, 1, 1);
+  const geometry = new THREE.PlaneGeometry(width, height, 1, 1);
   // Keep the entire additive flame above the authored anchor so it cannot wash over the shaft.
-  geometry.translate(0, 0.14, 0);
-  for (const yaw of [0, Math.PI / 3, Math.PI * 2 / 3]) {
+  geometry.translate(0, lift, 0);
+  for (const yaw of yaws) {
     const flame = new THREE.Mesh(geometry, material);
     flame.rotation.y = yaw;
     flame.frustumCulled = false;
@@ -74,11 +78,14 @@ function createFlameEffect() {
     group.add(flame);
   }
 
-  const light = new THREE.PointLight(0xffa04a, 0, 12.0, 2.0);
-  light.name = 'Torch warm light';
-  light.castShadow = false;
-  light.position.y = 0.16;
-  group.add(light);
+  let light = null;
+  if (withLight) {
+    light = new THREE.PointLight(0xffa04a, 0, 12.0, 2.0);
+    light.name = 'Torch warm light';
+    light.castShadow = false;
+    light.position.y = 0.16;
+    group.add(light);
+  }
 
   return { group, material, light };
 }
