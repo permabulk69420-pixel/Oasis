@@ -21,8 +21,8 @@ const HIP_SIDE = 0.26;
 // The body faces wherever the head looked when you start walking, so you can turn on the
 // spot and then push the stick; looking around while standing never moves the hips.
 const WALK_START = 0.35;
-const FACE_TURN_MIN = 0.26; // ~15 degrees
-const FACE_TURN_RATE = 9;
+const FACE_TURN_MIN = 0.80; // ~45 degrees: smaller differences are ignored, so it rarely fires
+const FACE_TURN_RATE = 4;
 const BODY_DEADZONE = 0.22;
 const BODY_DEADZONE_Y = 0.10;
 const BODY_SETTLE_RATE = 0.3;
