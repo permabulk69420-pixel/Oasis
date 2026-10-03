@@ -10,6 +10,7 @@ import { createGroundSticks } from './sticks.js';
 import { createGroundStones } from './stones.js';
 import { createGroundFruit } from './glow-fruit.js';
 import { createCampfires, campfireSpot, campfireSite } from './campfire.js';
+import { createWindSand, WIND_SAND } from './wind-sand.js';
 import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater } from './survival.js';
 import { pulseHaptics } from './haptics.js';
 import { createSurvivorMenu } from './survivor-menu.js';
@@ -89,6 +90,21 @@ scene.add(glowFruit.group);
 const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), materials.sky);
 sky.frustumCulled = false; sky.renderOrder = -10; sky.name = 'Sky'; scene.add(sky);
 const dayNight = createDayNightCycle({ scene, renderer, materials });
+// Wind-blown sand and drifting dust. It shares the terrain's sun and pond uniforms and the water's height texture.
+const windSand = createWindSand({
+  scene,
+  uniforms: {
+    uSun: materials.sand.uniforms.uSun,
+    uWater: materials.sand.uniforms.uWater,
+    uWaterRadii: materials.sand.uniforms.uWaterRadii,
+    uElevation: materials.water.uniforms.uElevation,
+  },
+});
+if (import.meta.env.DEV) {
+  const gain = Number(new URLSearchParams(location.search).get('sandgain'));
+  if (gain > 0) windSand.uniforms.uGain.value = gain; // dev only: exaggerate the sand to check it
+}
+const drawingSize = new THREE.Vector2();
 rig.position.set(SPAWN.x, field.sample(SPAWN.x, SPAWN.z), SPAWN.z);
 
 // Development-only camera fixtures for repeatable visual inspection. No travel shortcuts ship.
@@ -133,6 +149,14 @@ if (import.meta.env.DEV) {
     rig.position.set(-90, field.sample(-90, 30) + 8, 30);
     rig.rotation.y = -0.7; camera.rotation.x = -0.2;
   }
+  // Across the wind on a dune crest, so blowing sand streams past the view.
+  if (view === 'gust') {
+    const px = SPAWN.x, pz = SPAWN.z;
+    rig.position.set(px, field.sample(px, pz), pz);
+    rig.rotation.y = Math.atan2(-0.54, 0.84); camera.rotation.x = -0.05;
+  }
+  const eye = Number(new URLSearchParams(location.search).get('eye'));
+  if (new URLSearchParams(location.search).has('eye') && eye > 0) camera.position.y = eye; // low camera for ground-level shots
 }
 
 let playing = false;
@@ -406,6 +430,7 @@ function frame(time) {
   hands.update(dt);
   const activeCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
   activeCamera.getWorldPosition(head);
+  windSand.update(time * 0.001, head, renderer.xr.isPresenting ? WIND_SAND.vrViewHeight : renderer.getDrawingBufferSize(drawingSize).y);
   survivorMenu.update();
 
   // local-floor still reports the real headset height while sitting. In seated mode,

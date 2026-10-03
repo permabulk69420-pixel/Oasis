@@ -61,4 +61,8 @@ anything odd for him.
 
 ## Overnight progress log (3 to 4 Oct 2026)
 
-Merged so far (PR numbers, newest last): #25 campfire, #26 CLAUDE.md.
+Merged so far (PR numbers, newest last): #25 campfire, #26 and #27 CLAUDE.md, wind-blown sand and dust (PR number in
+the git log as "Wind-blown sand").
+Kane also asked (while asleep) for a spear, if there is time: a held tool like the axe and torch, my call on the
+design, no combat mechanics. Tasks left in order: fire smoke and heat haze plus moonlit rims, night sky, plant
+sway, alien bird, backpack, spear, newer trees with LODs, perf check.
