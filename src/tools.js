@@ -18,6 +18,11 @@ export const HIP_SIDES = Object.freeze(['left', 'right']);
 // Where a relaxed arm hangs, not the belt line: a hand at your side sits well below your waist.
 const HIP_DROP = 0.80;
 const HIP_SIDE = 0.26;
+// The body faces wherever the head looked when you start walking, so you can turn on the
+// spot and then push the stick; looking around while standing never moves the hips.
+const WALK_START = 0.35;
+const FACE_TURN_MIN = 0.26; // ~15 degrees
+const FACE_TURN_RATE = 9;
 const BODY_DEADZONE = 0.22;
 const BODY_DEADZONE_Y = 0.10;
 const BODY_SETTLE_RATE = 0.3;
@@ -36,9 +41,15 @@ const handPosition = new THREE.Vector3();
 const toolPosition = new THREE.Vector3();
 const anchorPosition = new THREE.Vector3();
 const headPosition = new THREE.Vector3();
+const headForward = new THREE.Vector3();
+const headRotation = new THREE.Matrix4();
 const inverseParent = new THREE.Matrix4();
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 const FORWARD = new THREE.Vector3(0, 0, -1);
+
+function wrapAngle(angle) {
+  return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
 
 // Is a hand position inside a hip's holster zone? Horizontal distance and height are
 // judged separately, so the zone is tall and narrow rather than a ball.
@@ -85,6 +96,8 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     belt[side] = anchor;
   }
   let bodyYaw = 0;
+  let bodyYawTarget = null;
+  let wasWalking = false;
   let bodyCenter = null;
 
   // Empty hips get a small soft dot while a hand holds a tool. When that hand is in the
@@ -284,12 +297,23 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     return best;
   }
 
+  function isWalking() {
+    for (const state of states) {
+      if (state.handedness !== 'left') continue;
+      const axes = state.inputSource?.gamepad?.axes || [];
+      if (axes.length < 2) continue;
+      const index = axes.length >= 4 ? axes.length - 2 : 0;
+      if (Math.hypot(axes[index] || 0, axes[index + 1] || 0) > WALK_START) return true;
+    }
+    return false;
+  }
+
   function updateBelt(dt) {
     const presenting = Boolean(renderer?.xr?.isPresenting);
     const view = presenting ? renderer.xr.getCamera() : camera;
     // No body on desktop, so nothing floats under the camera there.
     for (const side of HIP_SIDES) belt[side].visible = presenting;
-    if (!presenting) bodyCenter = null;
+    if (!presenting) { bodyCenter = null; bodyYawTarget = null; }
     if (!view) return;
     // WebXR prepares the XR camera's world matrix; do not recompute it (see chest-storage.js).
     if (!presenting) view.updateWorldMatrix(true, false);
@@ -299,9 +323,22 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     parent.updateWorldMatrix(true, false);
     inverseParent.copy(parent.matrixWorld).invert();
     headPosition.applyMatrix4(inverseParent);
+    headRotation.extractRotation(view.matrixWorld);
+    headForward.set(0, 0, -1).applyMatrix4(headRotation).transformDirection(inverseParent);
     // The belt never turns with the head: it keeps the rig's facing and only follows where
     // the head is. Stick-turning the rig carries it round.
-    bodyYaw = 0;
+    const walking = isWalking();
+    if (bodyYawTarget === null || !(dt > 0)) {
+      bodyYaw = bodyYawTarget = 0;
+      if (Math.hypot(headForward.x, headForward.z) > 0.15) bodyYaw = bodyYawTarget = Math.atan2(-headForward.x, -headForward.z);
+    } else {
+      if (walking && !wasWalking && Math.hypot(headForward.x, headForward.z) > 0.15) {
+        const headYaw = Math.atan2(-headForward.x, -headForward.z);
+        if (Math.abs(wrapAngle(headYaw - bodyYawTarget)) > FACE_TURN_MIN) bodyYawTarget = headYaw;
+      }
+      bodyYaw += wrapAngle(bodyYawTarget - bodyYaw) * (1 - Math.exp(-dt * FACE_TURN_RATE));
+    }
+    wasWalking = walking;
     // The body only moves when the head really travels: turning or tilting your head swings
     // the headset a few centimetres, and leaning a little shouldn't drag the hips with it.
     if (!bodyCenter || !(dt > 0)) bodyCenter = (bodyCenter || new THREE.Vector3()).copy(headPosition);
