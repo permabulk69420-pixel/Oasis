@@ -176,6 +176,61 @@ const HALO_FRAGMENT = /* glsl */`
   }
 `;
 
+// A bag of halo sprites sharing one material and one draw call. Instances start hidden (zero size);
+// place them with setInstance. Used by the pods here and by loose glow fruit.
+export function createHaloInstances(count, { name = 'Halos', color = 0x16b8ff, maxIntensity = 0.95 } = {}) {
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uColor: { value: new THREE.Color(color) },
+      uIntensity: { value: 0 },
+    },
+    vertexShader: HALO_VERTEX,
+    fragmentShader: HALO_FRAGMENT,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+  });
+  material.name = `${name} material`;
+
+  const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), material, Math.max(count, 1));
+  mesh.name = name;
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 5;
+  mesh.visible = false;
+
+  const matrix = new THREE.Matrix4();
+  const identity = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
+  const hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+  for (let i = 0; i < count; i++) mesh.setMatrixAt(i, hidden);
+  mesh.instanceMatrix.needsUpdate = true;
+
+  // position is in the mesh's parent space; radius is the halo radius there. radius 0 hides it.
+  function setInstance(index, position, radius) {
+    if (index < 0 || index >= count) return;
+    if (radius > 0) {
+      scale.setScalar(radius);
+      matrix.compose(position, identity, scale);
+      mesh.setMatrixAt(index, matrix);
+    } else {
+      mesh.setMatrixAt(index, hidden);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  // 0 = full day (no halo), 1 = full night.
+  function setNight(amount) {
+    const night = THREE.MathUtils.clamp(amount, 0, 1);
+    material.uniforms.uIntensity.value = night * maxIntensity;
+    mesh.visible = night > 0.01;
+  }
+
+  return { mesh, material, count, setInstance, setNight };
+}
+
 // root: the loaded hero model; halos are added as its children so they follow its transform.
 export function createPodHalos(root, {
   meshName = 'Glow_Pods',
@@ -197,47 +252,13 @@ export function createPodHalos(root, {
   const toRoot = new THREE.Matrix4().copy(root.matrixWorld).invert().multiply(podMesh.matrixWorld);
   const scaleToRoot = new THREE.Vector3().setFromMatrixScale(toRoot).x;
 
-  const material = new THREE.ShaderMaterial({
-    uniforms: {
-      uColor: { value: new THREE.Color(color) },
-      uIntensity: { value: 0 },
-    },
-    vertexShader: HALO_VERTEX,
-    fragmentShader: HALO_FRAGMENT,
-    transparent: true,
-    depthWrite: false,
-    depthTest: true,
-    blending: THREE.AdditiveBlending,
-    side: THREE.DoubleSide,
-    toneMapped: false,
-  });
-  material.name = 'Pod halo';
-
-  const mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), material, islands.length);
-  mesh.name = 'Pod halos';
-  mesh.frustumCulled = false;
-  mesh.renderOrder = 5;
-  mesh.visible = false;
-
-  const matrix = new THREE.Matrix4();
+  const halos = createHaloInstances(islands.length, { name: 'Pod halos', color, maxIntensity });
   const position = new THREE.Vector3();
-  const identity = new THREE.Quaternion();
-  const scale = new THREE.Vector3();
   islands.forEach((island, i) => {
     position.set(...island.center).applyMatrix4(toRoot);
-    scale.setScalar(island.radius * scaleToRoot * radiusPerPod);
-    matrix.compose(position, identity, scale);
-    mesh.setMatrixAt(i, matrix);
+    halos.setInstance(i, position, island.radius * scaleToRoot * radiusPerPod);
   });
-  mesh.instanceMatrix.needsUpdate = true;
-  root.add(mesh);
-
-  // 0 = full day (no halo), 1 = full night.
-  function setNight(amount) {
-    const night = THREE.MathUtils.clamp(amount, 0, 1);
-    material.uniforms.uIntensity.value = night * maxIntensity;
-    mesh.visible = night > 0.01;
-  }
+  root.add(halos.mesh);
 
   // Pod centres and radii in world space (the model must already be placed in the scene).
   function worldPods() {
@@ -249,5 +270,5 @@ export function createPodHalos(root, {
     });
   }
 
-  return { mesh, material, count: islands.length, setNight, worldPods };
+  return { mesh: halos.mesh, material: halos.material, count: islands.length, setNight: halos.setNight, worldPods };
 }
