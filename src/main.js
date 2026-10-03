@@ -12,12 +12,13 @@ import { createGroundFruit } from './glow-fruit.js';
 import { createCampfires, campfireSpot, campfireSite } from './campfire.js';
 import { createWindSand, WIND_SAND } from './wind-sand.js';
 import { createAlienBirds } from './alien-bird.js';
+import { createBackpack, PACK } from './backpack.js';
 import { windTime, windStrength } from './wind.js';
 import { installNightFill } from './night-fill.js';
 import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater } from './survival.js';
 import { pulseHaptics } from './haptics.js';
 import { createSurvivorMenu } from './survivor-menu.js';
-import { getInventoryWeight, getCarrySpeedMultiplier, removeInventoryItem } from './inventory.js';
+import { getInventoryWeight, getCarryCapacity, getCarrySpeedMultiplier, removeInventoryItem } from './inventory.js';
 
 installNightFill(); // moonlit fill for the lit (PBR) objects: before anything compiles
 const canvas = document.querySelector('#world');
@@ -144,6 +145,7 @@ if (import.meta.env.DEV) {
   if (view === 'approach') aimAt(HERO_TREE.x - 80, HERO_TREE.z + 80, { x: HERO_TREE.x, y: heroY + 22, z: HERO_TREE.z }, 1.7);
   if (view === 'glade') aimAt(HERO_TREE.x - 11, HERO_TREE.z + 12, { x: HERO_TREE.x + 3, y: heroY + 1.2, z: HERO_TREE.z - 4 }, 1.7);
   const fruit0 = glowFruit.slots[0];
+  if (view === 'pack') aimAt(PACK.spawn.x - 0.9, PACK.spawn.z + 1.5, { x: PACK.spawn.x, y: field.sample(PACK.spawn.x, PACK.spawn.z) + 0.3, z: PACK.spawn.z }, 1.2);
   if (view === 'fruit' && fruit0) aimAt(fruit0.x + 1.1, fruit0.z + 0.8, { x: fruit0.x, y: field.sample(fruit0.x, fruit0.z) + 0.06, z: fruit0.z }, 1.2);
   if (view === 'orchard') aimAt(HERO_TREE.x - 34, HERO_TREE.z + 22, { x: HERO_TREE.x - 8, y: heroY + 0.2, z: HERO_TREE.z + 2 }, 1.7);
   if (view === 'base') aimAt(HERO_TREE.x - 16, HERO_TREE.z + 17, { x: HERO_TREE.x - 2, y: heroY + 1.5, z: HERO_TREE.z + 2 }, 1.3);
@@ -236,15 +238,25 @@ function placeFromMenu(type) {
   const spot = campfireSpot(placeHead, placeForward);
   const check = campfires.canPlace(spot.x, spot.z);
   if (!check.ok) return check;
-  if (!removeInventoryItem('campfire', 1)) return { ok: false, message: 'No campfire in your backpack.' };
+  if (!removeInventoryItem('campfire', 1)) return { ok: false, message: 'No campfire in your inventory.' };
   campfires.place(spot.x, spot.z);
   return { ok: true, message: 'Campfire placed. Light it with a torch.' };
 }
+// The backpack: lies on the sand by the starting tools. Grab it by the handle and let go behind your shoulder to put it on;
+// it then adds to how much you can carry (and is taken off again from the menu's Back slot).
+const backpack = createBackpack({
+  scene, states: hands.states, renderer, camera, rig, tools: hands.tools,
+  heightAt: field.sample,
+  getExposure: () => renderer.toneMappingExposure,
+  onError: message => console.warn(message),
+});
+// Development-only: ?pack=worn starts with the backpack already on.
+if (import.meta.env.DEV && new URLSearchParams(location.search).get('pack') === 'worn') backpack.debug.wear();
 // Development-only: ?camp=lit or ?camp=unlit puts a campfire in view near the spawn point.
 let devCamp = import.meta.env.DEV ? new URLSearchParams(location.search).get('camp') : null;
 
 const survivorMenu = createSurvivorMenu({
-  scene, renderer, states: hands.states, tools: hands.tools, onPlace: placeFromMenu,
+  scene, renderer, states: hands.states, tools: hands.tools, backpack, onPlace: placeFromMenu,
   onToggle(open) {
     keys.clear(); touchMove = { x: 0, z: 0 }; touchMoveId = null; touchLookId = null; mouseDragging = false;
     velocity.set(0, 0, 0); footsteps.reset(); movePad.firstElementChild.style.transform = '';
@@ -464,6 +476,7 @@ function frame(time) {
   // Resource storage compares controller and headset WORLD positions. Refresh
   // the XR camera first; its raw pose at frame start is reference-space local.
   hands.update(dt);
+  backpack.update(dt); // after the hands, so a tool or stone in reach is grabbed first
   const activeCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
   activeCamera.getWorldPosition(head);
   // One wind clock for the sand and the swaying plants, so their gusts line up.
@@ -606,9 +619,10 @@ function frame(time) {
     canvas.dataset.position = JSON.stringify({ x: +head.x.toFixed(2), z: +head.z.toFixed(2), ground: +field.sample(head.x, head.z).toFixed(2), yaw: +rig.rotation.y.toFixed(3) });
     canvas.dataset.render = JSON.stringify({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures });
     canvas.dataset.birds = JSON.stringify(alienBirds.list());
+    canvas.dataset.pack = JSON.stringify(backpack.list());
     canvas.dataset.campfires = JSON.stringify(campfires.list().map(fire => ({ x: +fire.x.toFixed(1), z: +fire.z.toFixed(1), lit: fire.lit })));
     canvas.dataset.survival = JSON.stringify(Object.fromEntries(Object.entries(getSurvivalStats()).map(([k, v]) => [k, +v.toFixed(1)])));
-    canvas.dataset.inventory = JSON.stringify({ weight: getInventoryWeight(), speedMultiplier: getCarrySpeedMultiplier() });
+    canvas.dataset.inventory = JSON.stringify({ weight: getInventoryWeight(), capacity: getCarryCapacity(), speedMultiplier: getCarrySpeedMultiplier() });
     telemetryTime = time;
   }
 }
