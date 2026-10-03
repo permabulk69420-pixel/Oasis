@@ -1,32 +1,19 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { SPAWN, terrainHeight } from './world.js';
+import { SPAWN } from './world.js';
 import { pulseHaptics } from './haptics.js';
-import { attachHeldObject, setGripSurface } from './grip-contact.js';
+import { setGripSurface } from './grip-contact.js';
 
 const TORCH_URL = `${import.meta.env?.BASE_URL ?? '/'}models/torch/handheld_fire_torch.glb`;
 const TORCH_AUDIO_URL = `${import.meta.env?.BASE_URL ?? '/'}audio/fire/torch_fire_crackle_loop.mp3`;
 const TORCH_AUDIO_VOLUME = 0.65;
-const RIGHT_HAND = 'right';
-const GRIP_BUTTON = 1;
-const B_BUTTON = 5;
+// B on the right controller, X on the left: toggles whichever torch that hand holds.
+const TOGGLE_BUTTON = 5;
+const LEFT_TOGGLE_BUTTON = 4;
 const PICKUP_RADIUS = 0.58;
 const TORCH_BOTTOM_BELOW_GRIP = 0.151;
 
-const loader = new GLTFLoader();
-const handPosition = new THREE.Vector3();
-const torchPosition = new THREE.Vector3();
 const flamePosition = new THREE.Vector3();
 const heldRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
-
-function prepareTorch(root) {
-  setGripSurface(root, { meshes: ['WoodenShaft'], axis: [0, 1, 0], point: [0, 0, 0] });
-  root.traverse((object) => {
-    if (!object.isMesh) return;
-    object.castShadow = false;
-    object.receiveShadow = false;
-  });
-}
 
 function createFlameEffect() {
   const group = new THREE.Group();
@@ -141,178 +128,133 @@ function installWaterTorchLight(material, positionUniform, strengthUniform) {
   return true;
 }
 
-export function createHeldTorch({ scene, states, onError = console.warn }) {
-  if (!scene || !Array.isArray(states)) throw new Error('Torch requires the Oasis scene and VR hand states.');
+function makeFireAudio() {
+  if (typeof Audio === 'undefined') return null;
+  const audio = new Audio(TORCH_AUDIO_URL);
+  audio.loop = true;
+  audio.preload = 'auto';
+  audio.volume = TORCH_AUDIO_VOLUME;
+  audio.playsInline = true;
+  return audio;
+}
 
+export function createTorchKind({ scene, onError = console.warn }) {
+  // Terrain and water get one shared torch light, driven by the brightest lit torch.
   const terrainTorchPosition = { value: new THREE.Vector3(0, -1000, 0) };
   const terrainTorchStrength = { value: 0 };
-  const fireAudio = new Audio(TORCH_AUDIO_URL);
-  fireAudio.loop = true;
-  fireAudio.preload = 'auto';
-  fireAudio.volume = TORCH_AUDIO_VOLUME;
-  fireAudio.playsInline = true;
-
   let terrainLightingReady = false;
   let waterLightingReady = false;
-
-  let root = null;
-  let flameAnchor = null;
-  let flame = null;
-  let heldBy = null;
-  let gripDown = false;
-  let bDown = false;
-  let lit = false;
   let elapsed = 0;
 
   function ensureEnvironmentLighting() {
     if (!terrainLightingReady) {
       const terrainMesh = scene.getObjectByName('sand-0-0');
       if (terrainMesh?.material) {
-        terrainLightingReady = installTerrainTorchLight(
-          terrainMesh.material,
-          terrainTorchPosition,
-          terrainTorchStrength
-        );
+        terrainLightingReady = installTerrainTorchLight(terrainMesh.material, terrainTorchPosition, terrainTorchStrength);
         if (!terrainLightingReady) onError('[Oasis torch] Could not inject torch lighting into terrain shader.');
       }
     }
     if (!waterLightingReady) {
       const waterMesh = scene.getObjectByName('Shallow water');
       if (waterMesh?.material) {
-        waterLightingReady = installWaterTorchLight(
-          waterMesh.material,
-          terrainTorchPosition,
-          terrainTorchStrength
-        );
+        waterLightingReady = installWaterTorchLight(waterMesh.material, terrainTorchPosition, terrainTorchStrength);
         if (!waterLightingReady) onError('[Oasis torch] Could not inject torch lighting into water shader.');
       }
     }
   }
 
-  function startFireAudio() {
-    if (!fireAudio.paused) return;
-    fireAudio.play().catch((error) => {
-      if (error?.name !== 'NotAllowedError') {
-        onError(`[Oasis torch] Could not play fire audio: ${error?.message || error}`);
+  function setLit(instance, value) {
+    const { state } = instance;
+    state.lit = Boolean(value);
+    if (state.flame) state.flame.group.visible = state.lit;
+    if (state.lit) {
+      state.audio ??= makeFireAudio();
+      if (state.audio?.paused) {
+        state.audio.play().catch(error => {
+          if (error?.name !== 'NotAllowedError') onError(`[Oasis torch] Could not play fire audio: ${error?.message || error}`);
+        });
       }
-    });
-  }
-
-  function stopFireAudio() {
-    if (!fireAudio.paused) fireAudio.pause();
-    fireAudio.currentTime = 0;
-  }
-
-  function setLit(value) {
-    lit = Boolean(value);
-    if (flame) flame.group.visible = lit;
-    if (lit) {
-      startFireAudio();
     } else {
-      stopFireAudio();
-      if (flame) flame.light.intensity = 0;
-      terrainTorchStrength.value = 0;
+      if (state.audio && !state.audio.paused) state.audio.pause();
+      if (state.audio) state.audio.currentTime = 0;
+      if (state.flame) state.flame.light.intensity = 0;
     }
-    return lit;
-  }
-
-  function placeOnGround(x, z) {
-    if (!root) return;
-    if (root.parent !== scene) scene.attach(root);
-    root.position.set(x, terrainHeight(x, z) + TORCH_BOTTOM_BELOW_GRIP, z);
-    root.quaternion.identity();
-    root.scale.set(1, 1, 1);
-    root.updateMatrixWorld(true);
-  }
-
-  function grab(state) {
-    // The authored +Y torch axis points opposite the Quest hand socket's held-up direction.
-    if (!attachHeldObject(state, root, heldRotation)) return false;
-    heldBy = state;
-    return true;
-  }
-
-  function drop() {
-    if (!root || !heldBy) return false;
-    root.updateWorldMatrix(true, false);
-    root.getWorldPosition(torchPosition);
-    scene.attach(root);
-    heldBy = null;
-    placeOnGround(torchPosition.x, torchPosition.z);
-    return true;
-  }
-
-  loader.load(TORCH_URL, (gltf) => {
-    root = gltf.scene;
-    root.name = 'Handheld fire torch';
-    prepareTorch(root);
-    flameAnchor = root.getObjectByName('FlameAnchor');
-    if (!flameAnchor) {
-      flameAnchor = new THREE.Group();
-      flameAnchor.name = 'FlameAnchor_RuntimeFallback';
-      flameAnchor.position.set(0, 0.525, 0);
-      root.add(flameAnchor);
-      onError('[Oasis torch] FlameAnchor missing from GLB; using runtime fallback.');
-    }
-
-    flame = createFlameEffect();
-    flameAnchor.add(flame.group);
-    flame.group.visible = false;
-    scene.add(root);
-    placeOnGround(SPAWN.x + 0.75, SPAWN.z - 1.05);
-  }, undefined, (error) => {
-    onError(`[Oasis torch] Torch model failed to load: ${error?.message || error}`);
-  });
-
-  function update(dt) {
-    ensureEnvironmentLighting();
-    elapsed += Number.isFinite(dt) ? dt : 0;
-    const right = states.find((state) => state.handedness === RIGHT_HAND);
-    const buttons = right?.inputSource?.gamepad?.buttons || [];
-    const grip = Boolean(buttons[GRIP_BUTTON]?.pressed);
-    const b = Boolean(buttons[B_BUTTON]?.pressed);
-
-    if (right && root && !heldBy && grip && !gripDown) {
-      right.objectGrip.updateWorldMatrix(true, false);
-      right.objectGrip.getWorldPosition(handPosition);
-      root.updateWorldMatrix(true, false);
-      root.getWorldPosition(torchPosition);
-      torchPosition.y += 0.22;
-      if (handPosition.distanceTo(torchPosition) <= PICKUP_RADIUS) grab(right);
-    }
-    if (heldBy && (!heldBy.inputSource || !grip)) drop();
-
-    if (heldBy === right && b && !bDown) {
-      const turningOn = !lit;
-      setLit(turningOn);
-      pulseHaptics(right, turningOn ? 0.40 : 0.22, turningOn ? 55 : 28);
-    }
-    gripDown = grip;
-    bDown = b;
-
-    if (!root || !flameAnchor || !flame) return;
-    flame.material.uniforms.uTime.value = elapsed;
-    if (!lit) return;
-
-    flameAnchor.updateWorldMatrix(true, false);
-    flameAnchor.getWorldPosition(flamePosition);
-    const flicker = 0.90
-      + Math.sin(elapsed * 13.1) * 0.055
-      + Math.sin(elapsed * 21.7 + 0.8) * 0.035
-      + Math.sin(elapsed * 7.3 + 2.1) * 0.025;
-    const strength = THREE.MathUtils.clamp(flicker, 0.80, 1.08);
-    flame.material.uniforms.uStrength.value = strength;
-    flame.light.intensity = 18 * THREE.MathUtils.clamp(flicker, 0.82, 1.08);
-    terrainTorchPosition.value.copy(flamePosition);
-    terrainTorchStrength.value = strength;
+    return state.lit;
   }
 
   return {
-    update,
-    drop,
+    id: 'torch',
+    name: 'Handheld fire torch',
+    url: TORCH_URL,
+    groundBottom: TORCH_BOTTOM_BELOW_GRIP,
+    pickupLift: 0.22,
+    pickupRadius: PICKUP_RADIUS,
+    // The authored +Y torch axis points opposite the Quest hand socket's held-up direction.
+    heldRotation,
+    // Rides upright on the belt, leaned back so a lit flame stays clear of your face.
+    holster: { flip: false, lift: -0.06, outward: 0.16, pitch: 0.55 },
+    spawns: [{ x: SPAWN.x + 0.75, z: SPAWN.z - 1.05 }],
+
+    prepare(instance) {
+      const { root, state } = instance;
+      setGripSurface(root, { meshes: ['WoodenShaft'], axis: [0, 1, 0], point: [0, 0, 0] });
+      root.traverse(object => {
+        if (!object.isMesh) return;
+        object.castShadow = false;
+        object.receiveShadow = false;
+      });
+      let anchor = root.getObjectByName('FlameAnchor');
+      if (!anchor) {
+        anchor = new THREE.Group();
+        anchor.name = 'FlameAnchor_RuntimeFallback';
+        anchor.position.set(0, 0.525, 0);
+        root.add(anchor);
+        onError('[Oasis torch] FlameAnchor missing from GLB; using runtime fallback.');
+      }
+      state.flameAnchor = anchor;
+      state.flame = createFlameEffect();
+      state.flame.group.visible = false;
+      anchor.add(state.flame.group);
+    },
+    createState: () => ({ lit: false, toggleDown: false, flame: null, flameAnchor: null, audio: null }),
+    onDispose(instance) { setLit(instance, false); },
+
+    update(instance, dt) {
+      const { heldBy, state } = instance;
+      const button = heldBy?.handedness === 'left' ? LEFT_TOGGLE_BUTTON : TOGGLE_BUTTON;
+      const pressed = Boolean(heldBy?.inputSource?.gamepad?.buttons?.[button]?.pressed);
+      if (pressed && !state.toggleDown) {
+        const turningOn = setLit(instance, !state.lit);
+        pulseHaptics(heldBy, turningOn ? 0.40 : 0.22, turningOn ? 55 : 28);
+      }
+      state.toggleDown = pressed;
+      if (!state.flame) return;
+      state.flame.material.uniforms.uTime.value = elapsed;
+    },
+
+    updateShared(dt, torches) {
+      ensureEnvironmentLighting();
+      elapsed += dt;
+      const flicker = 0.90
+        + Math.sin(elapsed * 13.1) * 0.055
+        + Math.sin(elapsed * 21.7 + 0.8) * 0.035
+        + Math.sin(elapsed * 7.3 + 2.1) * 0.025;
+      const strength = THREE.MathUtils.clamp(flicker, 0.80, 1.08);
+      let lightSource = null;
+      for (const torch of torches) {
+        if (!torch.state.lit || !torch.state.flame) continue;
+        torch.state.flame.material.uniforms.uStrength.value = strength;
+        torch.state.flame.light.intensity = 18 * THREE.MathUtils.clamp(flicker, 0.82, 1.08);
+        // A torch in hand lights the ground first; otherwise any lit one (e.g. on a hip).
+        if (!lightSource || (torch.heldBy && !lightSource.heldBy)) lightSource = torch;
+      }
+      if (!lightSource) { terrainTorchStrength.value = 0; return; }
+      lightSource.state.flameAnchor.updateWorldMatrix(true, false);
+      lightSource.state.flameAnchor.getWorldPosition(flamePosition);
+      terrainTorchPosition.value.copy(flamePosition);
+      terrainTorchStrength.value = strength;
+    },
+
     setLit,
-    isLit: () => lit,
-    isHeld: () => Boolean(heldBy),
-    getObject: () => root,
   };
 }

@@ -206,7 +206,7 @@ function createProjectedVegetationShadow({ field, items, sunDirection, style }) 
       const footprintLength = style.footprintLength * scale;
       const projection = height * horizontal / Math.max(sunY, 0.22) * style.projectionScale;
       const length = Math.min(style.maxLength * scale, footprintLength + projection);
-      const width = style.width * scale * (0.97 + (itemIndex % 3) * 0.025);
+      const width = item.felled ? 0 : style.width * scale * (0.97 + (itemIndex % 3) * 0.025);
       const seed = style.seedBase + itemIndex * 1.618;
       const station = [];
 
@@ -351,6 +351,8 @@ export function createOasisVegetation({ field, sunDirection = null }) {
         lod.rotation.y = item.yaw;
         lod.scale.setScalar(item.scale);
         lod.userData.oasisTree = true;
+        // Chopping marks the layout item felled so its projected shadow disappears.
+        lod.userData.layoutItem = item;
 
         for (const level of levels) {
           const model = level.source.clone(true);
