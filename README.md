@@ -16,6 +16,7 @@ Desktop: **Explore**, WASD / arrow up and down to walk, mouse to look, Shift to 
 - Seeded wind-shaped dunes, sand ripples, wet shore sand, and animated shallow water with reeds and fireflies.
 - Around the oasis: blue alien trees, green ferns, alien desert plants, loose sticks and stones. The glowing 81 m veil tree stands a short walk from the pool (`?hero=crimson` swaps the old 60 m tree back in for comparison); small glow fruit lie around its base.
 - A short day/night cycle (3 min day, 3 min night while testing; `DAY_SECONDS` / `NIGHT_SECONDS` in `src/day-night.js`) with 2,400 twinkling stars, a moon with a face and a phase, a Milky Way band and now and then a shooting star (`src/night-sky.js`), desert ambience, sand footsteps, and a lightable torch. Night is dark and moonlit; the veil tree's pods glow and light the ground beneath them. Wind blows sand along the dunes: fine grains skimming the ground, soft veils spilling over the crests and big slow clouds of dust, all moved on the GPU (`src/wind-sand.js`). The air is calm at the oasis. The grass, ferns, reeds, desert plants and alien trees sway in the same wind, bending downwind with the gusts that throw the sand, with ripples running across the grass field; it is all in the vertex shader from one time uniform, with nothing for the CPU to do per frame (`src/wind.js`; the hero tree stays still). Lit objects (props, trees, hands, tools) get a faint moonlit fill and a thin cool rim at night so they read as shapes instead of black holes (`src/night-fill.js`).
+- Alien birds fly over by day, and now and then one lands on the bank to drink (see Alien birds in the game).
 - A coarse continuation of the sand outside the playable square hides the world edge.
 
 ## Run
@@ -98,9 +99,38 @@ vertices, open edges and inside-out faces. `tools/campfire/render_preview.py` re
 
 Development-only camera fixtures: `?view=fruit`, `?view=orchard`, `?view=glade`, `?view=approach`,
 `?view=wade`, `?view=gust` (across the wind on a dune crest), `?eye=<metres>` (a lower camera), `?yaw=<deg>` and `?pitch=<deg>` (look direction), `?skytime=<seconds>` (pin the sky clock, e.g. to catch a shooting star), `?sandgain=<n>` (exaggerate the blowing sand), `?windtime=<seconds>` (pin the wind clock so two screenshots can be compared), `?windgain=<n>` (exaggerate the sway), `?at=x,z` and `?look=x,z[,height]` (stand at a world position and look at a point), `?camp=lit` or `?camp=unlit` (puts a campfire on the flattest ground near spawn, with
-`?campd=<metres>` for the distance), plus `?hour=N` to fix the time of day.
+`?campd=<metres>` for the distance), `?bird=perch|fly|flare` (see Alien birds in the game), plus `?hour=N` to fix the time of day.
 
-## Alien bird (model and poses)
+## Alien birds in the game
+
+Now and then an alien bird turns up in daylight. It is scenery and atmosphere only: nothing about it changes how the
+game plays. `src/alien-bird.js` makes the birds and picks their model, `src/bird-brain.js` is what one bird does (a small
+state machine with no three.js in it) and `src/bird-flight.js` plans its routes. The numbers to tune are at the top of
+each file.
+
+- **When:** at most two at a time. The first arrives 12 to 22 seconds into the day and the next one 45 to 90 seconds
+  after each one, and no new bird once the light starts to fade. At dusk everything in the air heads away and
+  everything perched takes off; nothing arrives at night.
+- **A visit:** if you are within a couple of hundred metres of the pond, about two in three come to drink. One flies in
+  from 260 m off, circles the pond spiralling down, flares with its wings out and lands on a flat bit of the bank (never
+  in the water, on a steep slope, near a campfire or in the glowing fruit under the veil tree). It folds its wings, drinks,
+  looks about and stays 26 to 46 seconds, then crouches and takes off into the wind. The rest just cross the sky and soar
+  in one lazy circle.
+- **Skittish:** a perched bird notices you at 24 m (head up, crest raised) and flies off if you come within 8 m. A landing
+  is called off if you are standing near the spot.
+- **Flight:** routes are chains of Bézier curves with a steady speed profile, banking into the turns, flapping in bursts
+  with glides between, and legs trailing. The bird never flies lower than 12 m above the ground away from its landing.
+- **Cost:** up to three draw calls a bird (body, glow, shadow; the far model has no glow), 2,172 triangles close up. The model switches by distance
+  (0 to 32 m, 32 to 95 m, beyond), with a little give at each boundary so a bird right on one does not flicker; shaders
+  are compiled while loading so the first bird does not hitch a frame; no arrays or objects are created per frame. A soft blob shadow,
+  laid on the slope under the bird and thrown away from the sun, gives a bird in the air some weight over the dunes.
+- **Development fixtures** (stripped from the production build): `?bird=perch` (standing in front of you, side on),
+  `?bird=fly` (circling ahead) or `?bird=flare` (about to land, seen from the side), with `?birdd=<metres>` for how
+  far away, `?birdalt=<metres>` for the height, `?birdt=<metres>` for where on the circle, `?birdseed=<n>` to make
+  its choices repeatable and `?birdfreeze=0` to let it move instead of freezing it. With no `?bird=` fixture,
+  `?birdwait=<seconds>` makes the first bird due that many seconds into the day.
+
+### Model and poses
 
 A slender heron-like alien bird: midnight-blue back, teal wings, a cream belly, a coral crest, two long streamers with cyan
 paddles for a tail, and a few glowing cyan details (the wing-tip dots and the eye). It is a single skinned mesh with one
