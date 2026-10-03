@@ -5,7 +5,6 @@ import { createOasisVegetation } from './oasis-vegetation.js';
 import { createOasisGrassRing } from './oasis-grass-ring.js';
 import { createWaterReeds } from './water-reeds.js';
 import { createAlienDesertPlants } from './alien-desert-plants.js';
-import { addFernReplacementTrees } from './fern-replacement-trees.js';
 import { createGreenFerns } from './green-ferns.js';
 
 const CHUNK_SIZE = 62.5;
@@ -105,9 +104,6 @@ export function createTerrain(field, material) {
   // Larger oasis plants are lazy-loaded nearby.
   // Reuse the terrain shader's live sun vector so cheap projected tree shadows follow the day cycle.
   const vegetation = createOasisVegetation({ field, sunDirection: material.uniforms?.uSun?.value });
-  vegetation.fernGroup.removeFromParent();
-  vegetation.fernShadow.removeFromParent();
-  addFernReplacementTrees({ field, treeGroup: vegetation.treeGroup });
   group.add(vegetation.group);
 
   // A small near-shore clump of four reed patches. The reeds use their own two-level LOD and
