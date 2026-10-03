@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { findPodIslands, createPodHalos } from '../src/glow-halos.js';
+import { findPodIslands, createPodHalos, clusterPoints, buildGroundLights, applyGroundLights } from '../src/glow-halos.js';
 
 // Build an indexed UV-sphere-ish blob (an octahedron with a duplicated seam vertex, like a glTF
 // export that splits vertices at UV seams) centred at (cx, cy, cz).
@@ -91,4 +91,55 @@ test('createPodHalos places one instance per pod in the root space and toggles w
 
 test('createPodHalos returns null when the model has no pod mesh', () => {
   assert.equal(createPodHalos(new THREE.Group()), null);
+});
+
+function around(cx, cy, cz, n, spread = 1) {
+  return Array.from({ length: n }, (_, i) => ({
+    x: cx + Math.cos(i * 2.4) * spread,
+    y: cy + (i % 3) * 0.3,
+    z: cz + Math.sin(i * 2.4) * spread,
+  }));
+}
+
+test('clusterPoints groups well separated pods and is deterministic', () => {
+  const pods = [...around(0, 5, 0, 6), ...around(40, 20, 0, 4), ...around(0, 12, -50, 3)];
+  const a = clusterPoints(pods, 3);
+  const b = clusterPoints(pods, 3);
+  assert.deepEqual(a.map(c => c.count).sort((x, y) => x - y), [3, 4, 6]);
+  assert.deepEqual(a.map(c => c.center), b.map(c => c.center));
+});
+
+test('clusterPoints never returns more clusters than points', () => {
+  assert.equal(clusterPoints(around(0, 0, 0, 2), 8).length, 2);
+  assert.deepEqual(clusterPoints([], 8), []);
+});
+
+test('buildGroundLights gives low pods smaller, brighter pools than high pods', () => {
+  const pods = [...around(0, 6, 0, 5), ...around(60, 30, 0, 5)];
+  const lights = buildGroundLights(pods, () => 2, { maxLights: 2 });
+  assert.equal(lights.length, 2);
+  const low = lights.find(l => l.y < 15);
+  const high = lights.find(l => l.y >= 15);
+  assert.ok(low.radius < high.radius);
+  assert.ok(low.strength > high.strength);
+  assert.equal(Math.max(...lights.map(l => l.strength)), 1, 'strongest light is normalised to 1');
+});
+
+test('applyGroundLights fills uniform slots and zeroes unused ones', () => {
+  const uniforms = {
+    uPodLights: { value: Array.from({ length: 4 }, () => new THREE.Vector4()) },
+    uPodLightStrength: { value: [9, 9, 9, 9] },
+    uPodLightArea: { value: new THREE.Vector4(0, 0, 0, 0) },
+  };
+  applyGroundLights(uniforms, [
+    { x: 10, y: 5, z: 20, radius: 12, strength: 1 },
+    { x: 30, y: 8, z: 20, radius: 14, strength: 0.5 },
+  ]);
+  assert.deepEqual(uniforms.uPodLights.value[0].toArray(), [10, 5, 20, 12]);
+  assert.deepEqual(uniforms.uPodLightStrength.value, [1, 0.5, 0, 0]);
+  const area = uniforms.uPodLightArea.value;
+  assert.equal(area.x, 20);
+  assert.equal(area.y, 20);
+  assert.ok(area.z >= 10 + 14, 'cull range covers the farthest pool');
+  assert.doesNotThrow(() => applyGroundLights({}, []));
 });

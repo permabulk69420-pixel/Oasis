@@ -103,7 +103,11 @@ export function createTerrain(field, material) {
 
   // Larger oasis plants are lazy-loaded nearby.
   // Reuse the terrain shader's live sun vector so cheap projected tree shadows follow the day cycle.
-  const vegetation = createOasisVegetation({ field, sunDirection: material.uniforms?.uSun?.value });
+  const vegetation = createOasisVegetation({
+    field,
+    sunDirection: material.uniforms?.uSun?.value,
+    groundGlowUniforms: material.uniforms,
+  });
   group.add(vegetation.group);
 
   // A small near-shore clump of four reed patches. The reeds use their own two-level LOD and

@@ -64,6 +64,90 @@ export function findPodIslands(positions, index = null, { weld = 1e-3 } = {}) {
   }));
 }
 
+// Deterministic k-means for a handful of 3D points: farthest-point seeding (starting from the
+// lowest point), then a few Lloyd passes. Returns clusters with centre, member count and members.
+export function clusterPoints(points, k, iterations = 12) {
+  if (!points.length) return [];
+  k = Math.min(k, points.length);
+  const dist2 = (a, b) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2;
+
+  let lowest = points[0];
+  for (const p of points) if (p.y < lowest.y) lowest = p;
+  const centres = [{ x: lowest.x, y: lowest.y, z: lowest.z }];
+  while (centres.length < k) {
+    let best = null, bestD = -1;
+    for (const p of points) {
+      let nearest = Infinity;
+      for (const c of centres) nearest = Math.min(nearest, dist2(p, c));
+      if (nearest > bestD) { bestD = nearest; best = p; }
+    }
+    centres.push({ x: best.x, y: best.y, z: best.z });
+  }
+
+  let assignment = new Array(points.length).fill(0);
+  for (let pass = 0; pass < iterations; pass++) {
+    assignment = points.map(p => {
+      let bi = 0, bd = Infinity;
+      centres.forEach((c, i) => { const d = dist2(p, c); if (d < bd) { bd = d; bi = i; } });
+      return bi;
+    });
+    centres.forEach((c, i) => {
+      let n = 0, x = 0, y = 0, z = 0;
+      points.forEach((p, pi) => { if (assignment[pi] === i) { n++; x += p.x; y += p.y; z += p.z; } });
+      if (n) { c.x = x / n; c.y = y / n; c.z = z / n; }
+    });
+  }
+
+  return centres
+    .map((c, i) => ({ center: { ...c }, members: points.filter((_, pi) => assignment[pi] === i) }))
+    .filter(cluster => cluster.members.length)
+    .map(cluster => ({ ...cluster, count: cluster.members.length }));
+}
+
+// Turn pod positions into a few ground-light pools. Low pods give small bright pools; high pods give
+// big faint ones. `groundHeight(x, z)` is the terrain height under a point.
+export function buildGroundLights(pods, groundHeight, { maxLights = 8 } = {}) {
+  const clusters = clusterPoints(pods, maxLights);
+  const lights = clusters.map(({ center, count }) => {
+    const height = Math.max(center.y - groundHeight(center.x, center.z), 0.5);
+    return {
+      x: center.x,
+      y: center.y,
+      z: center.z,
+      radius: 15 + height * 1.0,
+      strength: Math.sqrt(count) / (1 + (height / 14) ** 2),
+    };
+  });
+  const top = Math.max(...lights.map(l => l.strength), 1e-6);
+  for (const light of lights) light.strength /= top;
+  return lights;
+}
+
+// Write lights into the terrain material's uniform arrays (see materials.js). Unused slots are
+// zeroed. uPodLightArea = (centre x, centre z, cull range, night gain).
+export function applyGroundLights(uniforms, lights) {
+  if (!uniforms?.uPodLights) return;
+  const slots = uniforms.uPodLights.value;
+  const strengths = uniforms.uPodLightStrength.value;
+  for (let i = 0; i < slots.length; i++) {
+    const light = lights[i];
+    if (light) {
+      slots[i].set(light.x, light.y, light.z, light.radius);
+      strengths[i] = light.strength;
+    } else {
+      slots[i].set(0, -1000, 0, 1);
+      strengths[i] = 0;
+    }
+  }
+  let cx = 0, cz = 0;
+  for (const l of lights) { cx += l.x; cz += l.z; }
+  if (lights.length) { cx /= lights.length; cz /= lights.length; }
+  let range = 0;
+  for (const l of lights) range = Math.max(range, Math.hypot(l.x - cx, l.z - cz) + l.radius);
+  const area = uniforms.uPodLightArea.value;
+  area.x = cx; area.y = cz; area.z = range;
+}
+
 const HALO_VERTEX = /* glsl */`
   varying vec2 vUv;
   void main() {
@@ -155,5 +239,15 @@ export function createPodHalos(root, {
     mesh.visible = night > 0.01;
   }
 
-  return { mesh, material, count: islands.length, setNight };
+  // Pod centres and radii in world space (the model must already be placed in the scene).
+  function worldPods() {
+    podMesh.updateWorldMatrix(true, false);
+    const worldScale = new THREE.Vector3().setFromMatrixScale(podMesh.matrixWorld).x;
+    return islands.map(island => {
+      const p = new THREE.Vector3(...island.center).applyMatrix4(podMesh.matrixWorld);
+      return { x: p.x, y: p.y, z: p.z, radius: island.radius * worldScale };
+    });
+  }
+
+  return { mesh, material, count: islands.length, setNight, worldPods };
 }

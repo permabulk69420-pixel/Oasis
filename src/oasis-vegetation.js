@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WATER, SUN, HERO_TREE } from './world.js';
-import { createPodHalos } from './glow-halos.js';
+import { createPodHalos, buildGroundLights, applyGroundLights } from './glow-halos.js';
 
 const BUSH_DRAW_DISTANCE = 180;
 const BUSH_LOAD_DISTANCE = 230;
@@ -280,7 +280,7 @@ function disableModelShadows(root) {
   });
 }
 
-export function createOasisVegetation({ field, sunDirection = null }) {
+export function createOasisVegetation({ field, sunDirection = null, groundGlowUniforms = null }) {
   const group = new THREE.Group();
   group.name = 'Oasis vegetation';
 
@@ -427,6 +427,11 @@ export function createOasisVegetation({ field, sunDirection = null }) {
       });
       heroHalos = createPodHalos(hero);
       heroGroup.add(hero);
+      if (heroHalos && groundGlowUniforms?.uPodLights) {
+        hero.updateWorldMatrix(true, true);
+        const slots = groundGlowUniforms.uPodLights.value.length;
+        applyGroundLights(groundGlowUniforms, buildGroundLights(heroHalos.worldPods(), field.sample, { maxLights: slots }));
+      }
       heroReady = true;
     }, undefined, error => {
       console.warn('[Oasis vegetation] Crimson hero tree model unavailable.', error);
@@ -448,7 +453,11 @@ export function createOasisVegetation({ field, sunDirection = null }) {
       const intensity = THREE.MathUtils.lerp(GLOW_NIGHT, GLOW_DAY, smoothstep(-0.05, 0.25, liveSun.y));
       for (const material of glowMaterials) material.emissiveIntensity = intensity;
     }
-    if (heroHalos) heroHalos.setNight(1 - smoothstep(-0.05, 0.25, liveSun.y));
+    if (heroHalos) {
+      const night = 1 - smoothstep(-0.05, 0.25, liveSun.y);
+      heroHalos.setNight(night);
+      if (groundGlowUniforms?.uPodLightArea) groundGlowUniforms.uPodLightArea.value.w = night;
+    }
     bushShadow.mesh.visible = bushesReady && bushGroup.visible && shadowDaylight;
     regularTreeShadow.mesh.visible = treesReady && treeGroup.visible && shadowDaylight;
     heroTreeShadow.mesh.visible = heroReady && heroGroup.visible && shadowDaylight;

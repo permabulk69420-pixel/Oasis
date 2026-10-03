@@ -4,6 +4,7 @@ import { attachSandPBR } from './sand-pbr.js';
 import { attachGrassTexture, GRASS_TILE_METRES } from './grass-texture.js';
 
 const CLOUD_TEXTURE_SIZE = 256;
+const POD_LIGHT_SLOTS = 8; // ground-light pools under the veil tree's pods
 
 function hash2(x, y, seed) {
   let h = Math.imul((x + seed) | 0, 0x45d9f3b) ^ Math.imul((y - seed) | 0, 0x27d4eb2d);
@@ -72,6 +73,8 @@ export const atmosphere = /* glsl */`
   // percent grey-blue under a moon: dark and tense, but not pitch black.
   const vec3 MOON_FILL = vec3(0.0026, 0.0039, 0.0070);
   const vec3 GRASS_NIGHT_FLOOR = vec3(0.12, 0.18, 0.24);
+  // Linear light added under the pods at peak (after tone mapping). Cyan, like the pods themselves.
+  const vec3 POD_LIGHT_COLOR = vec3(0.030, 0.230, 0.380);
   const vec3 SKY_NIGHT_HORIZON = vec3(0.0030, 0.0046, 0.0085);
   const vec3 SKY_NIGHT_ZENITH = vec3(0.0006, 0.0013, 0.0032);
   const vec3 WATER_NIGHT_FILL = vec3(0.0013, 0.0024, 0.0042);
@@ -204,6 +207,10 @@ export function createMaterials(renderer, field) {
       uHasGrassRoughness: { value: 0 },
       uHasGrassHeight: { value: 0 },
       uGrassTileMetres: { value: GRASS_TILE_METRES },
+      // Cyan light spilling from the veil tree's pods onto the ground (see glow-halos.js).
+      uPodLights: { value: Array.from({ length: POD_LIGHT_SLOTS }, () => new THREE.Vector4(0, -1000, 0, 1)) },
+      uPodLightStrength: { value: new Array(POD_LIGHT_SLOTS).fill(0) },
+      uPodLightArea: { value: new THREE.Vector4(0, 0, 0, 0) },
       uPbrBase: { value: solidTexture(255, 255, 255) },
       uPbrNormal: { value: solidTexture(128, 128, 255) },
       uPbrRoughness: { value: solidTexture(255, 255, 255) },
@@ -236,6 +243,9 @@ export function createMaterials(renderer, field) {
       uniform float uHasPbrHeight;
       uniform vec3 uWater;
       uniform vec2 uWaterRadii;
+      uniform vec4 uPodLights[${POD_LIGHT_SLOTS}];
+      uniform float uPodLightStrength[${POD_LIGHT_SLOTS}];
+      uniform vec4 uPodLightArea;
       uniform sampler2D uGrassBase;
       uniform sampler2D uGrassNormal;
       uniform sampler2D uGrassRoughness;
@@ -353,6 +363,20 @@ export function createMaterials(renderer, field) {
         // Turf is far darker than sand, so it gets a moonlit floor (cool blue-green) to stay readable.
         vec3 fillBase = mix(base, max(base, GRASS_NIGHT_FLOOR), grass);
         gl_FragColor.rgb += fillBase * MOON_FILL * mix(0.55, 1.0, max(n.y, 0.0)) * (1.0 - environmentDay);
+        // Cyan pools under the veil tree's glowing pods. Only evaluated near the tree and at night.
+        if (uPodLightArea.w > 0.001 && length(vWorld.xz - uPodLightArea.xy) < uPodLightArea.z) {
+          float podGlow = 0.0;
+          for (int i = 0; i < ${POD_LIGHT_SLOTS}; i++) {
+            vec3 toPod = uPodLights[i].xyz - vWorld;
+            float podDistance = length(toPod);
+            float falloff = 1.0 - smoothstep(0.0, uPodLights[i].w, podDistance);
+            falloff *= falloff;
+            float facing = 0.35 + 0.65 * max(dot(n, toPod / max(podDistance, 0.001)), 0.0);
+            podGlow += falloff * facing * uPodLightStrength[i];
+          }
+          float podTint = 0.55 + 0.45 * clamp(dot(fillBase, vec3(0.33)) * 2.5, 0.0, 1.0);
+          gl_FragColor.rgb += POD_LIGHT_COLOR * podGlow * podTint * uPodLightArea.w;
+        }
         #include <colorspace_fragment>
       }
     `,
