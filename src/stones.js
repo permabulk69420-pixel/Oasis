@@ -6,7 +6,7 @@ import { isHandAtChest } from './chest-storage.js';
 import { attachHeldObject, setGripSurface } from './grip-contact.js';
 
 const STONE_URL = `${import.meta.env?.BASE_URL ?? '/'}models/stone/vr_pickup_stone_uv_200.glb`;
-const ROCK_TEXTURE = `${import.meta.env?.BASE_URL ?? '/'}textures/rocks/pickup-rock/rock1.png`;
+const ROCK_TEXTURE = `${import.meta.env?.BASE_URL ?? '/'}textures/rocks/pickup-rock/pickup_rock_albedo.png`;
 const GRIP_BUTTON = 1;
 const PICKUP_RADIUS = 0.34;
 
@@ -36,7 +36,7 @@ function makeStoneMaterial(renderer) {
     roughness: 0.92,
     metalness: 0,
   });
-  material.name = 'Collectible stone — shared rock1';
+  material.name = 'Collectible stone — shared pickup rock';
 
   new THREE.TextureLoader().load(
     ROCK_TEXTURE,
@@ -49,7 +49,7 @@ function makeStoneMaterial(renderer) {
       material.needsUpdate = true;
     },
     undefined,
-    () => console.warn('[Oasis stones] rock1.png could not be loaded; using the fallback stone colour.'),
+    () => console.warn('[Oasis stones] Stone texture could not be loaded; using the fallback stone colour.'),
   );
 
   return material;

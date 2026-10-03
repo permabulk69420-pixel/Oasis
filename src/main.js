@@ -50,6 +50,7 @@ rig.add(camera); scene.add(rig);
 const hands = createVRHands({
   renderer,
   scene,
+  camera,
   gripDebug: import.meta.env.DEV && new URLSearchParams(location.search).get('gripDebug') === '1',
   onError: (message) => console.warn('[Oasis hands]', message)
 });
@@ -120,7 +121,7 @@ let crouchOffset = 0, crouchActive = false, crouchButtonDown = false;
 let sprintActive = false, sprintButtonDown = false;
 
 const survivorMenu = createSurvivorMenu({
-  scene, renderer, states: hands.states,
+  scene, renderer, states: hands.states, tools: hands.tools,
   onToggle(open) {
     keys.clear(); touchMove = { x: 0, z: 0 }; touchMoveId = null; touchLookId = null; mouseDragging = false;
     velocity.set(0, 0, 0); footsteps.reset(); movePad.firstElementChild.style.transform = '';

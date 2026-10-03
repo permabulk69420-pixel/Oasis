@@ -1,14 +1,8 @@
 # Oasis grass texture
 
-The grass band is painted into the terrain around the sandy water bank.
-It currently uses a muted green colour fallback, with no texture download.
+The grass band around the water uses the stylized grass set in this folder
+(`stylized-grass1_*`), configured in `src/grass-texture.js`.
+`GRASS_TILE_METRES` there controls its repeat size in metres.
 
-To add your seamless grass base-colour image:
-
-1. Put it in this folder (for example `grass_albedo.png`). PNG, JPG and WebP work.
-2. In `src/grass-texture.js`, set `GRASS_TEXTURE` to that filename instead of `null`.
-3. Build/publish normally. `GRASS_TILE_METRES` controls its repeat size in metres.
-
-The image replaces the fallback colour, repeats across the ground, and blends
-into sand at both edges. It shares terrain lighting and does not affect sand maps.
-A 1024 or 2048 pixel image is a practical starting size for Quest 3.
+To swap it, drop a new seamless set in here and update the filenames in
+`src/grass-texture.js`. 1024 or 2048 pixels is a practical size for Quest 3.

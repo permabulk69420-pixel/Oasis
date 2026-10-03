@@ -9,6 +9,7 @@ const DEFAULT_ITEM_WEIGHT = 1;
 const ITEM_WEIGHTS = Object.freeze({
   stick: 4,
   stone: 8,
+  wood: 6,
   fibre: 1,
   axe: 10,
   torch: 5,
@@ -24,6 +25,17 @@ export function addInventoryItem(type, amount = 1) {
   if (!Number.isSafeInteger(next)) return current;
   counts.set(type, next);
   return next;
+}
+
+// Take items out of the backpack (e.g. a tool moving to a hip slot). All or nothing.
+export function removeInventoryItem(type, amount = 1) {
+  const value = Number(amount);
+  if (typeof type !== 'string' || !Number.isSafeInteger(value) || value <= 0) return false;
+  const current = counts.get(type) || 0;
+  if (current < value) return false;
+  if (current === value) counts.delete(type);
+  else counts.set(type, current - value);
+  return true;
 }
 
 export function getInventoryCount(type) {
