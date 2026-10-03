@@ -157,6 +157,12 @@ if (import.meta.env.DEV) {
     rig.position.set(px, field.sample(px, pz), pz);
     rig.rotation.y = Math.atan2(-0.54, 0.84); camera.rotation.x = -0.05;
   }
+  // Look direction, in degrees: yaw turns the rig (0 faces -z, positive turns left), pitch tilts up.
+  const params = new URLSearchParams(location.search);
+  if (params.has('yaw') && Number.isFinite(Number(params.get('yaw')))) rig.rotation.y = Number(params.get('yaw')) * Math.PI / 180;
+  if (params.has('pitch') && Number.isFinite(Number(params.get('pitch')))) camera.rotation.x = Number(params.get('pitch')) * Math.PI / 180;
+  // Pin the sky clock (seconds), e.g. to catch a shooting star in a screenshot.
+  if (params.has('skytime') && Number.isFinite(Number(params.get('skytime')))) dayNight.setCloudTime(Number(params.get('skytime')));
   const eye = Number(new URLSearchParams(location.search).get('eye'));
   if (new URLSearchParams(location.search).has('eye') && eye > 0) camera.position.y = eye; // low camera for ground-level shots
 }

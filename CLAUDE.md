@@ -61,8 +61,8 @@ anything odd for him.
 
 ## Overnight progress log (3 to 4 Oct 2026)
 
-Merged so far (PR numbers, newest last): #25 campfire, #26 and #27 CLAUDE.md, #28 wind-blown sand and dust, then
-fire smoke plus a moonlit fill/rim for lit objects at night (see the git log).
+Merged so far (PR numbers, newest last): #25 campfire, #26 and #27 CLAUDE.md, #28 wind-blown sand and dust, #29 fire
+smoke plus a moonlit fill/rim for lit objects at night, then the night sky (moon, Milky Way, shooting stars).
 Kane also asked (while asleep) for a spear, if there is time: a held tool like the axe and torch, my call on the
 design, no combat mechanics. Heat haze was skipped on purpose (it needs a full-screen copy of the scene: too costly on Quest). Tasks left in
-order: night sky, plant sway, alien bird, backpack, spear, newer trees with LODs, perf check.
+order: plant sway, alien bird, backpack, spear, newer trees with LODs, perf check.
