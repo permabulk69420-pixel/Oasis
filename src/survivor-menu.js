@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { ITEMS, RECIPES, getRecipeStatus, craftItem } from './crafting.js';
-import { BASE_CARRY_WEIGHT, getInventoryItems, getInventoryWeight, getInventoryItemWeight, getInventoryCount } from './inventory.js';
+import {
+  PACK_CARRY_BONUS, POCKET_CARRY_WEIGHT, canTakeOffPack, getCarryCapacity, getInventoryItems, getInventoryWeight,
+  getInventoryItemWeight, getInventoryCount, isPackWorn,
+} from './inventory.js';
 import { getSurvivalStats } from './survival.js';
 
 // Ark-style survivor menu: three floating glass panels (inventory/crafting, you, details)
@@ -32,6 +35,8 @@ const PANELS = {
 };
 const HIPS = { left: { x: 668, y: 322, label: 'Left hip' }, right: { x: 944, y: 322, label: 'Right hip' } };
 const SLOT = 104;
+// The backpack slot sits on the mannequin's back (it is drawn from behind), between the shoulders and the belt.
+const BACK = { x: 806, y: 214, label: 'Back' };
 
 export function hitMenuControl(controls, x, y) {
   return controls.find(control => x >= control.x && x <= control.x + control.w && y >= control.y && y <= control.y + control.h) || null;
@@ -39,7 +44,8 @@ export function hitMenuControl(controls, x, y) {
 
 // onPlace(type) puts a placeable item (the campfire) in the world in front of the player and
 // returns { ok, message }. The menu closes on success so the player sees it appear.
-export function createSurvivorMenu({ scene, renderer, states, tools = null, onToggle = () => {}, onPlace = null }) {
+// backpack ({ isWorn(), takeOff() -> { ok, message } }) is the pack you wear: the Back slot, and how much you can carry.
+export function createSurvivorMenu({ scene, renderer, states, tools = null, backpack = null, onToggle = () => {}, onPlace = null }) {
   const controllers = states.map(state => state.controller);
   const surface = document.createElement('canvas');
   surface.width = WIDTH; surface.height = HEIGHT;
@@ -74,7 +80,7 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
   });
   const triggerDown = controllers.map(() => false);
   let open = false, tab = 'inventory', page = 0;
-  // What the details panel shows: a backpack item, a recipe, or a hip slot.
+  // What the details panel shows: an inventory item, a recipe, a hip slot or the back slot.
   let selected = { kind: 'recipe', id: RECIPES[0].id };
   let yDown = false, dirty = true, controls = [], hovered = '', message = '', snapshot = '', previousFocus = null;
 
@@ -169,6 +175,19 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
       handle(-24, 22, 18, -2, 8); handle(24, 22, -18, -2, 8);
       ctx.fillStyle = C.gold; ctx.beginPath(); ctx.moveTo(-10, 0); ctx.quadraticCurveTo(-18, -22, 0, -44); ctx.quadraticCurveTo(0, -26, 14, -22); ctx.quadraticCurveTo(20, -8, 10, 0); ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#fff1c4'; ctx.beginPath(); ctx.moveTo(-3, -1); ctx.quadraticCurveTo(-7, -14, 1, -24); ctx.quadraticCurveTo(3, -14, 7, -10); ctx.quadraticCurveTo(6, -2, -3, -1); ctx.fill();
+    } else if (type === 'backpack') {
+      // a rucksack: carry handle, body, flap with a coral band and a cyan edge, a rolled mat on two leather straps
+      ctx.strokeStyle = '#8a5a35'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(0, -28, 11, Math.PI, 0); ctx.stroke();
+      ctx.fillStyle = '#2f7c78'; ctx.strokeStyle = '#143a3b'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(-26, -10); ctx.quadraticCurveTo(-27, -30, -8, -30); ctx.lineTo(8, -30); ctx.quadraticCurveTo(27, -30, 26, -10);
+      ctx.lineTo(29, 26); ctx.quadraticCurveTo(29, 35, 20, 35); ctx.lineTo(-20, 35); ctx.quadraticCurveTo(-29, 35, -29, 26); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#3a8780'; ctx.fillRect(-37, 0, 10, 24); ctx.fillRect(27, 0, 10, 24);
+      ctx.fillStyle = '#225f63'; ctx.beginPath(); ctx.moveTo(-25, -26); ctx.lineTo(25, -26); ctx.lineTo(26, -4); ctx.quadraticCurveTo(0, 4, -26, -4); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#e5603b'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-24, -8); ctx.quadraticCurveTo(0, 0, 24, -8); ctx.stroke();
+      ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-25, -3); ctx.quadraticCurveTo(0, 5, 25, -3); ctx.stroke();
+      ctx.fillStyle = '#e3d5ac'; ctx.strokeStyle = '#8c7d52'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-27, 14); ctx.lineTo(27, 14); ctx.arc(27, 22, 8, -Math.PI / 2, Math.PI / 2); ctx.lineTo(-27, 30); ctx.arc(-27, 22, 8, Math.PI / 2, Math.PI * 1.5); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#4c301f'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-12, 2); ctx.lineTo(-12, 31); ctx.moveTo(12, 2); ctx.lineTo(12, 31); ctx.stroke();
     } else if (type === 'wood') {
       ctx.save(); ctx.rotate(-0.35);
       ctx.fillStyle = '#2f3a44'; ctx.fillRect(-30, -13, 50, 26);
@@ -245,11 +264,13 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
     drawTabs();
     if (tab === 'inventory') drawInventory(); else drawCrafting();
     const weight = getInventoryWeight();
-    const heavy = weight > BASE_CARRY_WEIGHT;
+    const capacity = getCarryCapacity();
+    const heavy = weight > capacity;
     text('Carry weight', GRID.x, 790, 22, C.muted);
-    text(`${weight} / ${BASE_CARRY_WEIGHT}`, GRID.x + 552, 790, 22, heavy ? C.warn : C.ink, 600, 'right');
-    bar(GRID.x, 804, 552, weight / BASE_CARRY_WEIGHT, heavy ? C.warn : C.bar);
-    if (heavy) text('Over 100 you walk at half speed.', GRID.x, 846, 20, C.warn);
+    text(`${weight} / ${capacity}`, GRID.x + 552, 790, 22, heavy ? C.warn : C.ink, 600, 'right');
+    bar(GRID.x, 804, 552, weight / capacity, heavy ? C.warn : C.bar);
+    if (heavy) text(`Over ${capacity} you walk at half speed.`, GRID.x, 846, 20, C.warn);
+    else if (backpack && !isPackWorn()) text('Pockets only. Wear a backpack to carry more.', GRID.x, 846, 20, C.dim);
     if (message) text(message, GRID.x, 890, 22, C.gold, 500);
   }
 
@@ -283,13 +304,21 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
       });
       text(label, x + SLOT / 2, y + SLOT + 30, 21, type ? C.ink : C.muted, 500, 'center');
     }
+    if (backpack) {
+      // The slot shows a faint pack when it is empty, so you can see what goes there.
+      const worn = isPackWorn();
+      tile('back', worn ? 'Back: backpack' : 'Back: empty', BACK.x, BACK.y, SLOT, {
+        type: 'backpack', faded: !worn, active: selected.kind === 'back',
+      });
+      text(BACK.label, BACK.x + SLOT / 2, BACK.y + SLOT + 30, 21, worn ? C.ink : C.muted, 500, 'center');
+    }
 
     const weight = getInventoryWeight();
     const live = getSurvivalStats();
     const stats = [
       ['Health', Math.round(live.health), 100], ['Stamina', Math.round(live.stamina), 100],
       ['Food', Math.round(live.food), 100], ['Water', Math.round(live.water), 100],
-      ['Weight', weight, BASE_CARRY_WEIGHT],
+      ['Weight', weight, getCarryCapacity()],
     ];
     stats.forEach(([name, value, max], i) => {
       const y = 600 + i * 58;
@@ -301,11 +330,34 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
     text('Wade into the pond to drink.', 672, 910, 19, C.dim);
   }
 
+  function drawBackDetail(left, width) {
+    const worn = isPackWorn();
+    text(worn ? 'Backpack' : 'Back is empty', left, 84, 34, C.ink, 700);
+    text(worn ? 'Worn' : 'Back slot', left, 120, 21, C.muted);
+    tile(null, '', left, 148, 176, {});
+    ctx.globalAlpha = worn ? 1 : 0.4;
+    icon('backpack', left + 88, 238, 1.6);
+    ctx.globalAlpha = 1;
+    [['Carry limit', `${getCarryCapacity()}`], [worn ? 'Pack adds' : 'A pack adds', `+${PACK_CARRY_BONUS}`]].forEach(([name, value], i) => {
+      text(name, left + 200, 196 + i * 56, 20, C.muted);
+      text(value, left + 200, 222 + i * 56, 24, C.ink, 600);
+    });
+    wrap(worn
+      ? 'Everything you pick up goes in here. Reach behind your back and grip to take it off, or use the button below.'
+      : 'Pick up the backpack by its handle and let go behind your shoulder to put it on. Then you can carry much more.', left, 372, width, 22);
+    if (!worn) return;
+    const canOff = canTakeOffPack();
+    if (!canOff) wrap(`Your pockets only hold ${POCKET_CARRY_WEIGHT}, so it can only come off when you carry that much or less.`, left, 520, width, 20, C.warn);
+    button('takeoff', canOff ? 'Take off' : 'Too much to carry without it', left, 776, width, 72, { primary: canOff, disabled: !canOff });
+    text('It goes on the ground in front of you.', left, 872, 20, C.dim);
+  }
+
   function drawDetail() {
     const p = PANELS.detail;
     glassPanel(p);
     button('close', 'Close', p.x + p.w - 128, 40, 104, 52);
     const left = p.x + 24, width = p.w - 48;
+    if (selected.kind === 'back' && backpack) { drawBackDetail(left, width); footer(); return; }
     const status = selected.kind === 'recipe' ? getRecipeStatus(selected.id) : null;
     const slots = tools?.getHipSlots?.() || {};
     const type = selected.kind === 'item' ? selected.id
@@ -329,7 +381,7 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
     icon(type, left + 88, 238, 1.6);
     const facts = [
       [`Weight`, `${getInventoryItemWeight(type)} each`],
-      [`In backpack`, `${getInventoryCount(type)}`],
+      [`In inventory`, `${getInventoryCount(type)}`],
     ];
     facts.forEach(([name, value], i) => {
       text(name, left + 200, 196 + i * 56, 20, C.muted);
@@ -348,7 +400,7 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
       });
       button('craft', status.canCraft ? `Craft ${status.recipe.name.toLowerCase()}` : 'Not enough materials', left, 776, width, 72, { primary: status.canCraft, disabled: !status.canCraft });
     } else if (selected.kind === 'slot') {
-      button('unequip', 'Back to backpack', left, 776, width, 72, { primary: true });
+      button('unequip', 'Back to inventory', left, 776, width, 72, { primary: true });
     } else if (item.equippable && tools) {
       text('Carry it on a hip', left, 690, 21, C.muted);
       const half = (width - 12) / 2;
@@ -359,7 +411,7 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
       text('Close the menu and grab it from your hip.', left, 822, 20, C.dim);
     } else if (item.placeable && onPlace) {
       const have = getInventoryCount(type) > 0;
-      button('place', have ? `Place ${item.name.toLowerCase()}` : `No ${item.name.toLowerCase()} in backpack`, left, 776, width, 72, { primary: have, disabled: !have });
+      button('place', have ? `Place ${item.name.toLowerCase()}` : `No ${item.name.toLowerCase()} in inventory`, left, 776, width, 72, { primary: have, disabled: !have });
       text('It goes on the ground in front of you.', left, 872, 20, C.dim);
     }
     footer();
@@ -420,16 +472,21 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
       if (carrying && !tools?.getHipSlots()[side]) equip(selected.id, side);
       else selected = { kind: 'slot', id: side };
     }
+    if (id === 'back') selected = { kind: 'back' };
+    if (id === 'takeoff' && backpack) {
+      const result = backpack.takeOff();
+      say(result.message);
+    }
     if (id.startsWith('equip:')) equip(selected.id, id.slice(6));
     if (id === 'unequip' && selected.kind === 'slot') {
       const type = tools?.getHipSlots()[selected.id];
-      if (type && tools.unequip(selected.id)) { say(`${ITEMS[type].name} back in your backpack.`); selected = { kind: 'item', id: type }; tab = 'inventory'; }
+      if (type && tools.unequip(selected.id)) { say(`${ITEMS[type].name} back in your inventory.`); selected = { kind: 'item', id: type }; tab = 'inventory'; }
     }
     if (id === 'previous') page = Math.max(0, page - 1);
     if (id === 'next') page++;
     if (id === 'craft') {
       const name = getRecipeStatus(selected.id)?.recipe.name;
-      say(craftItem(selected.id) ? `Crafted: ${name}. It’s in your backpack.` : 'Not enough materials.');
+      say(craftItem(selected.id) ? `Crafted: ${name}. It’s in your inventory.` : 'Not enough materials.');
     }
     if (id === 'place' && onPlace) {
       const type = selected.kind === 'item' ? selected.id : getRecipeStatus(selected.id)?.recipe.output;
@@ -445,7 +502,7 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
     if (tools.equip(type, side)) {
       say(`${ITEMS[type].name} on your ${side} hip.`);
       selected = { kind: 'slot', id: side };
-    } else say(getInventoryCount(type) < 1 ? `No ${ITEMS[type].name.toLowerCase()} in your backpack.` : `${ITEMS[type].name} isn’t ready yet.`);
+    } else say(getInventoryCount(type) < 1 ? `No ${ITEMS[type].name.toLowerCase()} in your inventory.` : `${ITEMS[type].name} isn’t ready yet.`);
   }
 
   function setOpen(value) {
@@ -454,7 +511,7 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
     overlay.hidden = !open || renderer.xr.isPresenting; panel.visible = open && renderer.xr.isPresenting;
     if (open) {
       previousFocus = document.activeElement;
-      if (tab === 'inventory' && selected.kind !== 'slot') {
+      if (tab === 'inventory' && selected.kind !== 'slot' && selected.kind !== 'back') {
         const first = getInventoryItems()[0];
         if (!(selected.kind === 'item' && getInventoryCount(selected.id) > 0)) selected = first ? { kind: 'item', id: first.type } : { kind: 'none' };
       }
@@ -513,7 +570,7 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, onTo
     if (pendingAction) activate(pendingAction);
     if (renderer.xr.isPresenting) setHover(hover);
     if (open) {
-      const current = JSON.stringify([getInventoryItems(), tools?.getHipSlots?.(), Object.values(getSurvivalStats()).map(Math.round)]);
+      const current = JSON.stringify([getInventoryItems(), tools?.getHipSlots?.(), Object.values(getSurvivalStats()).map(Math.round), isPackWorn()]);
       if (current !== snapshot) { snapshot = current; dirty = true; }
       if (dirty) draw();
     }
