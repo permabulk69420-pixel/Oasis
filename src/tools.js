@@ -17,7 +17,7 @@ export const HIP_SIDES = Object.freeze(['left', 'right']);
 // seated or crouched) but never its facing.
 // Where a relaxed arm hangs, not the belt line: a hand at your side sits well below your waist.
 const HIP_DROP = 0.80;
-const HIP_SIDE = 0.20;
+const HIP_SIDE = 0.26;
 const HIP_FORWARD = -0.10;
 const HIP_GRAB_RADIUS = 0.24;
 // Holster zone: a tall, forgiving ellipsoid around each hip. Wide enough to hit without
