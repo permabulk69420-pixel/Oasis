@@ -9,6 +9,17 @@ const TREE_LOAD_DISTANCE = 275;
 const HERO_DRAW_DISTANCE = 420;
 const HERO_LOAD_DISTANCE = 480;
 
+// The hero landmark. The veil tree is the default; ?hero=crimson loads the old tree to compare.
+const BASE = import.meta.env.BASE_URL;
+const HERO_MODELS = Object.freeze({
+  veil: { url: `${BASE}models/vegetation/veil-tree/veil_tree.glb`, name: 'Veil tree — 81 m', shadow: 'heroVeil' },
+  crimson: { url: `${BASE}models/vegetation/crimson-hero-tree/crimson_hero_tree_60m_optimized.glb`, name: 'Crimson hero tree — 60 m', shadow: 'hero' },
+});
+const HERO_MODEL = HERO_MODELS[new URLSearchParams(globalThis.location?.search || '').get('hero')] || HERO_MODELS.veil;
+// The veil tree's Glow material (pods and veins) is calm by day and brighter after dark.
+const GLOW_DAY = 1.0;
+const GLOW_NIGHT = 8;
+
 // Keep the full tree nearby, then step down aggressively once individual leaves are small in VR.
 const TREE_LODS = [
   { file: 'blue_alien_tree.glb', distance: 0 },
@@ -92,6 +103,17 @@ const SHADOW_STYLES = Object.freeze({
     projectionScale: 0.24,
     maxLength: 52,
     width: 24,
+    seedBase: 4.7,
+  }),
+  heroVeil: Object.freeze({
+    materialName: 'Veil tree projected shadow',
+    meshName: 'Veil tree shadow',
+    opacity: 0.52,
+    height: 81,
+    footprintLength: 22,
+    projectionScale: 0.24,
+    maxLength: 80,
+    width: 40,
     seedBase: 4.7,
   }),
 });
@@ -293,10 +315,11 @@ export function createOasisVegetation({ field, sunDirection = null }) {
     field,
     items: [HERO_TREE],
     sunDirection: liveSun,
-    style: SHADOW_STYLES.hero,
+    style: SHADOW_STYLES[HERO_MODEL.shadow],
   });
   group.add(bushShadow.mesh, regularTreeShadow.mesh, heroTreeShadow.mesh);
 
+  const glowMaterials = new Set();
   let bushLoadStarted = false;
   let treeLoadStarted = false;
   let heroLoadStarted = false;
@@ -372,10 +395,9 @@ export function createOasisVegetation({ field, sunDirection = null }) {
     if (heroLoadStarted) return;
     heroLoadStarted = true;
     const loader = new GLTFLoader();
-    const url = `${import.meta.env.BASE_URL}models/vegetation/crimson-hero-tree/crimson_hero_tree_60m_optimized.glb`;
-    loader.load(url, gltf => {
+    loader.load(HERO_MODEL.url, gltf => {
       const hero = gltf.scene;
-      hero.name = 'Crimson hero tree — 60 m';
+      hero.name = HERO_MODEL.name;
       hero.position.set(
         HERO_TREE.x,
         field.sample(HERO_TREE.x, HERO_TREE.z) - HERO_TREE.groundInset,
@@ -385,6 +407,10 @@ export function createOasisVegetation({ field, sunDirection = null }) {
       hero.userData.oasisHeroTree = true;
       hero.updateMatrixWorld(true);
       disableModelShadows(hero);
+      hero.traverse(object => {
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        for (const material of materials) if (material?.name === 'Glow') glowMaterials.add(material);
+      });
       heroGroup.add(hero);
       heroReady = true;
     }, undefined, error => {
@@ -399,6 +425,10 @@ export function createOasisVegetation({ field, sunDirection = null }) {
     bushGroup.visible = distance < BUSH_DRAW_DISTANCE;
     treeGroup.visible = distance < TREE_DRAW_DISTANCE;
     heroGroup.visible = heroDistance < HERO_DRAW_DISTANCE;
+    if (glowMaterials.size) {
+      const intensity = THREE.MathUtils.lerp(GLOW_NIGHT, GLOW_DAY, smoothstep(-0.05, 0.25, liveSun.y));
+      for (const material of glowMaterials) material.emissiveIntensity = intensity;
+    }
     bushShadow.mesh.visible = bushesReady && bushGroup.visible && shadowDaylight;
     regularTreeShadow.mesh.visible = treesReady && treeGroup.visible && shadowDaylight;
     heroTreeShadow.mesh.visible = heroReady && heroGroup.visible && shadowDaylight;
