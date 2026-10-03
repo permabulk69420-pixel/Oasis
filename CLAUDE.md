@@ -48,6 +48,9 @@ for how the game works. These are standing rules from Kane; they apply to every 
   fake `renderer.xr.isPresenting`); never commit it. After editing a `src/` file that scratch scripts import with a bare
   `import('/src/x.js')`, restart the dev server, because Vite then serves the app a `?t=` copy and the script gets a second module.
 - Screenshots: Playwright with Chromium (SwiftShader) against `npm run dev`. Look at them; do not assume.
+- Where the triangles go: with the same temporary `window.__oasis` hook (just `scene, camera, renderer, THREE`), walk `scene.traverseVisible`,
+  keep the meshes whose bounding sphere meets the camera frustum, add each one's draw-range index count / 3 (times `count` for an
+  InstancedMesh) and group by the first three names up the parents. It agrees with `renderer.info` to within 1%.
 - Day/night uses ACES tone mapping with very low night exposure (~0.035 vs day 0.82). Emissive and light
   levels must compensate for exposure, and night visibility relies on additive fills after tone mapping.
 - Place objects on `createHeightField().sample` (mesh-accurate), not the analytic `terrainHeight`.
@@ -93,5 +96,15 @@ circles the pond and lands to drink, or just crosses the sky; `src/alien-bird.js
 #35 the backpack in the game (grab it by the handle, let go behind your shoulder to wear it, Back slot in the menu, carry limit 40 to 100; `src/backpack.js`;
 dev fixtures `?view=pack`, `?pack=worn`), #36 the spear (model, kind, recipe, menu icon, `?view=spear`; the hold lab moved to `tools/hold-lab/` and
 now shows the pack, spear, torch and axe), #37 the blue palms (new tree models in 3 LODs replacing the first blue trees; `?trees=old` to compare).
-Heat haze was skipped on purpose (it needs a full-screen copy of the scene: too costly on Quest). Tasks left in
-order: perf check, then the morning summary.
+Heat haze was skipped on purpose (it needs a full-screen copy of the scene: too costly on Quest).
+
+Performance check (3 Oct 2026, after #37; desktop SwiftShader counts at midday, so they say what is drawn, not how fast a Quest draws
+it). At `?view=shore`: 563,000 triangles in 91 draw calls (it was 688,000 before the palms). The grass field is 308,000 of them in 2 draw
+calls (55%: one InstancedMesh with frustum culling off, so every patch within 190 m is drawn, behind you too; it is 159,000 from the
+spawn point and 134,000 from the elevated overview), the veil tree 117,000 in 6 calls (one level of detail only), the alien desert plants
+33,000, the ferns 26,000, the reeds 15,000, the 16 palms 15,000 in 17 calls, the fruit 5,500 in 14 calls, water 4,300, the backpack 3,100,
+everything else (terrain chunks, sky, stars, tools) a few thousand each. If a headset test shows the frame rate is short, the biggest saving
+for the least change is the grass (cull patches behind the view when it rebuilds, or lower `MAX_DRAW_DISTANCE`/`RICH_BLADES`), then a
+level of detail for the veil tree (Kane has said to leave that tree alone, so ask first). Nothing has been timed on a headset.
+
+Tasks left: the morning summary for Kane.
