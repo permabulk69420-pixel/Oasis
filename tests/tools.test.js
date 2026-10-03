@@ -186,3 +186,24 @@ test('the holster zone is tall and forgiving, and a glow marks empty hips while 
   assert.ok(Object.values(tools.markers).every(marker => !marker.visible), 'glow gone once nothing is held');
   clearInventory('axe');
 });
+
+test('hips stay put while you look around, and face where you look once you start walking', t => {
+  const { tools, state, xrCamera } = fixture(t);
+  state.handedness = 'left';
+  const stick = state.inputSource.gamepad.axes = [0, 0, 0, 0];
+  const hip = () => tools.belt.right.getWorldPosition(new THREE.Vector3());
+  const settle = () => { for (let i = 0; i < 40; i++) tools.update(0.016); };
+  const start = hip();
+  xrCamera.rotation.y = Math.PI / 2; // turn the head to the left
+  xrCamera.updateMatrixWorld(true);
+  settle();
+  assert.ok(hip().distanceTo(start) < 0.01, 'turning your head on the spot does not move the hips');
+  stick[3] = -1; // push forward
+  settle();
+  const after = hip();
+  assert.ok(after.distanceTo(start) > 0.3, 'the body turns to face the head when you start walking');
+  xrCamera.rotation.y = 0;
+  xrCamera.updateMatrixWorld(true);
+  settle();
+  assert.ok(hip().distanceTo(after) < 0.01, 'and then stays put while you keep walking and glance around');
+});
