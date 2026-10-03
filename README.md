@@ -148,3 +148,20 @@ colour per vertex and a tiny second material for the glow: no textures, two draw
 - A pose lab for judging the poses in the browser, never shipped: with `npm run dev` open
   `/tools/bird/lab.html?poses=rest,drink,glide,flapUp,flapDown,land&lod=0&yaw=135` (also `view=under|top`, `zoom=`, and
   `j=foldShoulder.sweep:1.4,foldHand.scaleZ:0.4` to try joint numbers).
+
+## The backpack
+
+A rucksack the player can pick up and wear, which makes the menu inventory bigger (the game side lands in the next change; this
+section covers the model). It is a stylised alien-expedition pack: teal canvas gone dusty at the base, a darker flap with a
+coral band and a pale cyan glowing trim, a cream bedroll held on by two leather straps with brass buckles, two side pockets and a
+leather carry handle on top. The trim and the little diamond mark on the flap are emissive, so you can find the pack at night.
+
+- `public/models/backpack/backpack.glb`: 3,364 triangles, 116 KB, no textures (one colour per vertex, two single-sided
+  materials: `Pack` and `Glow`), one level of detail on purpose (it is held at arm's length or lying in the sand, a
+  single hand-sized object, so a lighter copy would never be used). Two named objects, `Backpack` and `CarryHandle`: the game
+  puts the grip on the handle only, so a hand closes round the strap and not the canvas. The origin is the middle of the
+  bottom, +y up, the bedroll and flap in front (+z), about 0.47 m wide, 0.55 m tall and 0.34 m deep.
+- Built headless in Blender from one parametric script: `python3 tools/backpack/build_backpack.py --out
+  public/models/backpack/backpack.glb`, then `python3 tools/backpack/check_mesh.py` (every part a closed solid, no inside-out
+  shells, names, materials, triangle budget) and `python3 tools/backpack/render_preview.py` for Cycles previews
+  (`--views threeq,front,back,side,top,flap,low`, `--night` for the glow).
