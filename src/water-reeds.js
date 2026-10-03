@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WATER } from './world.js';
+import { addWindSway, SWAY } from './wind.js';
 
 const REED_DRAW_DISTANCE = 150;
 const REED_LOAD_DISTANCE = 190;
@@ -24,41 +25,11 @@ const REED_LAYOUT = Object.freeze([
   Object.freeze({ dx:  1.05, dz:  0.88, yaw: 4.72, scale: 0.99 }),
 ]);
 
+// The reeds sway with the same wind and gusts as the grass and trees (wind.js), all on the GPU.
 function makeSwayMaterial(sourceMaterial) {
   const material = sourceMaterial.clone();
   material.name = sourceMaterial.name ? `${sourceMaterial.name} — reed sway` : 'Water reed sway';
-
-  material.onBeforeCompile = shader => {
-    shader.uniforms.uReedTime = { value: 0 };
-    material.userData.reedSwayShader = shader;
-
-    shader.vertexShader = shader.vertexShader
-      .replace(
-        '#include <common>',
-        `#include <common>\nuniform float uReedTime;`,
-      )
-      .replace(
-        '#include <begin_vertex>',
-        `#include <begin_vertex>
-        float reedHeight = clamp((position.y + 0.02) / 1.75, 0.0, 1.0);
-        float reedWeight = reedHeight * reedHeight * (3.0 - 2.0 * reedHeight);
-        float reedPhase = uReedTime * 0.82
-          + modelMatrix[3].x * 0.071
-          + modelMatrix[3].z * 0.083
-          + position.x * 0.63
-          + position.z * 0.47;
-        float reedSway = (sin(reedPhase) + 0.32 * sin(reedPhase * 1.91 + 1.4))
-          * 0.045 * reedWeight;
-        transformed.x += reedSway;
-        transformed.z += reedSway * 0.38;`,
-      );
-  };
-
-  // Three.js includes this in the shader-program cache key. The sway patch must not share a
-  // compiled program with the unmodified material from the GLB.
-  material.customProgramCacheKey = () => 'oasis-water-reeds-sway-v1';
-  material.needsUpdate = true;
-  return material;
+  return addWindSway(material, SWAY.reed);
 }
 
 function prepareSwayingSource(root) {
@@ -78,17 +49,6 @@ function prepareSwayingSource(root) {
     object.material = Array.isArray(object.material)
       ? object.material.map(replaceMaterial)
       : replaceMaterial(object.material);
-
-    // Keep animation fully on the GPU. This callback only changes one tiny time uniform before
-    // rendering; no reed vertices or transforms are touched on the CPU each frame.
-    object.onBeforeRender = () => {
-      const now = performance.now() * 0.001;
-      const materials = Array.isArray(object.material) ? object.material : [object.material];
-      for (const material of materials) {
-        const shader = material.userData.reedSwayShader;
-        if (shader) shader.uniforms.uReedTime.value = now;
-      }
-    };
   });
 
   root.updateMatrixWorld(true);

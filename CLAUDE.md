@@ -51,7 +51,7 @@ for how the game works. These are standing rules from Kane; they apply to every 
 ## Roadmap
 
 Campfire (done). Kane is not sure about cold nights or fuel yet, so those are parked until he decides how
-they should work. Visual direction now: dust and sand, fire smoke and heat haze, night sky, plant sway, an
+they should work. Visual direction now: dust and sand, fire smoke and heat haze, night sky, plant sway (done), an
 ambient alien bird, a physical backpack, then newer trees with LODs. Later: first threat (sandworm, titan
 blocker or boss), building and more crafting. Not yet tested on a real headset: keep reporting that honestly.
 
@@ -62,7 +62,9 @@ anything odd for him.
 ## Overnight progress log (3 to 4 Oct 2026)
 
 Merged so far (PR numbers, newest last): #25 campfire, #26 and #27 CLAUDE.md, #28 wind-blown sand and dust, #29 fire
-smoke plus a moonlit fill/rim for lit objects at night, then the night sky (moon, Milky Way, shooting stars).
+smoke plus a moonlit fill/rim for lit objects at night, #30 the night sky (moon, Milky Way, shooting stars), #31 plant
+sway (grass, ferns, reeds, desert plants and the alien trees lean with the same gusts as the sand; `src/wind.js`;
+the hero tree is left still).
 Kane also asked (while asleep) for a spear, if there is time: a held tool like the axe and torch, my call on the
 design, no combat mechanics. Heat haze was skipped on purpose (it needs a full-screen copy of the scene: too costly on Quest). Tasks left in
-order: plant sway, alien bird, backpack, spear, newer trees with LODs, perf check.
+order: alien bird, backpack, spear, newer trees with LODs, perf check.
