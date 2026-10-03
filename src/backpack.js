@@ -4,6 +4,7 @@ import { SPAWN } from './world.js';
 import { attachHeldObject, setGripSurface } from './grip-contact.js';
 import { pulseHaptics } from './haptics.js';
 import { canTakeOffPack, isPackWorn, setPackWorn } from './inventory.js';
+import { exposureGlow } from './glow.js';
 
 // The backpack: one physical pack. It lies on the sand near where you start. Grab it by its handle, reach behind your
 // shoulder and let go there, and you are wearing it: it vanishes from your hand and the menu inventory grows (see
@@ -66,9 +67,7 @@ export function inBackZone(hand, centre, back = PACK.back) {
 // The brightness (emissiveIntensity) for the glowing trim so that it looks the same by day and night whatever the
 // tone-mapping exposure is: bright enough to show by day, a soft beacon at night.
 export function glowIntensity(exposure) {
-  const day = THREE.MathUtils.smoothstep(exposure, 0.07, 0.5);
-  const displayed = PACK.glow.night + (PACK.glow.day - PACK.glow.night) * day;
-  return displayed / Math.max(exposure, 0.02);
+  return exposureGlow(exposure, PACK.glow);
 }
 
 // Height for the pack's base at (x, z) facing yaw: the highest ground under its footprint, less a little sink.

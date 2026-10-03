@@ -61,9 +61,10 @@ The menu is three glass panels in the style of Ark:
 | --- | --- | --- |
 | Stone axe | 3 sticks + 2 stones | 1 axe in your inventory |
 | Torch | 2 sticks + 1 stone | 1 torch in your inventory |
+| Stone-tipped spear | 3 sticks + 1 stone | 1 spear in your inventory (see The spear) |
 | Campfire | 6 sticks + 5 stones | 1 campfire in your inventory (placeable) |
 
-**Tools in the world** (`src/tools.js`): every axe and torch is a real object. Grab one with
+**Tools in the world** (`src/tools.js`): every axe, torch and spear is a real object. Grab one with
 either hand. Let go next to a hip to holster it there, at your chest to pack it away in your
 inventory, anywhere else to drop it. Grab it back off the hip whenever you like. Light a held
 torch with **B** (right hand) or **X** (left hand).
@@ -71,7 +72,7 @@ torch with **B** (right hand) or **X** (left hand).
 **Chopping:** swing the axe into a blue alien tree. Six solid hits fell it; it drops two logs
 (Wood) and three sticks along where it fell, sinks away, and regrows after three minutes.
 Pick up sticks, stones and logs with grip and let go at your chest to pack them.
-Everything you carry is one shared pool with a weight per item (stick 4, stone 8, wood 6, axe 10, torch 5, campfire 25).
+Everything you carry is one shared pool with a weight per item (stick 4, stone 8, wood 6, axe 10, torch 5, spear 10, campfire 25).
 Your pockets carry 40; past the limit you walk at half speed, easing off to a standstill at twice the limit. Wearing the
 backpack lifts the limit to 100 (see The backpack). Inventory is session-only; reloading starts with an empty inventory.
 
@@ -102,7 +103,7 @@ vertices, open edges and inside-out faces. `tools/campfire/render_preview.py` re
 
 Development-only camera fixtures: `?view=fruit`, `?view=orchard`, `?view=glade`, `?view=approach`,
 `?view=wade`, `?view=gust` (across the wind on a dune crest), `?eye=<metres>` (a lower camera), `?yaw=<deg>` and `?pitch=<deg>` (look direction), `?skytime=<seconds>` (pin the sky clock, e.g. to catch a shooting star), `?sandgain=<n>` (exaggerate the blowing sand), `?windtime=<seconds>` (pin the wind clock so two screenshots can be compared), `?windgain=<n>` (exaggerate the sway), `?at=x,z` and `?look=x,z[,height]` (stand at a world position and look at a point), `?camp=lit` or `?camp=unlit` (puts a campfire on the flattest ground near spawn, with
-`?campd=<metres>` for the distance), `?bird=perch|fly|flare` (see Alien birds in the game), `?view=pack` (beside the backpack) and `?pack=worn` (start wearing it, see The backpack), plus `?hour=N` to fix the time of day.
+`?campd=<metres>` for the distance), `?bird=perch|fly|flare` (see Alien birds in the game), `?view=pack` (beside the backpack), `?pack=worn` (start wearing it, see The backpack) and `?view=spear` (beside the spear), plus `?hour=N` to fix the time of day.
 
 ## Alien birds in the game
 
@@ -180,9 +181,9 @@ are in one table, `PACK`, at the top; the carry limits are in `src/inventory.js`
 - **Cost:** 3 draw calls and 3,364 triangles while it is lying in the world or in a hand, none once it is on you; nothing is created
   per frame (the grip, the back zone and the glow are all plain arithmetic on a few reused vectors). Like everything you pick up,
   it needs the VR hands: on desktop it just lies there.
-- A hold lab for judging how a hand takes the handle, never shipped: with `npm run dev` open
-  `/tools/backpack/hold-lab.html?side=right&pitch=-90` (`side=left`, `roll=`, `close=1` for close-ups, `debug=1` for the contact
-  outline, `map=%2By,%2Bz` to try another way round).
+- A hold lab for judging how a hand takes a held thing, never shipped: with `npm run dev` open
+  `/tools/hold-lab/hold-lab.html?item=pack&side=right&pitch=-90` (`item=pack|spear|torch|axe`, `side=left`, `roll=`, `close=1` for
+  close-ups, `player=1` for what the player sees, `debug=1` for the contact outline, `map=%2By,%2Bz` to try another way round the pack).
 - Development-only fixtures: `?view=pack` (stand beside the pack, looking at it) and `?pack=worn` (start with it on).
 
 ### The model
@@ -196,3 +197,37 @@ are in one table, `PACK`, at the top; the carry limits are in `src/inventory.js`
   public/models/backpack/backpack.glb`, then `python3 tools/backpack/check_mesh.py` (every part a closed solid, no inside-out
   shells, names, materials, triangle budget) and `python3 tools/backpack/render_preview.py` for Cycles previews
   (`--views threeq,front,back,side,top,flap,low`, `--night` for the glow).
+
+## The spear
+
+A hand tool like the axe and the torch, and nothing more than that: it does not hurt or hunt anything. It stands planted in the
+sand a couple of metres from where you start, beside the other tools, and can be crafted (3 sticks and a stone). It is a
+1.47 m straight shaft of weathered brown wood with a leather-wrapped grip, a knapped blue-grey stone point lashed on with cream and
+coral sinew, and a small tassel of teal, coral and navy feathers hanging from the lashing on a cord, with one tiny glowing cyan
+bead so you can find it at night (the same glow trick as the backpack, shared in `src/glow.js`).
+
+### In the game
+
+`src/spear.js` is a tool kind for `src/tools.js`, like `src/axe.js` and `src/torch.js`. The numbers to tune (where it stands, how
+far you can reach it, how bright the bead is, how it hangs) are at the top of the file.
+
+- **Pick it up:** squeeze grip with an empty hand near the shaft (within about half a metre). The hand closes round the leather wrap,
+  with the point up and the tassel behind it, so you see the point and the feathers over the top of your fist.
+- **Carry it:** let go next to a hip and it holsters there, leaning back about 33 degrees with the point behind your shoulder and the butt
+  end about 30 cm off the ground (it only reaches the sand when your head drops below roughly 1.4 m, in a deep crouch). Draw it from the
+  hip by grabbing there. Let go at your chest to pack it into the inventory (weight 10); the menu can put it on a hip too.
+- **Cost:** 3 draw calls and 2,192 triangles per spear (it shares its geometry and materials with any other copy, and casts no
+  shadow), and the bead's glow is set once for all copies; nothing is created per frame.
+- Development-only fixture: `?view=spear` (stand beside it, looking at it).
+
+### The model
+
+- `public/models/spear/spear.glb`: 2,192 triangles, 80 KB, no textures (one colour per vertex, two single-sided materials: `Spear` and
+  `Glow`), one level of detail on purpose (a hand-sized prop that is held or stands a metre from you, so a lighter copy would never be
+  used). Two named objects, `Shaft` and `Spear` (the point, lashing and tassel): the game fits the fingers to the shaft only. The origin is
+  the middle of the grip, +y runs up to the stone point (0.955 m above the origin) and the butt end is 0.52 m below it; the tassel hangs on
+  the -z side.
+- Built headless in Blender from one parametric script: `python3 tools/spear/build_spear.py --out public/models/spear/spear.glb`, then
+  `python3 tools/spear/check_mesh.py` (every part a closed solid, no inside-out shells, names, materials, length, triangle budget) and
+  `python3 tools/spear/render_preview.py` for Cycles previews (`--views full,back,threeq,head,headside,headback,tassel,grip,butt`,
+  `--night` for the glow).
