@@ -70,11 +70,11 @@ export const atmosphere = /* glsl */`
   const float CLOUD_HEIGHT = 1250.0;
   // Night fill (linear light, added after tone mapping). Tuned so the ground reads as a few
   // percent grey-blue under a moon: dark and tense, but not pitch black.
-  const vec3 MOON_FILL = vec3(0.0042, 0.0062, 0.0105);
-  const vec3 GRASS_NIGHT_FLOOR = vec3(0.16, 0.24, 0.30);
+  const vec3 MOON_FILL = vec3(0.0026, 0.0039, 0.0070);
+  const vec3 GRASS_NIGHT_FLOOR = vec3(0.12, 0.18, 0.24);
   const vec3 SKY_NIGHT_HORIZON = vec3(0.0030, 0.0046, 0.0085);
   const vec3 SKY_NIGHT_ZENITH = vec3(0.0006, 0.0013, 0.0032);
-  const vec3 WATER_NIGHT_FILL = vec3(0.0016, 0.0030, 0.0052);
+  const vec3 WATER_NIGHT_FILL = vec3(0.0013, 0.0024, 0.0042);
 
   float daylightLevel() {
     return smoothstep(-0.07, 0.16, uSun.y);
