@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createTools, holsterQuaternion } from '../src/tools.js';
-import { createAxeKind, TREE_DROPS, TREE_HITS_TO_FELL } from '../src/axe.js';
+import { createAxeKind, TREE_DROPS, TREE_HITS_TO_FELL, TREE_TRUNK_RADIUS, TREE_CHOP_REACH, TREE_CHOP_TOP } from '../src/axe.js';
 import { createTorchKind } from '../src/torch.js';
 import { registerDropSpawner } from '../src/resource-drops.js';
 import { addInventoryItem, getInventoryCount, removeInventoryItem } from '../src/inventory.js';
@@ -150,4 +150,37 @@ test('six real swings fell a tree, which drops logs and sticks along where it fe
   assert.ok(drops.every(drop => drop.z < -2), 'drops land on the far side, away from the swing');
   for (let i = 0; i < 400; i++) kind.updateShared(0.016);
   assert.equal(tree.visible, false, 'the felled trunk sinks away');
+});
+
+test('the chop zone follows the real trunk: a 2x tree is not choppable through thin air', () => {
+  const kind = createAxeKind({ scene: new THREE.Scene(), onError: () => {} });
+  kind.prepareTemplate(toolModel('WoodenHandle'));
+  const HEAD_Y = 0.49; // where prepareTemplate puts the head of the test axe, above its origin
+
+  // Does one fast swing with the axe head at (distance from trunk, height) land a hit?
+  function hits(scale, distance, height) {
+    const scene = new THREE.Scene();
+    const trees = new THREE.Group(); trees.name = 'Alien desert trees'; scene.add(trees);
+    const tree = new THREE.Group();
+    tree.position.set(0, 3, 0); tree.scale.setScalar(scale); tree.userData.oasisTree = true;
+    trees.add(tree);
+    const axe = createAxeKind({ scene, onError: () => {} });
+    axe.prepareTemplate(toolModel('WoodenHandle'));
+    const root = toolModel('WoodenHandle'); scene.add(root);
+    const grip = new THREE.Group();
+    const instance = { root, heldBy: { grip, inputSource: { gamepad: {} } }, state: axe.createState() };
+    root.position.set(distance, 3 + height - HEAD_Y, 0);
+    for (let i = 0; i < 4; i++) { grip.position.x = i % 2 ? -0.05 : 0.05; axe.update(instance, 0.016); }
+    return (tree.userData.chopState?.hits || 0) > 0;
+  }
+
+  const reach = scale => TREE_TRUNK_RADIUS * scale + TREE_CHOP_REACH;
+  for (const scale of [1, 1.3, 2]) {
+    assert.equal(hits(scale, 0.1, 0.8 * scale), true, `scale ${scale}: on the trunk`);
+    assert.equal(hits(scale, reach(scale) - 0.05, 0.8 * scale), true, `scale ${scale}: just inside reach`);
+    assert.equal(hits(scale, reach(scale) + 0.05, 0.8 * scale), false, `scale ${scale}: just outside reach`);
+    assert.equal(hits(scale, 0.1, (TREE_CHOP_TOP + 0.3) * scale), false, `scale ${scale}: up in the canopy`);
+    assert.equal(hits(scale, 0.1, 0.0), false, `scale ${scale}: below the ground`);
+  }
+  assert.ok(reach(2) < 0.75, 'a 2x tree can be chopped from under 75 cm away (it used to be 1.44 m)');
 });
