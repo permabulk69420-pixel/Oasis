@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SPAWN } from './world.js';
 import { pulseHaptics } from './haptics.js';
 import { setGripSurface } from './grip-contact.js';
+import { createLoop } from './audio.js';
 
 const TORCH_URL = `${import.meta.env?.BASE_URL ?? '/'}models/torch/handheld_fire_torch.glb`;
 const TORCH_AUDIO_URL = `${import.meta.env?.BASE_URL ?? '/'}audio/fire/torch_fire_crackle_loop.mp3`;
@@ -128,14 +129,8 @@ function installWaterTorchLight(material, positionUniform, strengthUniform) {
   return true;
 }
 
-function makeFireAudio() {
-  if (typeof Audio === 'undefined') return null;
-  const audio = new Audio(TORCH_AUDIO_URL);
-  audio.loop = true;
-  audio.preload = 'auto';
-  audio.volume = TORCH_AUDIO_VOLUME;
-  audio.playsInline = true;
-  return audio;
+function makeFireAudio(onError) {
+  return createLoop(TORCH_AUDIO_URL, { volume: TORCH_AUDIO_VOLUME, onError });
 }
 
 export function createTorchKind({ scene, onError = console.warn }) {
@@ -168,15 +163,10 @@ export function createTorchKind({ scene, onError = console.warn }) {
     state.lit = Boolean(value);
     if (state.flame) state.flame.group.visible = state.lit;
     if (state.lit) {
-      state.audio ??= makeFireAudio();
-      if (state.audio?.paused) {
-        state.audio.play().catch(error => {
-          if (error?.name !== 'NotAllowedError') onError(`[Oasis torch] Could not play fire audio: ${error?.message || error}`);
-        });
-      }
+      state.audio ??= makeFireAudio(onError);
+      state.audio.play();
     } else {
-      if (state.audio && !state.audio.paused) state.audio.pause();
-      if (state.audio) state.audio.currentTime = 0;
+      state.audio?.pause();
       if (state.flame) state.flame.light.intensity = 0;
     }
     return state.lit;
