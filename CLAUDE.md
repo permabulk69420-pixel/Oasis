@@ -18,14 +18,20 @@ for how the game works. These are standing rules from Kane; they apply to every 
    merge it, and confirm the Pages deploy goes green. Verified means `npm test` passes, `npx vite build`
    works, and for visual changes you looked at screenshots. If something is not good enough, leave the PR
    open and say why instead of merging. A stop-hook message asking for a commit is not Kane asking.
-5. **Kane checks important 3D models before they ship.** For new or changed hand-built models (like the
-   campfire, hero tree, creatures), send him the `.glb` with SendUserFile (or leave it in an open PR) and
-   do not merge it until he says it looks right. Claude tends to miss stray vertices, inside-out faces and
-   bad blends. Run `tools/campfire/check_mesh.py` style checks on every model, but that does not replace
-   his look. Code, shader and gameplay changes do not need this.
+5. **Kane likes to check important 3D models, but on the night of 3 Oct 2026 he handed over the keys.**
+   His words: "you add and merge everything you think is good, we can always roll things back easy or
+   remove things, you're in charge on the game tonight". So for that overnight session models were merged
+   on my own judgement. In any other session, default to sending him the `.glb` (SendUserFile) and waiting
+   for his OK on new hand-built models (campfire, hero tree, creatures), because Claude tends to miss stray
+   vertices, inside-out faces and bad blends. Always run a mesh check (`tools/campfire/check_mesh.py` style)
+   and look at renders first. Code, shader and gameplay changes do not need his check.
 6. **Quest performance comes first.** No post-processing passes, no big shadow maps, no per-frame
    allocations, keep triangle counts and draw calls modest. Desktop screenshots cannot prove headset
    frame rate; say so when relevant.
+7. **Art and atmosphere over mechanics.** Kane wants to be involved in important gameplay and UI decisions
+   (fuel, cold, how things work). Do not invent game mechanics or UI beyond what he asked for. Visual art
+   direction is where he trusts me most. Anything substantial (trees, creatures, big props) needs proper LODs
+   (3 levels, with triangle counts checked against a Quest budget). Leave the hero tree alone.
 
 ## Working on this repo
 
@@ -42,8 +48,17 @@ for how the game works. These are standing rules from Kane; they apply to every 
 - Blender is headless (`import bpy` before `import bmesh`). glTF winding matters in three.js.
 - Tests live in `tests/`. Add tests for game logic. Keep constants in one table at the top of a module.
 
-## Roadmap (Kane's order of interest)
+## Roadmap
 
-Campfire (done) -> cold nights and fuel -> fire and night visuals -> atmosphere -> first threat
-(sandworm, titan blocker or boss; needs Kane's model check) -> building and more crafting.
-Not yet tested on a real headset: keep reporting that honestly.
+Campfire (done). Kane is not sure about cold nights or fuel yet, so those are parked until he decides how
+they should work. Visual direction now: dust and sand, fire smoke and heat haze, night sky, plant sway, an
+ambient alien bird, a physical backpack, then newer trees with LODs. Later: first threat (sandworm, titan
+blocker or boss), building and more crafting. Not yet tested on a real headset: keep reporting that honestly.
+
+Backpack design (my call, Kane approved): a physical pack you grab (reaching behind your back is the VR habit)
+and put on; it then disappears into the normal menu and expands the menu inventory. Keep it simple and note
+anything odd for him.
+
+## Overnight progress log (3 to 4 Oct 2026)
+
+Merged so far (PR numbers, newest last): #25 campfire, #26 CLAUDE.md.
