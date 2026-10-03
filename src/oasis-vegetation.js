@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WATER, SUN, HERO_TREE } from './world.js';
+import { createPodHalos } from './glow-halos.js';
 
 const BUSH_DRAW_DISTANCE = 180;
 const BUSH_LOAD_DISTANCE = 230;
@@ -330,6 +331,7 @@ export function createOasisVegetation({ field, sunDirection = null }) {
   let bushesReady = false;
   let treesReady = false;
   let heroReady = false;
+  let heroHalos = null;
 
   function ensureBushes() {
     if (bushLoadStarted) return;
@@ -423,6 +425,7 @@ export function createOasisVegetation({ field, sunDirection = null }) {
           }
         }
       });
+      heroHalos = createPodHalos(hero);
       heroGroup.add(hero);
       heroReady = true;
     }, undefined, error => {
@@ -445,6 +448,7 @@ export function createOasisVegetation({ field, sunDirection = null }) {
       const intensity = THREE.MathUtils.lerp(GLOW_NIGHT, GLOW_DAY, smoothstep(-0.05, 0.25, liveSun.y));
       for (const material of glowMaterials) material.emissiveIntensity = intensity;
     }
+    if (heroHalos) heroHalos.setNight(1 - smoothstep(-0.05, 0.25, liveSun.y));
     bushShadow.mesh.visible = bushesReady && bushGroup.visible && shadowDaylight;
     regularTreeShadow.mesh.visible = treesReady && treeGroup.visible && shadowDaylight;
     heroTreeShadow.mesh.visible = heroReady && heroGroup.visible && shadowDaylight;
