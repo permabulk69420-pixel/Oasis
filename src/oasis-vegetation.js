@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WATER, SUN, HERO_TREE } from './world.js';
 import { createPodHalos, buildGroundLights, applyGroundLights } from './glow-halos.js';
 import { addWindSwayToModel, SWAY } from './wind.js';
+import { pickTreeSet, levelDistance, forcedTreeLevel } from './tree-sets.js';
 
 const TREE_DRAW_DISTANCE = 240;
 const TREE_LOAD_DISTANCE = 275;
@@ -23,12 +24,11 @@ const GLOW_NIGHT = 8;
 // they get a daylight-only fill (their own texture, emissive) that fades out completely after dark.
 const LEAF_FILL_DAY = 0.38;
 
-// Keep the full tree nearby, then step down aggressively once individual leaves are small in VR.
-const TREE_LODS = [
-  { file: 'blue_alien_tree.glb', distance: 0 },
-  { file: 'blue_alien_tree_optimized_code.glb', distance: 18 },
-  { file: 'blue_alien_tree_lod3_ultra.glb', distance: 45 },
-];
+// Keep the full tree nearby, then step down aggressively once individual leaves are small in VR. The palm is the default;
+// ?trees=old puts the first blue trees back to compare (see tree-sets.js).
+const TREE_SET = pickTreeSet(globalThis.location?.search || '');
+// Dev build only: ?treelod=0|1|2 draws every tree at that one level.
+const FORCED_TREE_LEVEL = import.meta.env.DEV ? forcedTreeLevel(globalThis.location?.search || '', TREE_SET) : null;
 
 // Sparse taller anchors kept safely inside the grass shelf. Scale/yaw variation keeps repeated
 // copies from reading like a ring of clones while still sharing each LOD's geometry/materials.
@@ -303,7 +303,7 @@ export function createOasisVegetation({ field, sunDirection = null, groundGlowUn
     const loader = new GLTFLoader();
     const base = `${import.meta.env.BASE_URL}models/vegetation/alien-tree/`;
 
-    Promise.all(TREE_LODS.map(async level => {
+    Promise.all(TREE_SET.levels.map(async level => {
       const gltf = await loader.loadAsync(`${base}${level.file}`);
       const source = gltf.scene;
       source.updateMatrixWorld(true);
@@ -323,11 +323,12 @@ export function createOasisVegetation({ field, sunDirection = null, groundGlowUn
         // Chopping marks the layout item felled so its projected shadow disappears.
         lod.userData.layoutItem = item;
 
-        for (const level of levels) {
+        levels.forEach((level, index) => {
+          if (FORCED_TREE_LEVEL !== null && index !== FORCED_TREE_LEVEL) return;
           const model = level.source.clone(true);
           model.userData.oasisTree = true;
-          lod.addLevel(model, level.distance);
-        }
+          lod.addLevel(model, FORCED_TREE_LEVEL !== null ? 0 : levelDistance(TREE_SET, level, item.scale));
+        });
 
         treeGroup.add(lod);
       }

@@ -14,7 +14,7 @@ Desktop: **Explore**, WASD / arrow up and down to walk, mouse to look, Shift to 
 - The pool centre is `(300, -400)`, exactly 500 metres from spawn. It is approximately 80 × 68 metres, with an irregular shoreline and a maximum depth of 0.88 metres.
 - A bare sandy bank surrounds the water, followed by a textured grass band on a gently sloping shelf.
 - Seeded wind-shaped dunes, sand ripples, wet shore sand, and animated shallow water with reeds and fireflies.
-- Around the oasis: blue alien trees, green ferns, alien desert plants, loose sticks and stones. The glowing 81 m veil tree stands a short walk from the pool (`?hero=crimson` swaps the old 60 m tree back in for comparison); small glow fruit lie around its base.
+- Around the oasis: blue alien palms (see The blue palms), green ferns, alien desert plants, loose sticks and stones. The glowing 81 m veil tree stands a short walk from the pool (`?hero=crimson` swaps the old 60 m tree back in for comparison); small glow fruit lie around its base.
 - A short day/night cycle (3 min day, 3 min night while testing; `DAY_SECONDS` / `NIGHT_SECONDS` in `src/day-night.js`) with 2,400 twinkling stars, a moon with a face and a phase, a Milky Way band and now and then a shooting star (`src/night-sky.js`), desert ambience, sand footsteps, and a lightable torch. Night is dark and moonlit; the veil tree's pods glow and light the ground beneath them. Wind blows sand along the dunes: fine grains skimming the ground, soft veils spilling over the crests and big slow clouds of dust, all moved on the GPU (`src/wind-sand.js`). The air is calm at the oasis. The grass, ferns, reeds, desert plants and alien trees sway in the same wind, bending downwind with the gusts that throw the sand, with ripples running across the grass field; it is all in the vertex shader from one time uniform, with nothing for the CPU to do per frame (`src/wind.js`; the hero tree stays still). Lit objects (props, trees, hands, tools) get a faint moonlit fill and a thin cool rim at night so they read as shapes instead of black holes (`src/night-fill.js`).
 - Alien birds fly over by day, and now and then one lands on the bank to drink (see Alien birds in the game).
 - A coarse continuation of the sand outside the playable square hides the world edge.
@@ -231,3 +231,38 @@ far you can reach it, how bright the bead is, how it hangs) are at the top of th
   `python3 tools/spear/check_mesh.py` (every part a closed solid, no inside-out shells, names, materials, length, triangle budget) and
   `python3 tools/spear/render_preview.py` for Cycles previews (`--views full,back,threeq,head,headside,headback,tassel,grip,butt`,
   `--night` for the glow).
+
+## The blue palms
+
+The sixteen regular trees round the pool are banded blue palms: a slim trunk with pale rings, stilt-like roots and a pale crownshaft,
+a fountain of 24 arching fronds in three rings (long drooping ones outside, short upright ones inside, a new pale spear leaf in the
+middle) and a few pale veils hanging from the crownshaft, a small echo of the glowing veil tree. They stand 4.6 m tall at scale 1 (the nine
+big ones are 2x). They replace the first blue trees (tiered whorls of dark leaves, 40,000 triangles each) and everything that worked with
+those still does: the axe fells them (the trunk is straight and on the origin up to the 1.9 m chop height, about 12 cm in radius),
+they lean and tremble in the same wind (`src/wind.js` finds the leaf material by its name, `Waxy blue leaf tissue`, and the bark by
+`Banded teal bark`), and they cast the same soft projected ground shadow. The fronds hang no lower than 2.6 m, so you can walk under
+them. The shaded side of the fronds, which is most of what you see looking up into the crown, would go black under the game's lighting,
+so both materials carry a small flat light of their own (an `emissiveFactor` in the model, nothing in code); at night the tiny exposure
+hides it.
+
+### Levels of detail
+
+Three, switched by distance from your eye (`src/tree-sets.js`; a tree at scale 2 is twice as big at any distance, so its levels start
+twice as far out):
+
+| Level | From | Triangles | What it is |
+| --- | --- | --- | --- |
+| `alien_tree_lod0.glb` | 0 m | 4,774 | every frond a feather: a thin rachis with 17 pairs of tapering, drooping leaflets; banded trunk, 5 roots, 6 veils |
+| `alien_tree_lod1.glb` | 20 m | 1,584 | every frond one saw-toothed ribbon (the teeth are the leaflets); plain trunk, no roots or veils |
+| `alien_tree_lod2.glb` | 55 m | 476 | half of the fronds, 3 teeth each, a slightly darker tone (a solid ribbon catches more light than thin leaflets) |
+
+All three grow their fronds from the same seeds, so a frond has the same length, angle and droop at every level and the tree does not change
+shape when one takes over from another. Each level is one object with two materials, so a tree costs 2 draw calls at any distance, and the
+whole file set is 348 KB (the first trees were 2.2 MB). At the pond that took the view from 688,000 to 563,000 triangles.
+
+- `?trees=old` puts the first blue trees back to compare (their files are still in `public/models/vegetation/alien-tree/`). Dev build only:
+  `?treelod=0|1|2` draws every tree at one level, to judge it on its own.
+- Built headless in Blender from one parametric script: `python3 tools/alien-tree/build_alien_tree.py --outdir
+  public/models/vegetation/alien-tree`, then `python3 tools/alien-tree/check_mesh.py` (bark is closed solids facing outward, leaves are sheets
+  with no loose or degenerate faces, names, materials, budgets, height, a straight trunk in the axe's chop zone, clearance under the fronds) and
+  `python3 tools/alien-tree/render_preview.py` for Cycles previews (`--views lods,lodsabove,threeq,side,below,crown,base`).
