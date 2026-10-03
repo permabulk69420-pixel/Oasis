@@ -784,10 +784,17 @@ clusters = [
     (5, 35.0, 1.4, 4, (8, 12)),
     (2, 37.0, 1.2, 3, (8, 11)),
     (4, 33.0, 1.2, 3, (9, 13)),
+    # second pass: more pods nearer the trunk and mid limbs so the tree glows from every side
+    (0, 9.5, 1.0, 4, (20, 24)),
+    (2, 9.5, 1.0, 3, (18, 22)),
+    (1, 16.5, 1.2, 4, (13, 18)),
+    (3, 17.0, 1.0, 3, (12, 16)),
+    (5, 28.0, 1.2, 2, (9, 12)),
 ]
-assert sum(c[3] for c in clusters) == 40
+assert sum(c[3] for c in clusters) == 56
 strand_info = []
-POD_M = 10
+POD_M = 12
+POD_RINGS = 12
 
 
 def strand_clear(attach, L, pod_len, margin=1.6):
@@ -804,8 +811,9 @@ for (li, rc, rs, cnt, (l0, l1)) in clusters:
     imax = int(np.argmax(rxy))
     for n in range(cnt):
         L_want = rng.uniform(l0, l1)
-        D = rng.uniform(0.8, 1.5) * (1.0 if rc < 20 else 0.85)
-        pod_len = D * 1.35
+        # Big glowing fruit: roughly twice the size of the first version so they read from afar.
+        D = rng.uniform(1.5, 2.6) * (1.0 if rc < 20 else 0.82)
+        pod_len = D * 1.2
         r_try = rc + rng.uniform(-rs, rs)
         side_off = rng.uniform(-0.6, 0.6)
         for attempt in range(8):
@@ -836,8 +844,9 @@ for (li, rc, rs, cnt, (l0, l1)) in clusters:
         # ---- pod: lathe along the strand's end tangent
         ax = nrm(P[-1] - P[-2])
         top = P[-1] - ax * 0.15
-        sp = np.linspace(0.05, 0.96, 10)
-        prof = np.sin(np.pi * sp ** 0.72) ** 0.85
+        sp = np.linspace(0.05, 0.96, POD_RINGS)
+        # plump lantern: widest around the middle, rounded at both ends (was a narrow teardrop)
+        prof = np.sin(np.pi * sp ** 0.86) ** 0.62
         prof = prof / prof.max() * D / 2
         prof = np.maximum(prof, 0.075)
         Nn0 = nrm(np.cross(ax, d1) + 1e-6)
