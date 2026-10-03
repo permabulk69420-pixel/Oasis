@@ -68,6 +68,12 @@ export const atmosphere = /* glsl */`
   uniform sampler2D uCloudMap;
   uniform float uCloudTime;
   const float CLOUD_HEIGHT = 1250.0;
+  // Night fill (linear light, added after tone mapping). Tuned so the ground reads as a few
+  // percent grey-blue under a moon: dark and tense, but not pitch black.
+  const vec3 MOON_FILL = vec3(0.0042, 0.0062, 0.0105);
+  const vec3 SKY_NIGHT_HORIZON = vec3(0.0030, 0.0046, 0.0085);
+  const vec3 SKY_NIGHT_ZENITH = vec3(0.0006, 0.0013, 0.0032);
+  const vec3 WATER_NIGHT_FILL = vec3(0.0016, 0.0030, 0.0052);
 
   float daylightLevel() {
     return smoothstep(-0.07, 0.16, uSun.y);
@@ -335,6 +341,9 @@ export function createMaterials(renderer, field) {
         color = air(color, -view, distance);
         gl_FragColor = vec4(color, 1.0);
         #include <tonemapping_fragment>
+        // Faint moonlit fill, added after tone mapping (the film curve crushes anything this dim
+        // to pure black). It keeps dunes and shapes readable at night without touching the torch.
+        gl_FragColor.rgb += base * MOON_FILL * mix(0.55, 1.0, max(n.y, 0.0)) * (1.0 - environmentDay);
         #include <colorspace_fragment>
       }
     `,
@@ -382,6 +391,8 @@ export function createMaterials(renderer, field) {
 
         gl_FragColor = vec4(color, 1.0);
         #include <tonemapping_fragment>
+        // Faint night-sky glow, brighter toward the horizon, so silhouettes read against it.
+        gl_FragColor.rgb += mix(SKY_NIGHT_HORIZON, SKY_NIGHT_ZENITH, pow(max(ray.y, 0.0), 0.5)) * (1.0 - daylight);
         #include <colorspace_fragment>
       }
     `,
@@ -457,6 +468,7 @@ export function createMaterials(renderer, field) {
         color = air(color, -view, distance);
         gl_FragColor = vec4(color, 1.0);
         #include <tonemapping_fragment>
+        gl_FragColor.rgb += WATER_NIGHT_FILL * shore * (1.0 - environmentDay);
         #include <colorspace_fragment>
       }
     `,
