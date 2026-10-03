@@ -18,6 +18,9 @@ export const HIP_SIDES = Object.freeze(['left', 'right']);
 // Where a relaxed arm hangs, not the belt line: a hand at your side sits well below your waist.
 const HIP_DROP = 0.80;
 const HIP_SIDE = 0.26;
+const BODY_DEADZONE = 0.22;
+const BODY_DEADZONE_Y = 0.10;
+const BODY_SETTLE_RATE = 0.3;
 const HIP_FORWARD = -0.10;
 const HIP_GRAB_RADIUS = 0.24;
 // Holster zone: a tall, forgiving ellipsoid around each hip. Wide enough to hit without
@@ -82,6 +85,7 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     belt[side] = anchor;
   }
   let bodyYaw = 0;
+  let bodyCenter = null;
 
   // Empty hips get a small soft dot while a hand holds a tool. When that hand is in the
   // zone a faint ghost of the held tool shows exactly how it will sit on the hip.
@@ -285,6 +289,7 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     const view = presenting ? renderer.xr.getCamera() : camera;
     // No body on desktop, so nothing floats under the camera there.
     for (const side of HIP_SIDES) belt[side].visible = presenting;
+    if (!presenting) bodyCenter = null;
     if (!view) return;
     // WebXR prepares the XR camera's world matrix; do not recompute it (see chest-storage.js).
     if (!presenting) view.updateWorldMatrix(true, false);
@@ -297,15 +302,32 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     // The belt never turns with the head: it keeps the rig's facing and only follows where
     // the head is. Stick-turning the rig carries it round.
     bodyYaw = 0;
-    if (bodyYaw === null) return;
+    // The body only moves when the head really travels: turning or tilting your head swings
+    // the headset a few centimetres, and leaning a little shouldn't drag the hips with it.
+    if (!bodyCenter || !(dt > 0)) bodyCenter = (bodyCenter || new THREE.Vector3()).copy(headPosition);
+    else {
+      const dx = headPosition.x - bodyCenter.x, dz = headPosition.z - bodyCenter.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance > BODY_DEADZONE) {
+        const pull = (distance - BODY_DEADZONE) / distance;
+        bodyCenter.x += dx * pull;
+        bodyCenter.z += dz * pull;
+      }
+      const dy = headPosition.y - bodyCenter.y;
+      if (Math.abs(dy) > BODY_DEADZONE_Y) bodyCenter.y += dy - Math.sign(dy) * BODY_DEADZONE_Y;
+      const settle = 1 - Math.exp(-dt * BODY_SETTLE_RATE);
+      bodyCenter.x += (headPosition.x - bodyCenter.x) * settle;
+      bodyCenter.z += (headPosition.z - bodyCenter.z) * settle;
+      bodyCenter.y += (headPosition.y - bodyCenter.y) * settle;
+    }
     const fx = -Math.sin(bodyYaw), fz = -Math.cos(bodyYaw);
     const rx = Math.cos(bodyYaw), rz = -Math.sin(bodyYaw);
     for (const side of HIP_SIDES) {
       const sign = side === 'left' ? -1 : 1;
       belt[side].position.set(
-        headPosition.x + rx * HIP_SIDE * sign + fx * HIP_FORWARD,
-        headPosition.y - HIP_DROP,
-        headPosition.z + rz * HIP_SIDE * sign + fz * HIP_FORWARD,
+        bodyCenter.x + rx * HIP_SIDE * sign + fx * HIP_FORWARD,
+        bodyCenter.y - HIP_DROP,
+        bodyCenter.z + rz * HIP_SIDE * sign + fz * HIP_FORWARD,
       );
       belt[side].rotation.set(0, bodyYaw, 0);
       belt[side].updateMatrixWorld(true);
