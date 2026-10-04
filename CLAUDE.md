@@ -1,6 +1,6 @@
 # Oasis: instructions for Claude
 
-Oasis is a three.js WebXR desert survival game for Meta Quest 3. The owner (Kane, a solo VR dev in Sydney)
+Oasis is a three.js WebXR desert game for Meta Quest 3 (light survival and crafting, heading towards colossus fights; see "Game direction"). The owner (Kane, a solo VR dev in Sydney)
 tests by opening the deployed GitHub Pages URL on the headset. Pushing to `main` deploys. Read `README.md`
 for how the game works. These are standing rules from Kane; they apply to every session and survive compaction.
 
@@ -10,8 +10,7 @@ His words: it is "very ark lite", "just enough survival crafting stuff to be fun
 Beat a colossus and it unlocks something to craft, first idea a **glider that gets you to the next area**. "That's basically all I've got in my head at
 the moment", so keep it loose: he said not to get into too much of the specifics.
 - The loop: gather and craft lightly, go out, face a colossus, unlock a craft (the glider), reach the next area, a bigger colossus. The colossi are the point;
-  survival only feeds them. The stinger is the practice run. Crystals are material for what a colossus unlocks (no fuel system). The giant bones are scenery
-  and later story. VR scale (a creature you look up at) is the thing to protect.
+  survival only feeds them. The stinger is the practice run. Crystals are the likely material for what a colossus unlocks (my lean, not decided; no fuel system). The giant bones are scenery. VR scale (a creature you look up at) is the thing to protect.
 - My read, which he liked: the hardest part and the biggest risk is the climb (gripping something huge and moving by hand). A rough prototype of that comes
   before more survival or world detail. How a colossus is beaten, the glider's feel, what dying means and water/stamina pressure are HIS calls: do not
   invent them.
@@ -124,7 +123,7 @@ intentional later"), so none of the fight, water or insect sounds. In this order
 2. The pickaxe (recipe like the axe's, held, hip slot, menu icon, breaks mineable nodes like the axe fells trees) and the desert finds that give it a
    job: sandstone outcrops with a 1k Poly Haven PBR rock (credit file in `public/textures/<name>/`), glowing crystal clusters (visible across the dunes
    at night, first field near the stinger's patch, richer ones further out), and a spiny alien spire plant that gives fibre (an item with no source yet).
-   Crystals just go in the pack: what they are FOR (my suggestion to him: alien fuel and light, which would answer cold nights and fuel) is his call.
+   Crystals just go in the pack: what they are FOR is his call (current lean: material for what a colossus unlocks).
 3. (Done, #77.) Dune stinger v3 (`tools/dune-stinger/v3/`, built by me in Blender, no paid or AI mesh tools): a plated carapace with a ridge, an eye cluster, four leg
    pairs (thigh, shin, claw foot, knobbly knee), two jointed pincers (one bigger) that guard, flare open in the windup and close, a five segment tail.
    3 LODs, close level roughly 30 to 40k triangles (ceiling 50k), 2 draw calls, cyan glow seams in the spear's cyan. Retarget `src/stinger-pose.js` and
@@ -295,7 +294,7 @@ clusters, spiny teal spire plants, all with three levels of detail), `src/mining
 rocks), `src/loose-finds.js` (the crystal shard and the fibre bundle you pick up), `src/bursts.js` (flying chips). Tools hit by passing the tool
 instance through `weapon-hits.js`. Oddities to tell Kane: the pickaxe recipe (3 sticks + 3 stones), its 26 damage and where it stands are my numbers;
 stone drops are a piece per 30 damage and a rock gives about 6 to 8 (weight 8 each, so five fill your pockets); crystal shards weigh 4 and do nothing yet
-(my suggestion: alien fuel or light); respawn times 900 s (rock), 700 s (crystal), 300 s (spire); the first crystals sit on the stinger's ground on purpose;
+(current lean: material for a colossus unlock); respawn times 900 s (rock), 700 s (crystal), 300 s (spire); the first crystals sit on the stinger's ground on purpose;
 rocks are solid but the stinger walks through them; the sandstone is a dark red photo lifted warmer in `SANDSTONE.lift`.
 
 Dune stinger v3 (my call, built from scratch in Blender, done; `tools/dune-stinger/v3/build_stinger_v3.py` on the shared `tools/creature/kit.py`, models in `public/models/creatures/`, README
