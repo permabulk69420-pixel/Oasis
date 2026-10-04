@@ -6,7 +6,7 @@ import { exposureGlow } from './glow.js';
 // The spear: a hand tool like the axe and the torch, and no more than that (it does not hurt or hunt anything). It stands
 // planted in the sand by the other starting tools, can be crafted, gripped by the leather wrap, carried on a hip and packed
 // away at the chest. The model is public/models/spear/spear.glb (tools/spear/build_spear.py); +Y runs up the shaft to the stone
-// point, the butt end is 0.52 m below the origin and the leather grip is down at the butt end, centred 0.39 m below the origin.
+// point, the butt end is 0.52 m below the origin and the origin is the middle of the leather grip.
 
 const SPEAR_URL = `${import.meta.env?.BASE_URL ?? '/'}models/spear/spear.glb`;
 
@@ -14,7 +14,7 @@ export const SPEAR = Object.freeze({
   url: SPEAR_URL,
   // Planted upright in the sand by the starting tools: the butt end goes in a few centimetres.
   groundBottom: 0.48,
-  // Reach for it anywhere along the middle of the shaft (the model's origin is a point on the shaft about 0.5 m up).
+  // Reach for it anywhere along the middle of the shaft (the model's origin is the grip, about 0.5 m up).
   pickupRadius: 0.55,
   spawn: Object.freeze({ x: SPAWN.x - 2.0, z: SPAWN.z - 1.25 }),
   // How bright the little glowing bead on the tassel should look (the night exposure is undone), so you can find the spear in
@@ -22,10 +22,9 @@ export const SPEAR = Object.freeze({
   glow: Object.freeze({ day: 0.85, night: 0.65 }),
 });
 
-// What the fingers close on: the leather wrap at the butt end of the shaft, never the point or the tassel. Holding it this far back
-// is the point of it: the stone reaches 1.3 m past the fist, so the spear pokes as far away as it can. The fist keeps a few
-// centimetres of charred butt behind it.
-export const SPEAR_GRIP = Object.freeze({ meshes: ['Shaft'], axis: [0, 1, 0], point: [0, -0.39, 0], halfLength: 0.1 });
+// What the fingers close on: the leather wrap in the middle of the shaft, never the point or the tassel. The hand sits near the
+// balance point, so the spear is steady in one hand and the stone reaches about 0.95 m past the fist.
+export const SPEAR_GRIP = Object.freeze({ meshes: ['Shaft'], axis: [0, 1, 0], point: [0, 0, 0] });
 
 // How the spear lies in the hand. The torch and the axe stand up out of the fist; the spear is for poking, so it starts from the
 // same flip (the authored +Y, up the shaft, points opposite the Quest hand socket's held-up direction) and then turns about the
