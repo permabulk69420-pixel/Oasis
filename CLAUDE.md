@@ -29,8 +29,9 @@ for how the game works. These are standing rules from Kane; they apply to every 
    vertices, inside-out faces and bad blends. Always run a mesh check (`tools/campfire/check_mesh.py` style)
    and look at renders first. Code, shader and gameplay changes do not need his check.
 6. **Quest performance comes first.** No post-processing passes, no big shadow maps, no per-frame
-   allocations, keep triangle counts and draw calls modest. Desktop screenshots cannot prove headset
-   frame rate; say so when relevant.
+   allocations, keep triangle counts and draw calls modest. Kane knows desktop checks cannot prove how
+   something looks, feels or runs on the headset, so never add "not tested on a headset" to a report or a
+   PR. Only flag a specific thing worth looking at there (shimmer, tracking, frame rate) and say what to look for.
 7. **Art and atmosphere over mechanics.** Kane wants to be involved in important gameplay and UI decisions
    (fuel, cold, how things work). Do not invent game mechanics or UI beyond what he asked for. Visual art
    direction is where he trusts me most. Anything substantial (trees, creatures, big props) needs proper LODs
@@ -69,7 +70,7 @@ for how the game works. These are standing rules from Kane; they apply to every 
   `FRUIT.gripOffset` in `src/glow-fruit.js`). Keep one frozen surface object per hand so the solved grip is cached, and
   check both hands. `python3 tools/hold-lab/probe_grip_point.py <item> <side>` tries offsets on every axis (solving is
   not the same as looking right, so render the winners with `tools/hold-lab/lab_shot.py` and look). The solver is
-  independent of arm pose, so one good lab render covers the pose in the game; the headset is still unproven.
+  independent of arm pose, so one good lab render covers the pose in the game.
 - Screenshots of the hold lab: `python3 tools/hold-lab/lab_shot.py "<hold-lab query>" out.png` with `npm run dev` running
   (Playwright for Python, Chromium in `/opt/pw-browsers`, SwiftShader flags are in the script).
 - Stop the dev server with `fuser -k 4173/tcp`. `pkill -f vite` or `pgrep -f` matches its own shell and kills the command.
@@ -82,27 +83,26 @@ for how the game works. These are standing rules from Kane; they apply to every 
 Campfire (done). Kane is not sure about cold nights or fuel yet, so those are parked until he decides how
 they should work. Visual direction now: dust and sand, fire smoke and heat haze, night sky, plant sway (done), an
 ambient alien bird (done), a physical backpack (done), a spear (done), newer trees with LODs (done). Later: first threat (sandworm, titan
-blocker or boss), building and more crafting. Not yet tested on a real headset: keep reporting that honestly.
+blocker or boss), building and more crafting. Kane tests on the headset himself: do not keep saying it is untested, say what to look for.
 
 Backpack (done, `src/backpack.js`; my call, Kane approved): a physical pack you grab by its handle and put on by letting go
 behind your shoulder (reaching behind your back is the VR habit); it then disappears into the normal menu (a Back slot) and
 raises the carry limit from 40 (pockets) to 100. It only comes off when everything fits in your pockets. Oddities to tell
-Kane: the 40 pocket limit is my number and slows you to half speed over it; nothing is drawn on your back; no sound; not
-tested on a headset.
+Kane: the 40 pocket limit is my number and slows you to half speed over it; nothing is drawn on your back; no sound.
 
 Spear (done, `src/spear.js`; Kane asked for it in a queued message, my call on the design): a held tool like the axe and torch
 that does nothing else (no combat). Stands in the sand beside the starting tools, crafted from 3 sticks and a stone, weight 10,
 carried on a hip leaning back about 33 degrees, packed at the chest. One LOD on purpose (hand-sized, 2,192 tris, 3 draw calls).
 The little cyan bead on the tassel keeps its brightness at night through `src/glow.js` (shared with the backpack). Oddities to
-tell Kane: the butt end reaches the sand in a deep crouch (the hip hangs from the head position); not tested on a headset.
+tell Kane: the butt end reaches the sand in a deep crouch (the hip hangs from the head position).
 
 Blue palms (done, `tools/alien-tree/`, `src/tree-sets.js`; my call on the look, Kane said to make my own visual choices): the sixteen
 regular trees round the pool are now banded blue palms with feathery fronds and a few pale hanging veils, in 3 LODs (4,774, 1,584 and 476
 triangles against the first blue trees' 40,000, 24,000 and 12,500). The axe, the wind sway (found by material name) and the projected
 shadow work as before. The first trees' files are still in the repo and `?trees=old` shows them. LOD distances scale with each tree's
 scale. The materials carry a small flat emissive floor in the model so the shaded side of the crown is teal, not black. Oddities to tell
-Kane: the look is mine (a palm, not the old tiered tree); nothing here is tested on a headset (thin leaflets may shimmer in the headset;
-if so, widen them in `feather()` or lower `pairs`); a felled palm still drops its logs and sticks at the old distances along the fall
+Kane: the look is mine (a palm, not the old tiered tree); thin leaflets may shimmer in the headset (if so, widen them in
+`feather()` or lower `pairs`); a felled palm still drops its logs and sticks at the old distances along the fall
 line, so the sticks land a little past where the crown ends.
 
 ## Overnight progress log (3 to 4 Oct 2026)
@@ -125,6 +125,5 @@ spawn point and 134,000 from the elevated overview), the veil tree 117,000 in 6 
 33,000, the ferns 26,000, the reeds 15,000, the 16 palms 15,000 in 17 calls, the fruit 5,500 in 14 calls, water 4,300, the backpack 3,100,
 everything else (terrain chunks, sky, stars, tools) a few thousand each. If a headset test shows the frame rate is short, the biggest saving
 for the least change is the grass (cull patches behind the view when it rebuilds, or lower `MAX_DRAW_DISTANCE`/`RICH_BLADES`), then a
-level of detail for the veil tree (Kane has said to leave that tree alone, so ask first). Nothing has been timed on a headset.
-
+level of detail for the veil tree (Kane has said to leave that tree alone, so ask first).
 Tasks left: the morning summary for Kane.
