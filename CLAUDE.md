@@ -16,6 +16,10 @@ the moment", so keep it loose: he said not to get into too much of the specifics
   invent them.
 - Dropped or parked so they stop competing: base building and shelters, co-op, cold nights and fuel as a survival system, and water as a hard leash.
 - The setting is a desert moon with a ringed planet in the sky and giant bones in the dunes: atmosphere only, with no story attached. Do not invent a plot.
+- **The look is a twilight planet (Kane, 5 Oct, still loose).** His words, roughly: the sun should come up lower and the days be darker, with similar hours of night or even
+  more, because the game is "still a little bit too bright", it "has a better vibe at night", the darkness hides a lot of flaws, and the game leans on bioluminescence. So lean
+  darker and moodier, with the glow carrying the scene. Day length and the exact balance are not decided ("I don't know yet"), so do not change the day/night timing without
+  asking. Lighting and exposure are art, so those are mine to try and show (current: 3 minutes day, 3 minutes night, `src/day-night.js`; day exposure about 0.82, night about 0.035).
 - The full write-up is `claude/direction.md` in the Project (the `Projects` tool). Keep it and this section in step.
 
 ## How we work (Kane and me)
@@ -158,7 +162,7 @@ Campfire (done). Direction is in "Game direction" at the top: Ark-lite plus colo
 and co-op are parked or dropped (5 Oct). Visual direction now: dust and sand, fire smoke and heat haze, night sky, plant sway (done), an
 ambient alien bird (done), a physical backpack (done), a spear (done), newer trees with LODs (done). Next big thing: a colossus, starting with a rough
 climb prototype once Kane says go (how it is beaten is his call). Kane tests on the headset himself: do not keep saying it is untested, say what to look for.
-Art-only extras still open (no decision needed): dust devils by day, a dawn and dusk look, a small skittering critter, a bone texture pass, and a `creature-pipeline`
+Art-only extras still open (no decision needed): dust devils by day, a dawn and dusk look (part of the twilight direction in "Game direction"), a small skittering critter, a bone texture pass, and a `creature-pipeline`
 skill in `.claude/skills/` (the Blender to pose code to game procedure, written from the stinger v3 build).
 
 Backpack (done, `src/backpack.js`; my call, Kane approved): a physical pack you grab by its handle and put on by letting go
