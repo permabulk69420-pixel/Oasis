@@ -158,6 +158,23 @@ function legRest(bones, names, bodyRest) {
   };
 }
 
+// Which feet came down between two points of the walking cycle (phase in radians), for the footprints. Each foot comes down at the front of
+// its sweep. `out` is a list of { x, z } objects to fill (in the Root's space, scale 1); returns how many are filled. Nothing is allocated.
+export function plantedFeet(rig, fromPhase, toPhase, out, joints = JOINTS) {
+  let count = 0;
+  if (!rig || !(toPhase > fromPhase) || toPhase - fromPhase > TAU * 2) return 0; // standing, or the cycle wrapped
+  const from = fromPhase / TAU, to = toPhase / TAU;
+  for (const leg of rig.legs) {
+    const offset = leg.index * joints.wave + (leg.left ? 0 : 0.5);
+    if (Math.floor(to + offset) > Math.floor(from + offset) && count < out.length) {
+      out[count].x = leg.home.x;
+      out[count].z = leg.home.z + joints.sweep;
+      count++;
+    }
+  }
+  return count;
+}
+
 // Bends one leg so its claw tip is at `target` (in the Root's space). Writes the local rotations of the thigh, shin and foot.
 export function solveLeg(leg, bodyRest, qBody, target, outThigh, outShin, outFoot) {
   const H = sH.copy(leg.hip).applyQuaternion(qBody).add(bodyRest);
