@@ -218,8 +218,11 @@ bead so you can find it at night (the same glow trick as the backpack, shared in
 `src/spear.js` is a tool kind for `src/tools.js`, like `src/axe.js` and `src/torch.js`. The numbers to tune (where it stands, how
 far you can reach it, how bright the bead is, how it hangs) are at the top of the file.
 
-- **Pick it up:** squeeze grip with an empty hand near the shaft (within about half a metre). The hand closes round the leather wrap,
-  with the point up and the tassel behind it, so you see the point and the feathers over the top of your fist.
+- **Pick it up:** squeeze grip with an empty hand near the shaft (within about half a metre). The spear jumps so the hand closes round
+  the leather wrap, which is down at the butt end, and it lies pointing forward out of your fist (turned 35 degrees about the palm,
+  `SPEAR_THRUST_TILT`), with a few centimetres of butt behind your hand. So the stone point is 1.3 m ahead of your fist: it is for
+  poking as far away as it can. With the controller pitched about 30 degrees down the shaft is level; pointed straight ahead it
+  rises about 35 degrees. Right and left hands are the same.
 - **Carry it:** let go next to a hip and it holsters there, leaning back about 33 degrees with the point behind your shoulder and the butt
   end about 30 cm off the ground (it only reaches the sand when your head drops below roughly 1.4 m, in a deep crouch). Draw it from the
   hip by grabbing there. Let go at your chest to pack it into the inventory (weight 10); the menu can put it on a hip too.
@@ -232,8 +235,9 @@ far you can reach it, how bright the bead is, how it hangs) are at the top of th
 - `public/models/spear/spear.glb`: 2,192 triangles, 80 KB, no textures (one colour per vertex, two single-sided materials: `Spear` and
   `Glow`), one level of detail on purpose (a hand-sized prop that is held or stands a metre from you, so a lighter copy would never be
   used). Two named objects, `Shaft` and `Spear` (the point, lashing and tassel): the game fits the fingers to the shaft only. The origin is
-  the middle of the grip, +y runs up to the stone point (0.955 m above the origin) and the butt end is 0.52 m below it; the tassel hangs on
-  the -z side.
+  a point on the shaft, +y runs up to the stone point (0.955 m above the origin) and the butt end is 0.52 m below it; the leather grip wrap
+  is at the butt end, centred 0.39 m below the origin (`SPEAR_GRIP.point`), with a short coral and cream band in front of it; the tassel hangs
+  on the -z side.
 - Built headless in Blender from one parametric script: `python3 tools/spear/build_spear.py --out public/models/spear/spear.glb`, then
   `python3 tools/spear/check_mesh.py` (every part a closed solid, no inside-out shells, names, materials, length, triangle budget) and
   `python3 tools/spear/render_preview.py` for Cycles previews (`--views full,back,threeq,head,headside,headback,tassel,grip,butt`,

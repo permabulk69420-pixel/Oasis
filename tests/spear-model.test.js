@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { SPEAR_GRIP } from '../src/spear.js';
 
 // The spear model (tools/spear/build_spear.py makes it). These tests read the .glb directly: they check what the game
 // relies on (the two named parts, the size, the grip, the budget, the materials), not how it looks.
@@ -89,7 +90,16 @@ test('a real spear: about a metre and a half long, the grip at the origin, stone
   assert.ok(shaft.min[1] > -0.56 && shaft.min[1] < -0.48, `the butt end is ${(-shaft.min[1]).toFixed(3)} m below the origin`);
   assert.ok(head.max[1] > 0.9 && head.max[1] === top, 'the stone point is the highest thing');
   assert.ok(shaft.max[1] > 0.7 && shaft.max[1] < head.max[1], 'the shaft ends inside the lashing, below the tip');
-  assert.ok(shaft.min[1] < -0.3 && shaft.max[1] > 0.5, 'the origin is on the shaft, at the grip');
+  assert.ok(shaft.min[1] < -0.3 && shaft.max[1] > 0.5, 'the origin is on the shaft');
+});
+
+test('the leather grip wrap the hand closes on is at the butt end, where the game puts the hand', async () => {
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync(new URL('../tools/spear/build_spear.py', import.meta.url), 'utf8');
+  const match = source.match(/^GRIP_LO, GRIP_HI = (-?[0-9.]+), (-?[0-9.]+)/m);
+  assert.ok(match, 'wrap range found in the builder');
+  const [lo, hi] = [Number(match[1]), Number(match[2])];
+  assert.ok(lo < SPEAR_GRIP.point[1] - 0.04 && hi > SPEAR_GRIP.point[1] + 0.04, `the wrap ${lo} to ${hi} covers the whole fist around ${SPEAR_GRIP.point[1]}`);
 });
 
 test('the shaft is a pole a hand can close round, and the head and tassel stay close to its line', () => {
