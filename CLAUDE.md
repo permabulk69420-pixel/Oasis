@@ -85,6 +85,10 @@ work. What he has told me, or shown he wants, across sessions:
    time yourself (the clock tool says only the date here, so use `date` in the shell; he is in Sydney, `TZ=Australia/Sydney date`; the run began at
    22:33 AEDT on 4 Oct); his usage and permissions are set to the maximum, so nothing should stop the run; and if I have a question he wants it fired
    off straight away because he closes the app after his last message (then decide it myself).
+   **Nothing may touch a path outside the project, the scratchpad or its own temp folder in an unattended run:** that raises a permission prompt and the
+   whole run sits there until he is back. On 5 Oct it cost 3.5 hours (03:50 to 07:33) because of a stray `cat > $TMPDIR/dummy`: `$TMPDIR` was unset, so the
+   path became `/dummy` at the root of the disk. Scratch files go in the scratchpad (`$SP`), a variable is checked before it is used in a path, and a command
+   that waits on stdin (a bare `cat >`) is never run. If a run seems to have stalled for no reason, the likely cause is a prompt nobody can answer.
 6. **Quest performance comes first.** No post-processing passes, no big shadow maps, no per-frame
    allocations, keep triangle counts and draw calls modest. Kane knows desktop checks cannot prove how
    something looks, feels or runs on the headset, so never add "not tested on a headset" to a report or a
@@ -269,7 +273,7 @@ on you... just don't fire off subagent or do anything crazy"; "don't be afraid t
 about gameplay mechanic that's going to be something I really need to test and do myself"), no sound effects yet ("way more intentional later"). He
 wants "something more than just visual" and a reason to go out into the desert: a pickaxe, good stones or crystals, a "not a cactus" alien plant, PBR.
 Plan: pickaxe + desert finds, dune stinger v3 (Blender), fight effects, saving, footprints, giant bones, a direction doc in the Project. Keep the time
-(`TZ=Australia/Sydney date`). Done so far: #75 (smoke test in CI), #76 the pickaxe and desert finds, #77 the dune stinger v3, #78 fight effects (all below), #79 saving, #80 footprints, #81 giant bones (below, last paragraphs).
+(`TZ=Australia/Sydney date`). Done so far: #75 (smoke test in CI), #76 the pickaxe and desert finds, #77 the dune stinger v3, #78 fight effects (all below), #79 saving, #80 footprints, #81 giant bones, #82 the ringed planet and the smooth sun path, #83 crystal motes (below, last paragraphs). Not done when Kane woke (lost 3.5 hours to a permission prompt, see rule 5): the crashed ship wreck inside the lone ribcage, dust devils by day, a dawn and dusk look pass, a skittering critter, the `creature-pipeline` skill.
 
 Pickaxe and desert finds (my call, done; see README "The desert finds and the pickaxe"): `src/pickaxe.js` (a stone pickaxe like the axe, crafted from 3 sticks +
 3 stones, also stands by the starting tools, hurts the stinger for 26), `src/desert-finds.js` (fixed-seed layout of about 120 nodes in 25 sites),
