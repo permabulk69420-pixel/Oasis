@@ -117,7 +117,7 @@ intentional later"), so none of the fight, water or insect sounds. In this order
 8. A direction doc in the Project (`Projects` tool): the decisions only Kane can make, each with my one-line take, and the story seed we talked through
    (survivor of an expedition that came down on a desert moon with a ringed planet in the sky; the giant bones are what brought the ship down; the
    boss is its grown up version).
-9. If time: glow motes by the pond, the ringed planet in the night sky, dust devils by day, a skittering critter, a dawn and dusk look pass.
+9. If time: glow motes by the pond, the ringed planet in the night sky (done, with the sun's path fix), dust devils by day, a skittering critter, a dawn and dusk look pass.
 Add a `creature-pipeline` skill (`.claude/skills/`) when the stinger v3 build is done, since the Blender to pose code to game procedure is longer than a few lines.
 
 ## Working on this repo
@@ -323,4 +323,11 @@ list comprehension is drawn once PER POINT; I drew the ribs' sideways nudge that
 When a mesh looks faceted in the game, render a close-up of the GLB in Blender first (`tools/props/render_preview.py ... --views close --focus x,y,z --dist 9`) to see whether the geometry or the shading is at fault.
 Oddities to tell Kane: you can walk through the bones (no collision), they cast no shadow, there is no sound; they are big (the skull about 18 m long, the ribs about 14 m tall with spines above); the close level is a 1.1 MB download that only
 starts when you are about 190 m from the ribs; at night they are a thin moonlit silhouette against the stars like the trees. The skull's mouth is dark inside and the bone is plain ivory with a faint mottle, so a texture pass (cracks, a real bone photo) is the obvious next step if he wants it closer.
+
+Ringed planet and the sun's path (my call, done; README "The ringed planet and the sun's path", `src/night-sky.js`, `src/sun-path.js`, `tests/sun-path.test.js`): a teal banded gas giant with cream rings hangs in the sky 25 degrees right of the way you first look and 21 degrees up, fixed for ever (the moon is locked to it),
+lit by the sun so it has phases, with ring shadows both ways; all in the sky shader (`planetLight`, early-out for the rest of the sky), star points behind it are zeroed in `createNightStars`. Day: pale ghost, only the lit side and the rings. The sky shader composites it over everything else
+(premultiplied), so the Milky Way and stars never show through the disc. **I also fixed a bug in the day cycle:** the old sun kept one compass bearing all morning, then flipped to the opposite one at noon (and again at midnight), so the sun, the lighting and the moon each jumped 63 degrees across the sky once a cycle.
+`sun-path.js` keeps the rise and set points, every height, and the exact starting sun, and swings the bearing smoothly (`swing(angle) = angle - sin(2 angle)/2`); the cost is that mornings and afternoons are lit from a slightly different bearing than before (up to about 16 degrees at the
+start time, more near noon). If Kane preferred the old light, the quickest way back is `SUNRISE_BEARING`/`swing` in `sun-path.js` (a constant bearing gives the old morning), but the noon and midnight jump should not come back. Oddities to tell Kane: look up and to the right from the start; the planet is faint and ghostly by day;
+the rings are foreshortened so their outer edge can shimmer a little in the headset (if so, widen `edge` in `ringDensity`); a quick way to see it in a screenshot is `?hour=21&pitch=14` (night) or `?hour=7&yaw=-62&pitch=21`.
 
