@@ -17,7 +17,9 @@ the moment", so keep it loose: he said not to get into too much of the specifics
   invent them.
 - Dropped or parked so they stop competing: base building and shelters, co-op, cold nights and fuel as a survival system, water as a hard leash, and the
   crashed ship and crystal-beacon ending (my overnight idea, he never asked for it: "crossing a little bit into gameplay"). The ringed planet and the bones
-  stay as atmosphere only; nothing about a ship is in the game.
+  stay as atmosphere only; nothing about a ship is in the game. **Only the desert moon and the giant bones were Kane's.** The expedition survivor, the crashed ship
+  and the "boss is the grown up version" story were mine, written up overnight as "what we talked through", which was wrong; he laughed it off on 5 Oct ("this whole planet
+  crash ship idea, like lol"). Do not treat any of it as agreed or build on it.
 - The full write-up is `claude/direction.md` in the Project (the `Projects` tool). Keep it and this section in step.
 
 ## How we work (Kane and me)
@@ -136,7 +138,7 @@ intentional later"), so none of the fight, water or insect sounds. In this order
 7. (Done, #81.) Giant bones half buried in the dunes (Blender model with LODs) as landmarks; the crashed expedition wreck was parked on 5 Oct (see Game direction).
 8. A direction doc in the Project (`Projects` tool): the decisions only Kane can make, each with my one-line take, and the story seed we talked through
    (survivor of an expedition that came down on a desert moon with a ringed planet in the sky; the giant bones are what brought the ship down; the
-   boss is its grown up version).
+   boss is its grown up version). [5 Oct: only the moon and the bones were Kane's; the expedition and crashed ship were my invention, not agreed. See Game direction.]
 9. If time: glow motes (done: the pond already had fireflies, so they rise off the crystals), the ringed planet in the night sky (done, with the sun's path fix), dust devils by day, a skittering critter, a dawn and dusk look pass.
 Add a `creature-pipeline` skill (`.claude/skills/`) when the stinger v3 build is done, since the Blender to pose code to game procedure is longer than a few lines.
 
