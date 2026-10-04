@@ -171,6 +171,13 @@ are in one table, `PACK`, at the top; the carry limits are in `src/inventory.js`
 - **Put it on:** carry it behind your shoulder (the hand ticks once when it reaches the spot, which is behind and a little below
   your head, well clear of your chest) and let go. It leaves your hand: you are wearing it. Nothing is drawn on your back, because
   in VR there is no body to hang it on; the menu is where you see it.
+- **If it will not go on:** the spot is a zone about 56 cm across, centred 22 cm behind your head and 34 cm below your eyes,
+  so a hand about shoulder height, level with or just behind your ears (over the shoulder, like drawing an arrow from a quiver),
+  or round at your upper back, is in it. The buzz tells you when you are in; if you feel none, you are not there yet, and letting
+  go just drops the pack on the ground behind you. Two things move the zone: it is measured from your body's facing, which is the
+  way you were going when you last started walking (it does not follow your head, or you turning on the spot), and Quest
+  controllers can lose tracking when they are hidden behind you, so reaching just behind the ear works better than all the way
+  round. Nothing here has been tried on a headset yet.
 - **Take it off:** reach behind you with an empty hand and squeeze grip, and it comes off into that hand. Or open the menu, pick
   the **Back** slot and press **Take off**, and it is set down three quarters of a metre in front of you, facing you. It only comes
   off when everything you carry fits in your pockets (40), so taking it off never leaves you stuck; if it does not fit, the hand gives a
