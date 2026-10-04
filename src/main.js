@@ -15,6 +15,7 @@ import { createWindSand, WIND_SAND } from './wind-sand.js';
 import { createAlienBirds } from './alien-bird.js';
 import { createDuneStinger } from './dune-stinger.js';
 import { createSandPuffs } from './sand-puffs.js';
+import { createFootprints } from './footprints.js';
 import { createWeaponHits } from './weapon-hits.js';
 import { createMining } from './mining.js';
 import { registerLooseFindDrops } from './loose-finds.js';
@@ -295,8 +296,10 @@ const alienBirds = createAlienBirds({
 const STINGER_HIT_HAPTIC = [1, 220];
 // Puffs of sand and dust for anything heavy that lands on the dunes (the sting, a falling body), one draw call for all of them.
 const sandPuffs = createSandPuffs({ scene, sun: materials.sand.uniforms.uSun, heightAt: field.sample });
+// Footprints in the sand: yours as you walk, and the stinger's. The wind fills them in over a few minutes. One draw call.
+const footprints = createFootprints({ scene, sun: materials.sand.uniforms.uSun, heightAt: field.sample });
 const duneStinger = createDuneStinger({
-  scene, renderer, camera, field, puffs: sandPuffs,
+  scene, renderer, camera, field, puffs: sandPuffs, prints: footprints,
   getExposure: () => renderer.toneMappingExposure,
   onError: message => console.warn(message),
   onPlayerHit: strike => {
@@ -313,7 +316,7 @@ const mining = createMining({
 });
 registerLooseFindDrops({ stonesGroup, sticksGroup, materials: mining.materials, heightAt: field.sample });
 if (import.meta.env.DEV) window.__mining = mining; // dev only: lets a test strike a node without swinging a tool
-if (import.meta.env.DEV) { window.__stinger = duneStinger; window.__sandPuffs = sandPuffs; } // dev only: lets a screenshot script read or hurt the stinger and throw dust
+if (import.meta.env.DEV) { window.__stinger = duneStinger; window.__sandPuffs = sandPuffs; window.__prints = footprints; } // dev only: lets a screenshot script read or hurt the stinger and throw dust
 const weaponHits = createWeaponHits({ tools: hands.tools, rig, targets: [duneStinger, mining] });
 // Development-only: ?bird=perch|fly|flare puts a bird in view and stops time for it (?birdfreeze=0 lets it move),
 // ?birdd=<metres> sets how far ahead, ?birdseed=<n> makes the bird's choices repeatable.
@@ -360,6 +363,7 @@ if (askedFresh) { // so reloading the page does not start another new game
 // Where a VR session starts: the start of the world, or where the saved game left you (and from then on, where you left VR).
 let startPoint = { x: SPAWN.x, z: SPAWN.z, yaw: 0 };
 function placePlayer({ x, z, yaw }) {
+  footprints.reset();
   startPoint = { x, z, yaw };
   groundY = field.sample(x, z);
   rig.position.set(x, groundY, z);
@@ -381,7 +385,7 @@ const autosave = createAutosave({
   ],
 });
 autosave.update(); // what is already loaded goes back now, before the first frame
-if (import.meta.env.DEV) window.__save = { autosave, store: saveStore, start: saveStart.note, world: { THREE, rig, campfires, tools: hands.tools, backpack, mining, dayNight } }; // dev only: for the save's browser test
+if (import.meta.env.DEV) window.__save = { autosave, store: saveStore, start: saveStart.note, world: { THREE, renderer, scene, camera, rig, campfires, tools: hands.tools, backpack, mining, dayNight } }; // dev only: for the save's browser test
 document.addEventListener('visibilitychange', () => { if (document.hidden) autosave.flush(); });
 window.addEventListener('pagehide', () => autosave.flush());
 
@@ -507,6 +511,7 @@ renderer.xr.addEventListener('sessionstart', () => {
   document.exitPointerLock?.(); clearInput();
 
   // Match dumbgame's XR start state: no hidden world yaw or desktop camera transform.
+  footprints.reset();
   groundY = field.sample(startPoint.x, startPoint.z);
   rig.position.set(startPoint.x, groundY, startPoint.z);
   rig.rotation.set(0, startPoint.yaw, 0);
@@ -625,6 +630,7 @@ function frame(time) {
   mining.update(dt, head);
   duneStinger.update(dt, head);
   sandPuffs.update(dt);
+  footprints.update(time * 0.001);
   if (devBird && alienBirds.ready) {
     const params = devBirdParams;
     const spot = Number(params.get('birdd')) || (devBird === 'perch' ? 9 : 20);
@@ -759,6 +765,7 @@ function frame(time) {
       grounded: jumpHeight <= 0.001,
       active: true
     });
+    footprints.walk(head.x, head.z, { onGround: jumpHeight <= 0.001, speed: Math.hypot(velocity.x, velocity.z) });
   }
   if (time - lodTime > 350) { terrain.update(head.x, head.z); lodTime = time; }
   materials.water.uniforms.uTime.value = time * 0.001;

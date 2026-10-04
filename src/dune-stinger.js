@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { HERO_TREE, SPAWN, basinRadius, isInPond } from './world.js';
-import { createStingerPoser } from './stinger-pose.js';
+import { createStingerPoser, plantedFeet, LEG_NAMES } from './stinger-pose.js';
 import { createStinger, BRAIN } from './stinger-brain.js';
 import { createBurstPool } from './bursts.js';
 import { createShadowTexture, pickLod } from './alien-bird.js';
@@ -83,7 +83,7 @@ export function lineOfSight(groundAt, ax, ay, az, bx, by, bz, margin = 0.25, ski
 }
 
 export function createDuneStinger({
-  scene, renderer = null, camera = null, field, getExposure = () => 1, rng = Math.random, onError = () => {}, onPlayerHit = () => {}, puffs = null,
+  scene, renderer = null, camera = null, field, getExposure = () => 1, rng = Math.random, onError = () => {}, onPlayerHit = () => {}, puffs = null, prints = null,
 }) {
   const cfg = DUNE_STINGER;
   const scale = cfg.scale;
@@ -120,6 +120,9 @@ export function createDuneStinger({
     },
   });
   const state = brain.state;
+  // the feet that came down this frame, for the footprints (eight at most; one per leg)
+  const planted = LEG_NAMES.map(() => ({ x: 0, z: 0 }));
+  let lastPhase = 0;
   const glowMaterials = [];
   const levels = [];
   const holder = new THREE.Group();
@@ -266,6 +269,17 @@ export function createDuneStinger({
     const next = pickLod(head3, lod, cfg.lodDistances, cfg.lodHysteresis);
     if (next !== lod) { levels[lod].root.visible = false; levels[next].root.visible = true; lod = next; }
     levels[lod].poser.apply(state.pose, state.time);
+    // footprints: every foot that came down while it walks leaves a small dent where it landed
+    if (prints && state.mode !== 'dead' && state.pose.gait > 0.25 && buried === 0) {
+      const count = plantedFeet(levels[lod].poser.rig, lastPhase, state.pose.phase, planted);
+      const cos = Math.cos(state.yaw), sin = Math.sin(state.yaw);
+      for (let i = 0; i < count; i++) {
+        const foot = planted[i];
+        // the model turned by the body's yaw and scaled, put where the body is
+        prints.plant(state.x + (foot.x * cos + foot.z * sin) * scale, state.z + (-foot.x * sin + foot.z * cos) * scale, state.yaw, scale, foot.x >= 0 ? 1 : -1);
+      }
+    }
+    lastPhase = state.pose.phase;
     endsStale = true;
     updateGlow();
 

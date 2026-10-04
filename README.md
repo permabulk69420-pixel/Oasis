@@ -235,6 +235,20 @@ no death yet, and nothing drops from it yet.
 - The model is built in Blender by `tools/dune-stinger/v3/build_stinger_v3.py` (see `tools/dune-stinger/README.md`); `tools/stinger-lab/` is a page for judging its poses
   without walking out to it. The tail is 2 m long in the model so a strike can reach a person's head.
 
+## Footprints
+
+Where you have walked on the sand you leave prints, and so does the dune stinger (`src/footprints.js`). Your feet alternate every 0.74 m (1.05 m when you run
+faster than 3.7 m/s), each a hand's width off the line you walk and turned a little outward, pointing the way you go. Nothing is laid while you are in the air, standing
+still or shuffling in a circle, and not on grass or under the water. The stinger lays a small four-claw mark wherever one of its eight feet comes down (`plantedFeet` in
+`src/stinger-pose.js` reads the gait, so a print is where the foot really lands, not near it); each is scaled with the creature.
+
+A print is a decal that **multiplies** the ground under it, so it takes the sand's own colour and light by day, by firelight and at night. It is shaded like a dent
+lit from the sun's side (the sole is a parametric foot, heel, arch, ball and toes; the claw mark is four small pits), with a slightly darker, pressed floor and a low rim. At night
+the sun gives no light, so only the pressed floor shows. **The wind fills them in:** a print holds for the first 18% of its life, then softens, spreads a little and is gone
+(150 s for yours, 220 s for the stinger's). Prints thin out between 34 and 62 m from you. Each kind has its own ring of 480 slots (the oldest is reused, and the creature cannot push yours out),
+the whole lot is one instanced draw call, nothing is allocated per frame, and nothing is drawn until the first print is laid. It is not saved: a reload starts with clean sand.
+Numbers are in the `PRINTS` table at the top of the file; the dev build has `window.__prints` (`walk`, `plant`, `reset`, `laid`) for screenshots. No sound.
+
 ## The desert finds and the pickaxe
 
 Something to walk out into the dunes for. About 120 things stand in 25 places across the world (`src/desert-finds.js`, a fixed seed, so the
