@@ -7,8 +7,9 @@ coral sinew, and a small tassel of alien feathers hanging from the lashing on a 
 can be found at night. Vertex colours and one tiny extra material for the glow: no textures.
 
 Frame: built directly in glTF axes (exported with "Y up" off, so nothing is converted). +Y runs up the shaft to the tip,
-the origin is in the middle of the grip (so it is the point the hand closes on), the butt end is 0.52 m below it and the
-tip 0.955 m above it. The stone's broad faces face +Z and -Z; the tassel hangs on the -Z side. Units are metres.
+the origin is a point on the shaft where the spear stands and hangs, the butt end is 0.52 m below it and the tip 0.955 m above
+it. The leather grip wrap is at the butt end (centred 0.39 m below the origin): that is where the hand closes, so the point
+reaches as far as possible when it is held. The stone's broad faces face +Z and -Z; the tassel hangs on the -Z side. Units are metres.
 
 Objects: "Spear" (materials Spear and Glow: the point, the lashing and the tassel) and "Shaft" (Spear: the wooden shaft with
 its grip wrap, the part the game's grip code fits the fingers to).
@@ -197,7 +198,7 @@ def tube(S, path, radii, K, hint, colour, p=2.0, phase=0.0, mat=MAT_SPEAR, part=
 BUTT_Y = -0.520
 SHAFT_TOP_Y = 0.745
 TIP_Y = 0.955
-GRIP_LO, GRIP_HI = -0.155, 0.125
+GRIP_LO, GRIP_HI = -0.490, -0.290   # the leather wrap sits at the BUTT end: the hand holds the spear far back, so the point reaches as far as it can
 KNOTS = [(-0.33, 0.0022, 0.014), (0.31, 0.0018, 0.012), (0.52, 0.0014, 0.010)]  # y, bump, width: the odd knot in the wood
 
 
@@ -279,8 +280,8 @@ def build_grip(S):
 
 
 def build_butt_binding(S):
-    """A short coral and cream wrap near the butt, so the colours of the lashing are echoed at the other end."""
-    ys = np.linspace(-0.464, -0.416, 6)
+    """A short coral and cream wrap just in front of the leather grip (like a hilt), so the colours of the lashing are echoed at the other end."""
+    ys = np.linspace(-0.262, -0.214, 6)
     path = [centre(y) for y in ys]
     radii = [(shaft_radius(y) + 0.0024 + (0.0007 if i % 2 == 0 else -0.0003), shaft_radius(y) + 0.0024 + (0.0007 if i % 2 == 0 else -0.0003)) for i, y in enumerate(ys)]
     pattern = "ccrrcc"
