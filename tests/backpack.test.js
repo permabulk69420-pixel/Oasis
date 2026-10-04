@@ -407,6 +407,23 @@ test('let go behind your shoulder and you are wearing it: it vanishes from the s
   reset();
 });
 
+test('the tick at the back zone is strong enough to feel, and the "it is on" pulse is firmer than the tick', t => {
+  reset();
+  const { right, handTo, squeeze, handle, backZone, pulses } = world(t);
+  handTo(right, handle());
+  squeeze(right, true);
+  pulses.length = 0;
+  handTo(right, backZone());
+  squeeze(right, true);
+  assert.equal(pulses.length, 1, 'one tick on reaching the zone');
+  const [tick] = pulses;
+  assert.ok(tick.strength >= 0.3 && tick.ms >= 30, `a tick you can feel on a Quest, not ${tick.strength} for ${tick.ms} ms`);
+  squeeze(right, false);
+  const wear = pulses[pulses.length - 1];
+  assert.ok(wear.strength > tick.strength && wear.ms > tick.ms, 'wearing it is firmer than the tick');
+  reset();
+});
+
 test('the pack is not put on with a hand that is not behind you, nor by a controller that went away', t => {
   reset();
   const { backpack, right, handTo, squeeze, handle, backZone, xrCamera } = world(t);
