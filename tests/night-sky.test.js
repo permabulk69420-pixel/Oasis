@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { MILKY_WAY, MOON, NIGHT_SKY_GLSL, milkyWayPoint } from '../src/night-sky.js';
+import { MILKY_WAY, MOON, NIGHT_SKY_GLSL, milkyWayPoint, bandFalloff } from '../src/night-sky.js';
 
 test('the Milky Way basis is orthonormal, so stars and the painted band line up', () => {
   const { normal, axisA, axisB, core } = MILKY_WAY;
@@ -69,4 +69,23 @@ test('the shooting-star hash does not rely on sin(), which differs from GPU to G
   const values = Array.from({ length: 40 }, (_, i) => nightHash(i + 7));
   for (const value of values) assert.ok(value >= 0 && value < 1);
   assert.ok(new Set(values.map(v => v.toFixed(4))).size > 35);
+});
+
+test('the Milky Way fades to exactly zero where it is skipped, so it has no outline against the dark sky', () => {
+  // It used to stop at 0.02 of its peak: a step of a few brightness levels, plainly visible in a headset.
+  assert.equal(bandFalloff(MILKY_WAY.cut), 0, 'nothing is left at the cut');
+  assert.equal(bandFalloff(MILKY_WAY.cut / 2), 0, 'and nothing beyond it');
+  assert.equal(bandFalloff(1), 1, 'the centre line keeps its full brightness');
+  assert.ok(MILKY_WAY.cut > 0 && MILKY_WAY.cut <= 0.01, 'the cut is far down the tail, so the look of the band is untouched');
+  assert.ok(Math.abs(bandFalloff(0.5) - 0.5) < 0.005 && Math.abs(bandFalloff(0.1) - 0.1) < 0.005, 'the middle of the band is unchanged');
+  let previous = 0;
+  for (let bell = 0; bell <= 1; bell += 0.01) {
+    const value = bandFalloff(bell);
+    assert.ok(value >= previous, 'brighter towards the centre line, never a dip');
+    previous = value;
+  }
+  // The shader does the same sum, from the same constant, and no longer has a hard cut.
+  assert.match(NIGHT_SKY_GLSL, new RegExp(`const float MW_CUT = ${MILKY_WAY.cut.toFixed(4)};`));
+  assert.match(NIGHT_SKY_GLSL, /band = \(band - MW_CUT\) \/ \(1\.0 - MW_CUT\);/);
+  assert.doesNotMatch(NIGHT_SKY_GLSL, /band < 0\.02/, 'the old hard cut at 0.02 is gone');
 });
