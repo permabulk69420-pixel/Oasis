@@ -90,7 +90,7 @@ export function createDirector({ rng, config = ALIEN_BIRD }) {
 }
 
 // A soft round shadow, as a texture made in code (no image file, no canvas).
-function createShadowTexture(size = 64) {
+export function createShadowTexture(size = 64) {
   const data = new Uint8Array(size * size * 4);
   for (let j = 0; j < size; j++) {
     for (let i = 0; i < size; i++) {
