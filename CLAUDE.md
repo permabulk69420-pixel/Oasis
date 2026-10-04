@@ -60,6 +60,21 @@ for how the game works. These are standing rules from Kane; they apply to every 
 - Blender is headless (`import bpy` before `import bmesh`). It is not preinstalled in a fresh session, but it is
   free and installs fine: `pip install bpy --break-system-packages` (a big download, so do it only when a model
   needs building). Kane has said this is fine, no need to ask. glTF winding matters in three.js.
+- **Something clips through the fingers when held?** Nearly always the grip solver (`src/adaptive-grip.js`) gave up. It
+  shifts the object off the palm by at most 6 cm (`MAX_PALM_SHIFT`); if the open hand still intersects it, `solve`
+  returns false and the hand closes on the plain authored pose, with no fitting and no warning. Find out first: the hold
+  lab logs `solved true|false` (`item=fruit` and the others; `debug=1` draws the contact outline). Fix it with a grip
+  offset on the object, not by touching the solver: the palm normal is the grip socket's X axis, so the point goes
+  along X, and the two hands are mirrored (the fruit needs -X on the right hand and +X on the left, see
+  `FRUIT.gripOffset` in `src/glow-fruit.js`). Keep one frozen surface object per hand so the solved grip is cached, and
+  check both hands. `python3 tools/hold-lab/probe_grip_point.py <item> <side>` tries offsets on every axis (solving is
+  not the same as looking right, so render the winners with `tools/hold-lab/lab_shot.py` and look). The solver is
+  independent of arm pose, so one good lab render covers the pose in the game; the headset is still unproven.
+- Screenshots of the hold lab: `python3 tools/hold-lab/lab_shot.py "<hold-lab query>" out.png` with `npm run dev` running
+  (Playwright for Python, Chromium in `/opt/pw-browsers`, SwiftShader flags are in the script).
+- Stop the dev server with `fuser -k 4173/tcp`. `pkill -f vite` or `pgrep -f` matches its own shell and kills the command.
+- After a squash merge, `git checkout -B main origin/main` and `git branch -D` the feature branch. The stop hook counts
+  the unsquashed local commit as unpushed and nags, even though the work is already on `main`.
 - Tests live in `tests/`. Add tests for game logic. Keep constants in one table at the top of a module.
 
 ## Roadmap
