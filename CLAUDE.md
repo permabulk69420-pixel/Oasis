@@ -173,6 +173,11 @@ for the least change is the grass (cull patches behind the view when it rebuilds
 level of detail for the veil tree (Kane has said to leave that tree alone, so ask first).
 ## Day session log (4 Oct 2026, Kane and me)
 
+Creature triangle budget (Kane, 4 Oct): he thinks the 6,000 / 2,000 / 600 limits in the first brief were too conservative, since fights happen in the
+desert where little else is drawn (measured on desktop: 25k to 80k triangles in open dunes, 376k at spawn, mostly grass). He wants a close-up level of
+up to about 50,000. My view: fine as a ceiling for one creature at a time (it adds about 13% to the spawn scene); spend it where it shows at 1 to 5 m
+(head, plates, legs), do not pad. Keep three levels and keep the draw calls at two per creature.
+
 Dune stinger (first creature, `tools/dune-stinger/`): the other model's first build (3 LODs 4,482 / 1,560 / 582 tris, 49 bones) passes my checks
 (`python3 tools/creature/check_glb.py`: numpy + trimesh, no Blender) and loads and bends in three.js, but it is artistically generic and barely
 glows. It is kept in `tools/`, NOT in `public/`, and waits for Kane's OK; the plan I gave him is to use it as a base and improve it myself
