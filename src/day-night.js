@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { SUN } from './world.js';
+import { sunDirectionFor, INITIAL_PHASE } from './sun-path.js';
 import { installOasisWater } from './oasis-water.js';
 import { createWaterFireflies } from './water-fireflies.js';
 import { nightFill } from './night-fill.js';
-import { milkyWayPoint } from './night-sky.js';
+import { milkyWayPoint, planetCovers } from './night-sky.js';
 
 // The game leans toward twilight and night: a shorter day, a longer night.
 // Short on purpose while testing; the shipped game will use 30+ minute days.
@@ -15,12 +15,7 @@ const NIGHT_EXPOSURE = 0.035;
 const DAY_EXPOSURE = 0.82;
 
 const TAU = Math.PI * 2;
-const INITIAL_SUN = new THREE.Vector3(SUN.x, SUN.y, SUN.z).normalize();
-const SUN_PATH_AZIMUTH = Math.atan2(INITIAL_SUN.z, INITIAL_SUN.x);
-// The sun never climbs high: its arc tops out at about 58 degrees instead of passing straight
-// overhead. Days stay softer and low, and the golden twilight around each horizon crossing lasts longer.
-const SUN_ARC = 0.65;
-const INITIAL_PHASE = Math.min(Math.asin(THREE.MathUtils.clamp(INITIAL_SUN.y, -1, 1)) / SUN_ARC, Math.PI / 2) / TAU;
+// The sun's path (it never climbs past 58 degrees, and it swings smoothly round the sky) is in sun-path.js.
 
 const DAY_SKY_LIGHT = new THREE.Color(0xc4ddf0);
 const NIGHT_SKY_LIGHT = new THREE.Color(0x02050a);
@@ -65,6 +60,7 @@ function createNightStars(sunUniform, timeUniform) {
   };
 
   const bandPoint = new THREE.Vector3();
+  const starDirection = new THREE.Vector3();
   for (let i = 0; i < STAR_COUNT; i++) {
     const p = i * 3;
     const inBand = i < BAND_STARS;
@@ -86,6 +82,8 @@ function createNightStars(sunUniform, timeUniform) {
     const sparkle = random();
     sizes[i] = inBand ? 1.15 + random() * 0.8 : sparkle > 0.965 ? 3.0 + random() * 1.8 : 1.25 + random() * 1.15;
     brightness[i] = (inBand ? 0.30 : 0.42) + Math.pow(random(), 2.2) * (inBand ? 0.50 : 0.58);
+    // the ringed planet is nearer than the stars: any star behind it is simply not lit (the others keep their places)
+    if (planetCovers(starDirection.set(positions[p], positions[p + 1], positions[p + 2]).multiplyScalar(1 / STAR_RADIUS))) brightness[i] = 0;
 
     const tint = random();
     if (tint < 0.12) {
@@ -198,15 +196,7 @@ export function createDayNightCycle({ scene, renderer, materials }) {
 
   function apply() {
     const phase = phaseFromElapsed(elapsedSeconds);
-    const angle = phase * TAU;
-    const elevation = Math.asin(Math.sin(angle)) * SUN_ARC;
-    const horizontal = Math.cos(elevation) * (Math.cos(angle) >= 0 ? 1 : -1);
-
-    sunDirection.set(
-      Math.cos(SUN_PATH_AZIMUTH) * horizontal,
-      Math.sin(elevation),
-      Math.sin(SUN_PATH_AZIMUTH) * horizontal
-    ).normalize();
+    sunDirectionFor(phase, sunDirection);
     moonDirection.copy(sunDirection).multiplyScalar(-1);
 
     const sunHeight = sunDirection.y;

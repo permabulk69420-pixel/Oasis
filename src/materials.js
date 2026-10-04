@@ -434,6 +434,9 @@ export function createMaterials(renderer, field) {
         float moonNight = 1.0 - smoothstep(-0.12, 0.10, uSun.y);
         if (moonNight > 0.01) gl_FragColor.rgb += moonLight(ray) * moonNight;
         if (starNight > 0.01) gl_FragColor.rgb += (milkyWayLight(ray) + shootingStarLight(ray, uCloudTime)) * starNight;
+        // The great ringed planet this moon circles, laid over everything above (it is nearer than the stars and the Milky Way).
+        vec4 planet = planetLight(ray, daylight);
+        gl_FragColor.rgb = gl_FragColor.rgb * (1.0 - planet.a) + planet.rgb;
         #include <colorspace_fragment>
       }
     `,
