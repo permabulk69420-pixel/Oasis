@@ -27,6 +27,9 @@ work. What he has told me, or shown he wants, across sessions:
 - **He often talks to me by text-to-speech, with an Australian accent**, so messages come through long, without punctuation, and sometimes with
   words the transcriber got wrong. Read for the meaning. If a word or a whole request could be a mishearing and the guess would matter (which
   tree, which file, which look), ask him one short question rather than building on it. He asked for exactly that.
+  **Watch "can", "can't" and "don't" in particular:** with his accent the transcriber swaps them, and he does not notice, so a sentence can
+  mean the opposite of what he said ("don't change it" arriving as "can change it"). If one of those words decides whether I act or not,
+  and the rest of the message does not settle it, check with him before touching anything.
 - **Do not make him repeat himself.** When he tells me a fact, rule or preference, it goes in this file before the session ends. If I hit
   the same pain twice, add a note here and tell him (he asked for that).
 - Everything above sits on top of the standing rules below (no sub-agents, nothing that costs money, no keys, merge what is verified).
