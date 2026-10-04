@@ -6,18 +6,30 @@ import * as THREE from 'three';
 // same bark can sit on a teal trunk or a brown log.
 //
 // UV rules the models follow, so one texture fits them all:
-//   bark  u runs once round the trunk, v is height in metres * BARK.tilesPerMetre (so the grain is the same size on every tree)
+//   bark  u runs once round the trunk, v is height in metres * BARK.tilesPerMetre (1.25) (so the grain is the same size on every tree)
 //   leaf  u runs across the leaf (the midrib is at 0.5), v runs along it once, tip at 1
 //
 // Both are seamless, small (128 x 128 and 64 x 128 grey pixels), mip-mapped, and cached: one texture each however many trees.
+//
+// The bark has a second, better version: a real photographed palm bark (CC0, Poly Haven, see public/textures/bark/CREDITS.md) as a
+// neutral grey detail map plus a normal map, 1024 x 1024 each (about 0.8 MB to download). It loads in the background and takes
+// over from the drawn one when it arrives; if it cannot load (or in a test, with no browser) the drawn bark simply stays.
 
 export const BARK = Object.freeze({
   size: 128,
-  tilesPerMetre: 2, // v repeats every half metre of trunk
+  tilesPerMetre: 1.25, // v repeats every 0.8 m of trunk, about the distance round it, so the grain is not stretched
   fibreCells: 22, // fibres round the tile (many thin vertical streaks)
   fibreLength: 3, // cells down the tile: long streaks
   scarRows: 14, // faint horizontal scars per tile
   mean: 0.81, // the average grey; materials are brightened by 1/mean so the vertex colours keep their brightness
+});
+
+// The photographed bark (files made by tools/textures/make_bark.py).
+export const BARK_PHOTO = Object.freeze({
+  detail: 'textures/bark/palm_bark_detail.jpg', // neutral grey, average BARK.mean, multiplies the vertex colours
+  normal: 'textures/bark/palm_bark_normal.jpg', // OpenGL convention, as glTF and three.js expect
+  normalScale: 1.0,
+  anisotropy: 4,
 });
 
 export const LEAF = Object.freeze({
@@ -127,9 +139,44 @@ export function surfaceTexture(kind) {
 
 const MEAN = Object.freeze({ bark: BARK.mean, leaf: LEAF.mean });
 
+// Every material that has had the bark put on it, so the photo can be swapped in when it arrives.
+const barkMaterials = new Set();
+let barkPhoto = null; // { detail, normal } once loaded
+let barkPhotoRequest = null;
+
+function setBarkPhoto(material) {
+  material.map = barkPhoto.detail;
+  material.emissiveMap = barkPhoto.detail;
+  material.normalMap = barkPhoto.normal;
+  material.normalScale.set(BARK_PHOTO.normalScale, BARK_PHOTO.normalScale);
+  material.needsUpdate = true;
+}
+
+// Loads the photographed bark once. Resolves to { detail, normal }, or null if it cannot be loaded (never rejects).
+export function loadBarkPhoto(loader = new THREE.TextureLoader(), base = import.meta.env?.BASE_URL ?? '/') {
+  if (barkPhotoRequest) return barkPhotoRequest;
+  const load = file => loader.loadAsync(`${base}${file}`).then(texture => {
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.colorSpace = THREE.NoColorSpace; // detail and normals are data, not colours
+    texture.flipY = false; // glTF puts the UV origin at the top left, like the models' UVs
+    texture.anisotropy = BARK_PHOTO.anisotropy;
+    return texture;
+  });
+  barkPhotoRequest = Promise.all([load(BARK_PHOTO.detail), load(BARK_PHOTO.normal)]).then(([detail, normal]) => {
+    barkPhoto = { detail, normal };
+    for (const material of barkMaterials) setBarkPhoto(material);
+    return barkPhoto;
+  }).catch(error => {
+    console.warn('[Oasis] Photo bark unavailable, keeping the drawn bark.', error);
+    return null;
+  });
+  return barkPhotoRequest;
+}
+
 // Put the shared textures on the materials of a loaded model that have a known name (SURFACE_BY_MATERIAL). Call it before the
-// model is first drawn. Materials with other names are left alone.
-export function applySurfaceTextures(root) {
+// model is first drawn. Materials with other names are left alone. In a browser the photographed bark is loaded too and replaces
+// the drawn one when it arrives; pass { photo: false } to keep the drawn bark only.
+export function applySurfaceTextures(root, { photo = typeof document !== 'undefined' } = {}) {
   const done = new Set();
   root.traverse(object => {
     const materials = Array.isArray(object.material) ? object.material : object.material ? [object.material] : [];
@@ -140,7 +187,12 @@ export function applySurfaceTextures(root) {
       material.map = surfaceTexture(kind);
       material.emissiveMap = material.map; // the models' small light of their own carries the detail too, so the shaded side is not flat
       material.color.setScalar(1 / MEAN[kind]);
+      if (kind === 'bark') {
+        barkMaterials.add(material);
+        if (barkPhoto) setBarkPhoto(material);
+      }
       material.needsUpdate = true;
     }
   });
+  if (photo && barkMaterials.size > 0) loadBarkPhoto();
 }
