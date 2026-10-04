@@ -98,8 +98,9 @@ export function layoutFinds({ heightAt, seed = FINDS.seed } = {}) {
   function add(kind, variant, x, z, scale, site, extra = {}) {
     const radius = footprintOf(kind, variant) * scale;
     const ground = groundUnder(heightAt, x, z, radius);
-    // A rock stands on its lowest corner (its foot is already buried a little); the others on the average.
-    const height = kind === 'rock' ? ground.min + 0.04 * heightOf(kind, variant) * scale : ground.mean;
+    // Everything stands on its lowest corner with the foot buried a little, so on a slope the uphill side sinks into the dune instead of
+    // the downhill side showing daylight underneath (a crystal's foot was seen floating on a slope with the average ground under it).
+    const height = ground.min + (kind === 'rock' ? 0.04 : 0.02) * heightOf(kind, variant) * scale - (kind === 'rock' ? 0 : 0.04);
     const node = {
       id: `${kind[0]}${String(counts[kind]++).padStart(2, '0')}`,
       kind, variant, x, z, y: height, yaw: rng() * TAU, scale, radius, site, ...extra,
