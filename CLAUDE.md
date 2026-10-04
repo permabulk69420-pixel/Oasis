@@ -4,6 +4,30 @@ Oasis is a three.js WebXR desert survival game for Meta Quest 3. The owner (Kane
 tests by opening the deployed GitHub Pages URL on the headset. Pushing to `main` deploys. Read `README.md`
 for how the game works. These are standing rules from Kane; they apply to every session and survive compaction.
 
+## How we work (Kane and me)
+
+Kane is a solo dev. He is casual, often away from the headset (travelling, testing in bursts) and happy to hand me a stretch of
+work. What he has told me, or shown he wants, across sessions:
+
+- **Make the call on art and atmosphere.** His words: "you make the call what you think is best, we can always change it, I'd rather that
+  call than me making a bad call." Pick, build, show it, and say what to look at. Do not hand him a menu for a visual choice. Ask first on
+  gameplay and UI (fuel, cold, how things work, new mechanics) and on anything that costs money or touches an account.
+- **Say what I think.** When he asks "what do you think", give a recommendation with reasons, and say so plainly if I disagree. He
+  would rather have an opinion than a list of options.
+- **Short reports.** What changed, one or two specific things to check in the headset (shimmer, scale, feel), and whether a PR is
+  merged or waiting. No recap of the steps and no "untested on a headset" (he knows).
+- **He reads the screenshots in the tool log**, so render and actually look at them, and send the key before/after images with
+  anything visual. I can judge stills, not real-time motion or headset feel.
+- **New hand-built models wait for his OK** (send the `.glb` and renders, leave the PR open). Code, shader, texture-plumbing and docs
+  changes get merged once verified (rule 4). Wait for his headset feedback before changing a feature he has not tested yet (the
+  backpack's back zone is waiting on that).
+- **Performance in the headset is fine right now** (he says the grass and the hero tree with no level of detail are not a problem), so do
+  not optimise them ahead of a real problem. Real 1k CC0 PBR textures are fine where they matter up close (bark, ground), at 1k not 2k, and
+  not on thin leaves. Poly Haven (`api.polyhaven.com`) and ambientCG are reachable and free.
+- **Do not make him repeat himself.** When he tells me a fact, rule or preference, it goes in this file before the session ends. If I hit
+  the same pain twice, add a note here and tell him (he asked for that).
+- Everything above sits on top of the standing rules below (no sub-agents, nothing that costs money, no keys, merge what is verified).
+
 ## Standing rules (do not lose these)
 
 1. **No sub-agents.** Never use the Agent tool or spawn helpers in this project. They burn Kane's
@@ -76,6 +100,15 @@ for how the game works. These are standing rules from Kane; they apply to every 
 - Stop the dev server with `fuser -k 4173/tcp`. `pkill -f vite` or `pgrep -f` matches its own shell and kills the command.
 - After a squash merge, `git checkout -B main origin/main` and `git branch -D` the feature branch. The stop hook counts
   the unsquashed local commit as unpushed and nags, even though the work is already on `main`.
+- **Stop-hook "N unpushed commits and no remote branch" is often wrong.** It can fire after a push and after a squash merge. Check
+  before doing anything: `git ls-remote --heads origin BRANCH` against `git rev-parse HEAD`. If they match, nothing is unpushed (a missing
+  local `origin/BRANCH` ref is why it complains; `git fetch origin +refs/heads/BRANCH:refs/remotes/origin/BRANCH` and setting
+  `branch.BRANCH.remote`/`.merge` quietens it). Never re-push or re-do work because of it, and it is not Kane asking for anything.
+- Palm close-up for a screenshot (dev build): `?hour=14&at=311.6,-357.7&look=313.5,-351,2.5&treelod=0`; `&eye=1.0` for a low camera at
+  the base. Other palms are at `WATER + (cos a * radiusX * r, sin a * radiusZ * r)` for the `angle`/`radius` pairs in
+  `TREE_LAYOUT`, `src/oasis-vegetation.js`. `?camp=lit` ignores `?at` (the fire goes near spawn).
+- Free texture sources: `python3 tools/textures/make_bark.py` (arrives with #46) shows the pattern (download the 1k Poly Haven set, reduce it to a neutral
+  grey detail map plus a normal map, record the credit in `public/textures/<name>/CREDITS.md`, add a test that the files exist and are small).
 - Tests live in `tests/`. Add tests for game logic. Keep constants in one table at the top of a module.
 
 ## Roadmap
@@ -126,4 +159,12 @@ spawn point and 134,000 from the elevated overview), the veil tree 117,000 in 6 
 everything else (terrain chunks, sky, stars, tools) a few thousand each. If a headset test shows the frame rate is short, the biggest saving
 for the least change is the grass (cull patches behind the view when it rebuilds, or lower `MAX_DRAW_DISTANCE`/`RICH_BLADES`), then a
 level of detail for the veil tree (Kane has said to leave that tree alone, so ask first).
-Tasks left: the morning summary for Kane.
+## Day session log (4 Oct 2026, Kane and me)
+
+Merged: #39 glow fruit grip fix (mirrored per-hand offset), #40, #41 and #44 notes in this file, #42 backpack haptic tick (stronger, so you can
+feel the back zone), #43 Milky Way edge (the band now fades to exactly zero where it is cut), #45 softer wind-blown sand (patchy veils, fewer
+hair-thin streaks). Open, waiting for Kane's headset check: #46 palm pass (shared bark and leaf textures in `src/surface-textures.js`, real
+CC0 palm bark with a normal map, buttress base instead of root spikes, a fourth ring of older fronds, more arch, outer palms vary in size
+and turn). Waiting on Kane before touching: the backpack back zone (options if it still feels hard: a repeating buzz, a sound, a bigger zone,
+a visual cue). Only if Kane says go: a script and post for his explainer on tokens, API price and plan usage.
+
