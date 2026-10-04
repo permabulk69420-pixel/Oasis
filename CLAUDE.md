@@ -15,11 +15,8 @@ the moment", so keep it loose: he said not to get into too much of the specifics
 - My read, which he liked: the hardest part and the biggest risk is the climb (gripping something huge and moving by hand). A rough prototype of that comes
   before more survival or world detail. How a colossus is beaten, the glider's feel, what dying means and water/stamina pressure are HIS calls: do not
   invent them.
-- Dropped or parked so they stop competing: base building and shelters, co-op, cold nights and fuel as a survival system, water as a hard leash, and the
-  crashed ship and crystal-beacon ending (my overnight idea, he never asked for it: "crossing a little bit into gameplay"). The ringed planet and the bones
-  stay as atmosphere only; nothing about a ship is in the game. **Only the desert moon and the giant bones were Kane's.** The expedition survivor, the crashed ship
-  and the "boss is the grown up version" story were mine, written up overnight as "what we talked through", which was wrong; he laughed it off on 5 Oct ("this whole planet
-  crash ship idea, like lol"). Do not treat any of it as agreed or build on it.
+- Dropped or parked so they stop competing: base building and shelters, co-op, cold nights and fuel as a survival system, and water as a hard leash.
+- The setting is a desert moon with a ringed planet in the sky and giant bones in the dunes: atmosphere only, with no story attached. Do not invent a plot.
 - The full write-up is `claude/direction.md` in the Project (the `Projects` tool). Keep it and this section in step.
 
 ## How we work (Kane and me)
@@ -135,10 +132,8 @@ intentional later"), so none of the fight, water or insect sounds. In this order
 4. Fight effects: sand puffs on the lunge and death, the dead stinger sinks into the sand instead of popping out of the world.
 5. Saving: a silent, versioned autosave of inventory, tools, fires, felled trees, position and time (`?fresh=1` starts clean; mismatched saves discarded).
 6. (Done.) Footprints in the sand (player and creature), filled in by the wind, one instanced draw call.
-7. (Done, #81.) Giant bones half buried in the dunes (Blender model with LODs) as landmarks; the crashed expedition wreck was parked on 5 Oct (see Game direction).
-8. A direction doc in the Project (`Projects` tool): the decisions only Kane can make, each with my one-line take, and the story seed we talked through
-   (survivor of an expedition that came down on a desert moon with a ringed planet in the sky; the giant bones are what brought the ship down; the
-   boss is its grown up version). [5 Oct: only the moon and the bones were Kane's; the expedition and crashed ship were my invention, not agreed. See Game direction.]
+7. (Done, #81.) Giant bones half buried in the dunes (Blender model with LODs) as landmarks.
+8. (Done, since rewritten; see Game direction.) A direction doc in the Project (`Projects` tool).
 9. If time: glow motes (done: the pond already had fireflies, so they rise off the crystals), the ringed planet in the night sky (done, with the sun's path fix), dust devils by day, a skittering critter, a dawn and dusk look pass.
 Add a `creature-pipeline` skill (`.claude/skills/`) when the stinger v3 build is done, since the Blender to pose code to game procedure is longer than a few lines.
 
@@ -291,7 +286,7 @@ on you... just don't fire off subagent or do anything crazy"; "don't be afraid t
 about gameplay mechanic that's going to be something I really need to test and do myself"), no sound effects yet ("way more intentional later"). He
 wants "something more than just visual" and a reason to go out into the desert: a pickaxe, good stones or crystals, a "not a cactus" alien plant, PBR.
 Plan: pickaxe + desert finds, dune stinger v3 (Blender), fight effects, saving, footprints, giant bones, a direction doc in the Project. Keep the time
-(`TZ=Australia/Sydney date`). Done so far: #75 (smoke test in CI), #76 the pickaxe and desert finds, #77 the dune stinger v3, #78 fight effects (all below), #79 saving, #80 footprints, #81 giant bones, #82 the ringed planet and the smooth sun path, #83 crystal motes (below, last paragraphs). Not done when Kane woke (lost 3.5 hours to a permission prompt, see rule 5): the crashed ship wreck inside the lone ribcage (parked on 5 Oct, see Game direction), dust devils by day, a dawn and dusk look pass, a skittering critter, the `creature-pipeline` skill.
+(`TZ=Australia/Sydney date`). Done so far: #75 (smoke test in CI), #76 the pickaxe and desert finds, #77 the dune stinger v3, #78 fight effects (all below), #79 saving, #80 footprints, #81 giant bones, #82 the ringed planet and the smooth sun path, #83 crystal motes (below, last paragraphs). Not done when Kane woke (lost 3.5 hours to a permission prompt, see rule 5): dust devils by day, a dawn and dusk look pass, a skittering critter, the `creature-pipeline` skill.
 
 Pickaxe and desert finds (my call, done; see README "The desert finds and the pickaxe"): `src/pickaxe.js` (a stone pickaxe like the axe, crafted from 3 sticks +
 3 stones, also stands by the starting tools, hurts the stinger for 26), `src/desert-finds.js` (fixed-seed layout of about 120 nodes in 25 sites),
