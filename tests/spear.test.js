@@ -312,7 +312,7 @@ test('hold the torch button with the spear in your hand and it turns to the thro
   assert.ok(spear.root.quaternion.angleTo(poke) > 0, 'it starts turning at once');
   assert.ok(spear.root.quaternion.angleTo(poke) < THREE.MathUtils.degToRad(SPEAR_THROW_TILT - SPEAR_THRUST_TILT), 'but not in a single frame');
   for (let i = 0; i < 20; i++) tools.update(0.016);
-  assert.ok(spear.root.quaternion.angleTo(spearHeldRotation(SPEAR_THROW_TILT)) < 1e-6, 'a third of a second later it is in the throwing grip');
+  assert.ok(spear.root.quaternion.angleTo(spearHeldRotation(SPEAR_THROW_TILT)) < 1e-6, 'a third of a second later it is in the throwing grip (flipped)');
   const expected = new THREE.Vector3(...SPEAR_GRIP.point).applyQuaternion(spear.root.quaternion).negate();
   assert.ok(spear.root.position.distanceTo(expected) < 1e-9, 'the grip point stays in the palm while it turns');
   assert.ok(Math.abs(spear.root.quaternion.angleTo(poke) - THREE.MathUtils.degToRad(SPEAR_THROW_TILT - SPEAR_THRUST_TILT)) < 1e-6);
@@ -322,7 +322,7 @@ test('hold the torch button with the spear in your hand and it turns to the thro
   assert.ok(spear.root.quaternion.angleTo(poke) < 1e-6, 'and back to the poke');
 });
 
-test('the throwing grip is the same on the left hand (X), a dropped spear starts as a poke again, and the tilt stays one the fingers can close on', t => {
+test('the throwing grip is the same on the left hand (X), a dropped spear starts as a poke again, and the grip is a straight flip', t => {
   const { tools, state, handTo, squeeze, buttons } = fixture(t);
   state.handedness = 'left';
   const [spear] = tools.getInstances('spear');
@@ -337,5 +337,5 @@ test('the throwing grip is the same on the left hand (X), a dropped spear starts
   tools.update(0.016);
   buttons[SPEAR_SWITCH.leftButton].pressed = false;
   tools.update(0.016);
-  assert.ok(SPEAR_THROW_TILT > SPEAR_THRUST_TILT && SPEAR_THROW_TILT <= 80, 'past about 80 degrees the fingers cannot close round the shaft');
+  assert.equal(SPEAR_THROW_TILT - SPEAR_THRUST_TILT, 180, 'the throwing grip is the spear flipped end for end: the same line across the palm, so the fingers still close on it');
 });
