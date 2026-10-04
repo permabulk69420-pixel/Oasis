@@ -1,3 +1,4 @@
+import { terrainHeight } from '../src/world.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -92,9 +93,14 @@ test('a tool drawn from one hip can be put on the other, dropped, or packed at t
   handTo(away);
   squeeze(false);
   assert.equal(axe.slot, null);
-  assert.equal(axe.root.parent?.isScene, true, 'released away from the body, it lands on the ground');
+  assert.equal(axe.root.parent?.isScene, true, 'released away from the body, it falls to the ground');
+  assert.ok(axe.fall, 'it is falling');
+  for (let i = 0; i < 1200 && axe.fall.phase !== 'rest'; i++) tools.update(0.016);
+  assert.equal(axe.fall.phase, 'rest', 'and comes to rest');
+  const at = axe.root.getWorldPosition(new THREE.Vector3());
+  assert.ok(Math.abs(at.y - terrainHeight(at.x, at.z)) < 0.4, 'lying on the sand (dropped from 18 m in this fake world, so it took a while)');
 
-  handTo(axe.root.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.14, 0)));
+  handTo(at.add(new THREE.Vector3(0, 0.1, 0)));
   squeeze(true);
   assert.equal(axe.heldBy, state);
   const before = getInventoryCount('axe');
@@ -239,4 +245,54 @@ test('hips stay put while you look around, and face where you look once you star
   xrCamera.updateMatrixWorld(true);
   settle();
   assert.ok(hip().distanceTo(after) < 0.01, 'and then stays put while you keep walking and glance around');
+});
+
+test('letting go while the hand swings throws the tool the way the hand was moving', t => {
+  const { tools, state, handTo, squeeze, rig } = fixture(t);
+  addInventoryItem('torch', 1);
+  tools.equip('torch', 'right');
+  const torch = tools.getInstances('torch').find(instance => instance.slot === 'right');
+  handTo(tools.belt.right.getWorldPosition(new THREE.Vector3()));
+  squeeze(true);
+  assert.equal(torch.heldBy, state);
+
+  // Swing the hand forward (away from the body, -z) at about 6 m/s for a fifth of a second, then let go.
+  const start = rig.localToWorld(new THREE.Vector3(0.5, 3.0, -0.5)); // a high swing, so it has time to fly
+  handTo(start);
+  tools.update(0.016);
+  for (let i = 1; i <= 12; i++) {
+    handTo(start.clone().add(new THREE.Vector3(0, 0, -0.096 * i)));
+    tools.update(0.016);
+  }
+  squeeze(false);
+  assert.ok(torch.fall, 'it is in flight');
+  assert.ok(torch.fall.velocity.z < -3, `thrown forward (z speed ${torch.fall.velocity.z.toFixed(1)})`);
+  assert.ok(Math.abs(torch.fall.velocity.x) < 1, 'and not sideways');
+  const before = torch.root.getWorldPosition(new THREE.Vector3());
+  for (let i = 0; i < 1200 && torch.fall.phase !== 'rest'; i++) tools.update(0.016);
+  const after = torch.root.getWorldPosition(new THREE.Vector3());
+  assert.ok(before.z - after.z > 1.5, `it travelled a few metres forward (${(before.z - after.z).toFixed(1)} m)`);
+  clearInventory('torch');
+});
+
+test('a tool lying on the ground can be picked up from along its length, not only from its handle end', t => {
+  const { tools, state, handTo, squeeze, rig } = fixture(t);
+  addInventoryItem('torch', 1);
+  tools.equip('torch', 'right');
+  const torch = tools.getInstances('torch').find(instance => instance.slot === 'right');
+  handTo(tools.belt.right.getWorldPosition(new THREE.Vector3()));
+  squeeze(true);
+  handTo(rig.localToWorld(new THREE.Vector3(0.5, 1.0, -0.5)));
+  squeeze(false);
+  for (let i = 0; i < 1200 && torch.fall.phase !== 'rest'; i++) tools.update(0.016);
+  assert.equal(torch.fall.phase, 'rest');
+
+  // Reach for the far end of the lying torch, further from its origin than the old pickup radius.
+  const origin = torch.root.getWorldPosition(new THREE.Vector3());
+  const tip = new THREE.Vector3(0, torch.kind.shape.top, 0).applyQuaternion(torch.root.getWorldQuaternion(new THREE.Quaternion())).add(origin);
+  assert.ok(tip.distanceTo(origin) > 0.4, 'the torch is longer than the pickup radius');
+  handTo(tip.add(new THREE.Vector3(0, 0.05, 0)));
+  squeeze(true);
+  assert.equal(torch.heldBy, state, 'grabbed by its far end');
+  clearInventory('torch');
 });

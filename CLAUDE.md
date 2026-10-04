@@ -35,6 +35,12 @@ work. What he has told me, or shown he wants, across sessions:
 - **He does not get motion sickness and is building the game mainly around himself.** Comfort and safety options (vignettes, snap turning,
   seated modes) are a very low priority for now; he will add some later. Do not hold a design back, or add comfort features, on
   motion-sickness grounds unless he asks.
+- **The game is "Ark-like with VR controls", not Green Hell or Boneworks.** His words: he wants a real game and physical interaction only
+  "where it really makes sense". Keep physics light and purposeful (things falling, being thrown); do not add gimmicky full-body or
+  everything-is-physical systems. He is fine with a light custom system, not a full physics engine.
+- **Astra (OpenAI's model) was a bust for the creature.** Kane sent it my dune stinger brief (and a sandworm), it took two or three attempts, used about
+  70% of his five hour allowance, and he was not happy with the result. Do not suggest handing models to another model again unless he asks. If he
+  wants the creature, I build it myself in Blender (free; mesh-check and render it, send the `.glb` for his OK first).
 - **Keep it relaxed.** Kane is easy-going, often has a drink in hand, likes philosophy and likes to have fun while we work. Talk to him like a
   mate: laid back, plain words, a joke when one fits. Do not force it and do not pad reports with banter; the short-report rule still holds.
 - **Do not make him repeat himself.** When he tells me a fact, rule or preference, it goes in this file before the session ends. If I hit
@@ -166,6 +172,13 @@ everything else (terrain chunks, sky, stars, tools) a few thousand each. If a he
 for the least change is the grass (cull patches behind the view when it rebuilds, or lower `MAX_DRAW_DISTANCE`/`RICH_BLADES`), then a
 level of detail for the veil tree (Kane has said to leave that tree alone, so ask first).
 ## Day session log (4 Oct 2026, Kane and me)
+
+Dropping and throwing (`src/falling.js`, `src/hand-motion.js`; Kane said "100% go for it"): a tool you let go of falls with your hand's
+speed and turn (letting go while swinging throws it), bounces a little, topples and lies along the ground (axe rolls its head flat), and a spear
+point-first at 3+ m/s sticks in the sand. A lying tool can be grabbed anywhere along its length. Tools have `fall: { radius, landing, com }` in
+their kind; the starting tools still stand planted. Oddities to tell Kane: things do not hit each other or trees; the spear sticks at any angle
+steeper than about 18 degrees; dev fixture `?view=throws`; headless tests cannot show the feel of a real throw (check the swing speed and
+whether the spear sticks sensibly).
 
 Merged: #39 glow fruit grip fix (mirrored per-hand offset), #40, #41 and #44 notes in this file, #42 backpack haptic tick (stronger, so you can
 feel the back zone), #43 Milky Way edge (the band now fades to exactly zero where it is cut), #45 softer wind-blown sand (patchy veils, fewer
