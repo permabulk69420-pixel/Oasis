@@ -14,6 +14,7 @@ import { createCampfires, campfireSpot, campfireSite } from './campfire.js';
 import { createWindSand, WIND_SAND } from './wind-sand.js';
 import { createAlienBirds } from './alien-bird.js';
 import { createDuneStinger } from './dune-stinger.js';
+import { createSandPuffs } from './sand-puffs.js';
 import { createWeaponHits } from './weapon-hits.js';
 import { createMining } from './mining.js';
 import { registerLooseFindDrops } from './loose-finds.js';
@@ -291,8 +292,10 @@ const alienBirds = createAlienBirds({
 // The dune stinger: one lives in the dunes to the right of the start. It wanders, stalks you when it sees you, and strikes with its
 // tail (a warning first, and it lands where you were standing). Your spear and axe hurt it; a few good blows kill it.
 const STINGER_HIT_HAPTIC = [1, 220];
+// Puffs of sand and dust for anything heavy that lands on the dunes (the sting, a falling body), one draw call for all of them.
+const sandPuffs = createSandPuffs({ scene, sun: materials.sand.uniforms.uSun, heightAt: field.sample });
 const duneStinger = createDuneStinger({
-  scene, renderer, camera, field,
+  scene, renderer, camera, field, puffs: sandPuffs,
   getExposure: () => renderer.toneMappingExposure,
   onError: message => console.warn(message),
   onPlayerHit: strike => {
@@ -309,7 +312,7 @@ const mining = createMining({
 });
 registerLooseFindDrops({ stonesGroup, sticksGroup, materials: mining.materials, heightAt: field.sample });
 if (import.meta.env.DEV) window.__mining = mining; // dev only: lets a test strike a node without swinging a tool
-if (import.meta.env.DEV) window.__stinger = duneStinger; // dev only: lets a screenshot script read or hurt the stinger
+if (import.meta.env.DEV) { window.__stinger = duneStinger; window.__sandPuffs = sandPuffs; } // dev only: lets a screenshot script read or hurt the stinger and throw dust
 const weaponHits = createWeaponHits({ tools: hands.tools, rig, targets: [duneStinger, mining] });
 // Development-only: ?bird=perch|fly|flare puts a bird in view and stops time for it (?birdfreeze=0 lets it move),
 // ?birdd=<metres> sets how far ahead, ?birdseed=<n> makes the bird's choices repeatable.
@@ -575,6 +578,7 @@ function frame(time) {
   weaponHits.update(dt);
   mining.update(dt, head);
   duneStinger.update(dt, head);
+  sandPuffs.update(dt);
   if (devBird && alienBirds.ready) {
     const params = devBirdParams;
     const spot = Number(params.get('birdd')) || (devBird === 'perch' ? 9 : 20);
