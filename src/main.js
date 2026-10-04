@@ -309,6 +309,7 @@ const mining = createMining({
 });
 registerLooseFindDrops({ stonesGroup, sticksGroup, materials: mining.materials, heightAt: field.sample });
 if (import.meta.env.DEV) window.__mining = mining; // dev only: lets a test strike a node without swinging a tool
+if (import.meta.env.DEV) window.__stinger = duneStinger; // dev only: lets a screenshot script read or hurt the stinger
 const weaponHits = createWeaponHits({ tools: hands.tools, rig, targets: [duneStinger, mining] });
 // Development-only: ?bird=perch|fly|flare puts a bird in view and stops time for it (?birdfreeze=0 lets it move),
 // ?birdd=<metres> sets how far ahead, ?birdseed=<n> makes the bird's choices repeatable.
