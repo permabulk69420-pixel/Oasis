@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WATER } from './world.js';
 import { addWindSwayToModel, SWAY } from './wind.js';
+import { MATERIAL_BOOST, normaliseVertexColours } from './plant-colours.js';
 
 const HIGH_URL = `${import.meta.env.BASE_URL}models/alien_desert_plant/alien_desert_plant_lod0.glb`;
 const LOW_URL = `${import.meta.env.BASE_URL}models/alien_desert_plant/alien_desert_plant_lod1.glb`;
@@ -18,6 +19,27 @@ const LAYOUT = [
   { angle: 3.72, radius: 1.54, yaw: 4.40, scale: 3.0 },
   { angle: 5.18, radius: 1.73, yaw: 5.55, scale: 3.0 },
 ];
+
+function liftVertexColours(source) {
+  source.traverse(object => {
+    if (!object.isMesh) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    const boost = materials.map(m => MATERIAL_BOOST[m?.name]).find(Boolean);
+    const colour = object.geometry?.getAttribute('color');
+    if (!boost || !colour || object.geometry.userData.liftedColours) return;
+    const data = new Float32Array(colour.count * colour.itemSize);
+    for (let i = 0; i < colour.count; i++) {
+      data[i * colour.itemSize] = colour.getX(i);
+      data[i * colour.itemSize + 1] = colour.getY(i);
+      data[i * colour.itemSize + 2] = colour.getZ(i);
+      if (colour.itemSize === 4) data[i * 4 + 3] = colour.getW(i);
+    }
+    const lifted = normaliseVertexColours(data, colour.itemSize);
+    for (let i = 0; i < lifted.length; i++) if (i % colour.itemSize < 3) lifted[i] *= boost;
+    object.geometry.setAttribute('color', new THREE.BufferAttribute(lifted, colour.itemSize));
+    object.geometry.userData.liftedColours = true;
+  });
+}
 
 function applyPlantTextures(source, stemTexture, leafTexture) {
   source.traverse(object => {
@@ -41,6 +63,7 @@ function prepareSource(source, stemTexture, leafTexture) {
     object.castShadow = false;
     object.receiveShadow = false;
   });
+  liftVertexColours(source);
   applyPlantTextures(source, stemTexture, leafTexture);
   return {
     source,
