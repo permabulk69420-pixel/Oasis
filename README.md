@@ -282,6 +282,36 @@ world is the same every session): two **sandstone outcrops** and three **spire p
 - Development only: `window.__mining.debug.strike('r00', 26, 'pickaxe', { x, z })` strikes a node as if swung (the smoke test uses it);
   `window.__mining.list({x, z}, 60)` lists nearby nodes.
 
+## The giant bones
+
+Something to see on the skyline and walk out to (`src/giant-bones.js`). About 230 m from where you start, the skull of something enormous lies in the dunes with its jaws open and
+turned towards you, and the ribcage of the same animal stands behind it, 43 m further out. A smaller ribcage lies a long walk away the other way (about 320 m). Nothing
+about them is gameplay: you can walk through them, they cast no shadow and there is no sound. At the carcass's scale (1.6) the skull is about 18 m long, more with its
+horns, and the ribs stand about 14 m tall with a row of spines above them.
+
+The layout is a pure function of a seed and the real height field (`layoutBones`), so the world is the same every session. The carcass is found by searching round the start for ground that is level
+enough (the highest and lowest ground under a model within 2.2 m per unit of scale), at least 125 m from the pond, 100 m from the hero tree, 75 m from the stinger's home and clear of every
+desert find, with the ribs in sight of the start (so the first thing you see is a ribcage over a dune); the skull is turned to face the start (within 0.28 radians). The skull follows the
+lean of the ground, the ribs stand upright with their feet buried. The models are single sided, with vertex colours only (ivory, sand stain where they are buried, a little teal mineral).
+
+| Model | Close (within 75 m, times the scale) | Middle (to 200 m) | Far |
+| --- | --- | --- | --- |
+| Ribs (`GiantRibs`, 53 closed parts) | 23,592 triangles, 630 KB | 5,716, 190 KB | 2,256, 105 KB |
+| Skull (`GiantSkull`, 49 parts) | 17,088 triangles, 455 KB | 4,476, 149 KB | 1,496, 62 KB |
+
+- **Levels of detail are fetched as you need them.** Only the far level of each is requested at the start; the middle level is fetched as soon as you are within its distance (that is at the start,
+  since the carcass sits in the middle band), and the close level when you come within 1.5 times the distance it takes over at, so it has arrived by the time you reach it. While a better level is
+  on its way the nearest level that has arrived stays on screen. Each file is requested once. A file that fails to load reports once and that model is just missing. Nothing is drawn past 900 m.
+- **Cost:** one draw call per model on screen; from the start the carcass is 10,200 triangles and the lone ribcage 2,300 (when in view); standing at the ribs with both close levels shown it is about 41,000.
+- **Built in Blender** by `tools/giant-bones/build_bones.py` on `tools/props/propkit.py`: every rib is a tube along a curve with lumps and flutes, with a collapsed stretch of spine, one missing pair of ribs, snapped ends,
+  fallen ribs and loose vertebrae; the skull has a crest, two horns, brow and cheek spikes, deep eye sockets, an upper row of conical teeth (one lost, two broken) and a lower jaw lying flat with its own teeth.
+  Rebuild: `pip install bpy --break-system-packages`, then `python3 tools/giant-bones/build_bones.py --model both --lod all --outdir public/models/bones`; check each file with
+  `python3 tools/props/check_mesh.py public/models/bones/giant_skull_lod0.glb --nodes GiantSkull --materials Bone --budget 18000` (every shell must be a closed, outward facing solid);
+  preview with `python3 tools/props/render_preview.py --glb <file> --outdir <dir> --tag <name> --views front,side,threeq --ground 0`.
+- **Numbers** are in the `BONES` table at the top of `src/giant-bones.js` (seed, distances, scales, the clear distances, the level of detail distances and hysteresis).
+- Development only: `window.__bones` (`list()` says which level each site wants and shows, `request(kind, level)`, `sites`) and `canvas.dataset.bones`, which the smoke test reads (all three sites must show a model).
+  Tests are `tests/giant-bones.test.js` (the layout rules, the loading with a fake loader, and the six model files).
+
 ## The backpack
 
 A rucksack you pick up and put on, which raises how much you can carry before it slows you down. It lies in the sand a couple of

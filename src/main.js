@@ -18,6 +18,7 @@ import { createSandPuffs } from './sand-puffs.js';
 import { createFootprints } from './footprints.js';
 import { createWeaponHits } from './weapon-hits.js';
 import { createMining } from './mining.js';
+import { createGiantBones } from './giant-bones.js';
 import { registerLooseFindDrops } from './loose-finds.js';
 import { createBackpack, PACK } from './backpack.js';
 import { SPEAR } from './spear.js';
@@ -315,6 +316,10 @@ const mining = createMining({
   onError: message => console.warn(message),
 });
 registerLooseFindDrops({ stonesGroup, sticksGroup, materials: mining.materials, heightAt: field.sample });
+// The giant bones: the skull and ribs of something enormous, half buried far out in the dunes. Landmarks to walk to; nothing about them
+// affects play (you can walk through them, and they make no sound). Only the smallest model is fetched at first, the rest as you near.
+const giantBones = createGiantBones({ scene, camera, heightAt: field.sample, onError: message => console.warn(message) });
+if (import.meta.env.DEV) window.__bones = giantBones; // dev only: for screenshots
 if (import.meta.env.DEV) window.__mining = mining; // dev only: lets a test strike a node without swinging a tool
 if (import.meta.env.DEV) { window.__stinger = duneStinger; window.__sandPuffs = sandPuffs; window.__prints = footprints; } // dev only: lets a screenshot script read or hurt the stinger and throw dust
 const weaponHits = createWeaponHits({ tools: hands.tools, rig, targets: [duneStinger, mining] });
@@ -631,6 +636,7 @@ function frame(time) {
   duneStinger.update(dt, head);
   sandPuffs.update(dt);
   footprints.update(time * 0.001);
+  giantBones.update(head);
   if (devBird && alienBirds.ready) {
     const params = devBirdParams;
     const spot = Number(params.get('birdd')) || (devBird === 'perch' ? 9 : 20);
@@ -775,6 +781,7 @@ function frame(time) {
     canvas.dataset.render = JSON.stringify({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures });
     canvas.dataset.birds = JSON.stringify(alienBirds.list());
     canvas.dataset.stinger = JSON.stringify(duneStinger.list());
+    canvas.dataset.bones = JSON.stringify(giantBones.list());
     canvas.dataset.save = JSON.stringify(autosave.status());
     canvas.dataset.finds = JSON.stringify({ stats: mining.stats(), near: mining.list(head, 60) });
     canvas.dataset.pack = JSON.stringify(backpack.list());
