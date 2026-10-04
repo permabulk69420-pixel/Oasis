@@ -94,6 +94,20 @@ export function launch(body, { origin, quaternion, velocity, spin }) {
   body.topple = 0;
 }
 
+// Put a body down already at rest, in the pose it was left in (a saved game): lying on the ground ('rest') or stuck in the sand
+// ('stuck'). No fall is played, and nothing is checked against the ground: the pose is trusted, because it came from here.
+export function placeAtRest(body, { origin, quaternion }, phase = 'rest') {
+  body.quaternion.copy(quaternion).normalize();
+  worldAxis(body, axis);
+  body.centre.copy(origin).addScaledVector(axis, body.shape.com);
+  body.velocity.set(0, 0, 0);
+  body.spin.set(0, 0, 0);
+  body.phase = phase === 'stuck' ? 'stuck' : 'rest';
+  body.time = 0;
+  body.topple = 0;
+  return body;
+}
+
 // The model origin's world position for the body's current pose.
 export function bodyOrigin(body, out) {
   worldAxis(body, axis);

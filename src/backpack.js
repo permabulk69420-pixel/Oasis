@@ -297,6 +297,22 @@ export function createBackpack({
     canTakeOff: () => status === 'worn' && canTakeOffPack(),
     getStatus: () => status,
     get ready() { return Boolean(pack); },
+    // The save (src/save-game.js): worn, or lying where it was left. A pack in your hand is put down where it is.
+    snapshot() {
+      if (status === 'worn') return { status: 'worn' };
+      if (!pack) return null;
+      pack.updateWorldMatrix(true, false);
+      pack.getWorldPosition(packPosition);
+      return { status: 'ground', x: Math.round(packPosition.x * 100) / 100, z: Math.round(packPosition.z * 100) / 100, yaw: Math.round(yaw * 1000) / 1000 };
+    },
+    restore(data) {
+      if (!pack || !data) return false;
+      if (data.status === 'worn') { if (status !== 'worn') wear(null); return true; }
+      if (data.status !== 'ground') return false;
+      if (status === 'worn') setPackWorn(false);
+      toGround(data.x, data.z, data.yaw ?? PACK.spawn.yaw);
+      return true;
+    },
     list: () => {
       if (!pack || status === 'worn') return { status, worn: isPackWorn() };
       pack.getWorldPosition(packPosition);
