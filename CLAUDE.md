@@ -16,6 +16,8 @@ work. What he has told me, or shown he wants, across sessions:
   would rather have an opinion than a list of options.
 - **Short reports.** What changed, one or two specific things to check in the headset (shimmer, scale, feel), and whether a PR is
   merged or waiting. No recap of the steps and no "untested on a headset" (he knows).
+- **Black rectangles in his headset screenshots are a Quest capture bug**, not something in the game (his words). Ignore them; do not go
+  looking for a missing object or a rendering fault because of one.
 - **He reads the screenshots in the tool log**, so render and actually look at them, and send the key before/after images with
   anything visual. I can judge stills, not real-time motion or headset feel.
 - **New hand-built models wait for his OK** (send the `.glb` and renders, leave the PR open). Code, shader, texture-plumbing and docs
