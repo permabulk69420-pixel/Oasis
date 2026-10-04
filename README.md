@@ -177,7 +177,7 @@ are in one table, `PACK`, at the top; the carry limits are in `src/inventory.js`
   go just drops the pack on the ground behind you. Two things move the zone: it is measured from your body's facing, which is the
   way you were going when you last started walking (it does not follow your head, or you turning on the spot), and Quest
   controllers can lose tracking when they are hidden behind you, so reaching just behind the ear works better than all the way
-  round. Nothing here has been tried on a headset yet.
+  round.
 - **Take it off:** reach behind you with an empty hand and squeeze grip, and it comes off into that hand. Or open the menu, pick
   the **Back** slot and press **Take off**, and it is set down three quarters of a metre in front of you, facing you. It only comes
   off when everything you carry fits in your pockets (40), so taking it off never leaves you stuck; if it does not fit, the hand gives a
