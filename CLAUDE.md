@@ -67,13 +67,20 @@ work. What he has told me, or shown he wants, across sessions:
    merge it, and confirm the Pages deploy goes green. Verified means `npm test` passes, `npx vite build`
    works, and for visual changes you looked at screenshots. If something is not good enough, leave the PR
    open and say why instead of merging. A stop-hook message asking for a commit is not Kane asking.
-5. **Kane likes to check important 3D models, but on the night of 3 Oct 2026 he handed over the keys.**
+5. **Kane likes to check important 3D models, but on the nights of 3 and 4 Oct 2026 he handed over the keys.**
    His words: "you add and merge everything you think is good, we can always roll things back easy or
    remove things, you're in charge on the game tonight". So for that overnight session models were merged
    on my own judgement. In any other session, default to sending him the `.glb` (SendUserFile) and waiting
    for his OK on new hand-built models (campfire, hero tree, creatures), because Claude tends to miss stray
    vertices, inside-out faces and bad blends. Always run a mesh check (`tools/campfire/check_mesh.py` style)
    and look at renders first. Code, shader and gameplay changes do not need his check.
+   **The night of 4 to 5 Oct, going to sleep, he said it again:** "when I leave you overnight you just merge and do whatever you feel is right,
+   that's one hundred percent on you, I do not care at all... just don't fire off subagents or do anything crazy, I trust you enough, the other night
+   went really well." So that night: do not stop to ask anything, merge everything (models included) on my own judgement, still mesh-check and look
+   at renders first. **No gameplay, though:** "you can go as crazy as you want with the animations and stuff... let's not think about gameplay
+   mechanics, that's something I really need to test and do myself." Animations, art, sound, effects, atmosphere: yes. New mechanics (a pincer
+   snap attack, drops, player death, anything that changes how play works): no, and no new numbers for them. He gives this overnight authority
+   when he says so, as he did on both nights; do not assume it in an ordinary daytime session.
 6. **Quest performance comes first.** No post-processing passes, no big shadow maps, no per-frame
    allocations, keep triangle counts and draw calls modest. Kane knows desktop checks cannot prove how
    something looks, feels or runs on the headset, so never add "not tested on a headset" to a report or a
@@ -82,6 +89,21 @@ work. What he has told me, or shown he wants, across sessions:
    (fuel, cold, how things work). Do not invent game mechanics or UI beyond what he asked for. Visual art
    direction is where he trusts me most. Anything substantial (trees, creatures, big props) needs proper LODs
    (3 levels, with triangle counts checked against a Quest budget). Leave the hero tree alone.
+
+## Overnight plan (4 to 5 Oct 2026, Kane asleep, full authority, art and animation only)
+
+In this order (tick them off in the task list; the morning report is short, rule above):
+1. Dune stinger v3 (`tools/dune-stinger/v3/`, built by me in Blender, no paid or AI mesh tools): a plated carapace with a ridge, an eye cluster, four leg pairs
+   (thigh, shin, claw foot, knobbly knee), two jointed pincers (one bigger) that guard, flare open in the windup and close, a five segment tail. 3 LODs, close
+   level roughly 30 to 40k triangles (ceiling 50k), 2 draw calls, cyan glow seams in the spear's cyan. Retarget `src/stinger-pose.js` and the `hitBalls`; the fight
+   logic and numbers stay as they are. Feet planted on the sand (no skating on dunes). Claws are animation only, no pincer attack.
+2. Fight sounds, synthesised in code (free): windup rattle, tail whoosh, blow thud, flinch, death, player grunt. Positional at the creature.
+3. Fight effects: sand puffs on the lunge and death, the dead stinger sinks into the sand instead of popping out of the world.
+4. Footprints in the sand (player and creature), fading as the wind fills them in. One instanced draw call.
+5. Night life: drifting glow motes by the pond and the glow plants, a ringed planet low in the night sky, water lapping and night insect sound.
+6. Giant bones half buried in the dunes: a landmark and a hint of the big thing to come. Blender model with LODs.
+7. If time: dust devils by day, a small skittering critter, a dawn and dusk look pass.
+Add a `creature-pipeline` skill (`.claude/skills/`) when the stinger v3 build is done, since the Blender to pose code to game procedure is longer than a few lines.
 
 ## Working on this repo
 
