@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createTools, holsterPose } from '../src/tools.js';
-import { createSpearKind, SPEAR, SPEAR_GRIP, SPEAR_HELD_ROTATION, SPEAR_HOLSTER } from '../src/spear.js';
+import { createSpearKind, SPEAR, SPEAR_GRIP, SPEAR_HELD_ROTATION, SPEAR_HOLSTER, SPEAR_THRUST_TILT } from '../src/spear.js';
 import { createTorchKind } from '../src/torch.js';
 import { createAxeKind } from '../src/axe.js';
 import { terrainHeight } from '../src/world.js';
@@ -97,12 +97,15 @@ test('the spear stands planted in the sand a little way from the axe and torch, 
   }
 });
 
-test('gripped by the wrap on the shaft, with the same flip as the torch and the axe, and nothing else on it casts a shadow', t => {
+test('gripped by the wrap at the butt end, flipped like the torch and then tilted so the point goes forward, and nothing else on it casts a shadow', t => {
   const { tools, state, handTo, squeeze } = fixture(t);
   const [spear] = tools.getInstances('spear');
   assert.deepEqual(spear.root.userData.gripSurface, SPEAR_GRIP);
   assert.deepEqual(SPEAR_GRIP.meshes, ['Shaft'], 'the hand closes on the shaft, never the stone point or the tassel');
-  assert.deepEqual(SPEAR_GRIP.point, [0, 0, 0], 'the grip is at the model origin');
+  assert.ok(SPEAR_GRIP.point[1] < -0.3 && SPEAR_GRIP.point[1] > -0.45, `the hand holds the back of the shaft (${SPEAR_GRIP.point[1]} m from the origin)`);
+  assert.equal(SPEAR_GRIP.point[0], 0);
+  assert.equal(SPEAR_GRIP.point[2], 0);
+  assert.ok(0.52 + SPEAR_GRIP.point[1] > 0.06, 'a few centimetres of butt stay behind the fist');
   spear.root.traverse(object => { if (object.isMesh) assert.equal(object.castShadow || object.receiveShadow, false); });
 
   handTo(worldOf(spear.root).add(new THREE.Vector3(0.05, 0.1, 0.05)));
@@ -110,9 +113,12 @@ test('gripped by the wrap on the shaft, with the same flip as the torch and the 
   assert.equal(spear.heldBy, state, 'picked up from the sand by reaching for the middle of the shaft');
   assert.equal(state.objectGrip.children[0], spear.root);
   assert.ok(spear.root.quaternion.angleTo(SPEAR_HELD_ROTATION) < 1e-6);
-  assert.ok(spear.root.position.length() < 1e-9, 'the grip point sits in the palm');
+  const expected = new THREE.Vector3(...SPEAR_GRIP.point).applyQuaternion(SPEAR_HELD_ROTATION).negate();
+  assert.ok(spear.root.position.distanceTo(expected) < 1e-9, 'the grip point sits in the palm');
   const torch = tools.getInstances('torch')[0];
-  assert.ok(SPEAR_HELD_ROTATION.angleTo(torch.kind.heldRotation) < 1e-6, 'held like the torch: the point goes up out of the fist');
+  assert.ok(Math.abs(SPEAR_HELD_ROTATION.angleTo(torch.kind.heldRotation) - THREE.MathUtils.degToRad(SPEAR_THRUST_TILT)) < 1e-6,
+    'held like the torch, then turned about the palm normal so the point goes out in front of the fist');
+  assert.ok(SPEAR_THRUST_TILT > 15 && SPEAR_THRUST_TILT < 80, 'enough to point forward, not so much that the fingers cannot close round the shaft');
 });
 
 test('on a hip it leans back with the point behind the shoulder and the butt well clear of the ground', () => {

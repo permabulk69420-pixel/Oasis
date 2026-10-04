@@ -123,8 +123,11 @@ Kane: the 40 pocket limit is my number and slows you to half speed over it; noth
 Spear (done, `src/spear.js`; Kane asked for it in a queued message, my call on the design): a held tool like the axe and torch
 that does nothing else (no combat). Stands in the sand beside the starting tools, crafted from 3 sticks and a stone, weight 10,
 carried on a hip leaning back about 33 degrees, packed at the chest. One LOD on purpose (hand-sized, 2,192 tris, 3 draw calls).
-The little cyan bead on the tassel keeps its brightness at night through `src/glow.js` (shared with the backpack). Oddities to
-tell Kane: the butt end reaches the sand in a deep crouch (the hip hangs from the head position).
+The little cyan bead on the tassel keeps its brightness at night through `src/glow.js` (shared with the backpack). Held (Kane's call, #59): the point goes out in front of the fist like a thrusting spear and the hand sits
+at the butt end, so the stone reaches 1.3 m ahead (`SPEAR_THRUST_TILT` 35 degrees about the palm normal and `SPEAR_GRIP.point` y -0.39 in
+`src/spear.js`; the leather wrap was moved to the butt end in `tools/spear/build_spear.py`; the hold lab `item=spear&pitch=-30` shows it).
+Oddities to tell Kane: the butt end reaches the sand in a deep crouch (the hip hangs from the head position); picking it up snaps it to
+the hand at the butt wrap wherever you reached; it does no damage yet (the creature will give it a job).
 
 Blue palms (done, `tools/alien-tree/`, `src/tree-sets.js`; my call on the look, Kane said to make my own visual choices): the sixteen
 regular trees round the pool are now banded blue palms with feathery fronds and a few pale hanging veils, in 3 LODs (5,920, 1,884 and 560 triangles after the texture pass, up from 4,774, 1,584 and 476,
@@ -165,6 +168,6 @@ CC0 palm bark with a normal map, buttress base instead of root spikes, a fourth 
 and turn). Then #47 and #48 (this file: how we work, palms merged), #49 (every model and texture request carries `?v=<build id>`, so a deploy
 is not hidden by the 10 minute Pages cache), #50 (the stop-hook false alarm and its fix), #51 (palm fronds wear the alien desert plant's leaf
 texture because the blue read too blue; default look `plant`, mid-dark; Kane asked about "the much darker one", so `?leaf=dark` is the likely
-next default, but he has not said which: ask which look he settled on after the headset). #53: the four alien desert plants were near black (vertex colour times texture), now lit properly (night unchanged). #54: three skills split out of this file. Waiting on Kane before touching: the backpack back zone (options if it still feels hard: a repeating buzz, a sound, a bigger zone,
+next default, but he has not said which: ask which look he settled on after the headset). #53: the four alien desert plants were near black (vertex colour times texture), now lit properly (night unchanged). #54: three skills split out of this file. #55 to #58: notes on text-to-speech, relaxed tone, no motion sickness. #59: spear held pointing forward with the hand at the butt. Waiting on Kane before touching: the backpack back zone (options if it still feels hard: a repeating buzz, a sound, a bigger zone,
 a visual cue). Only if Kane says go: a script and post for his explainer on tokens, API price and plan usage.
 
