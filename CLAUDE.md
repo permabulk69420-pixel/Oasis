@@ -100,10 +100,13 @@ work. What he has told me, or shown he wants, across sessions:
 - Stop the dev server with `fuser -k 4173/tcp`. `pkill -f vite` or `pgrep -f` matches its own shell and kills the command.
 - After a squash merge, `git checkout -B main origin/main` and `git branch -D` the feature branch. The stop hook counts
   the unsquashed local commit as unpushed and nags, even though the work is already on `main`.
-- **Stop-hook "N unpushed commits and no remote branch" is often wrong.** It can fire after a push and after a squash merge. Check
-  before doing anything: `git ls-remote --heads origin BRANCH` against `git rev-parse HEAD`. If they match, nothing is unpushed (a missing
-  local `origin/BRANCH` ref is why it complains; `git fetch origin +refs/heads/BRANCH:refs/remotes/origin/BRANCH` and setting
-  `branch.BRANCH.remote`/`.merge` quietens it). Never re-push or re-do work because of it, and it is not Kane asking for anything.
+- **Stop-hook "N unpushed commits and no remote branch" is usually this clone's fault, not a real problem.** The hook
+  (`~/.claude/stop-hook-git-check.sh`) looks for a local `origin/<branch>` ref and, if there is none, counts every commit that is not on
+  `origin/HEAD` as unpushed. This clone's fetch rule only covers `main` (`remote.origin.fetch = +refs/heads/main:refs/remotes/origin/main`), so
+  a pushed feature branch never gets that ref and always looks unpushed. At the start of a session run
+  `git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*' && git fetch origin`; after that a push updates the ref and the hook
+  stays quiet. If it still fires, compare `git ls-remote --heads origin BRANCH` with `git rev-parse HEAD`: if they match, nothing is unpushed.
+  Never re-push or re-do work because of it, and it is not Kane asking for anything.
 - Palm close-up for a screenshot (dev build): `?hour=14&at=311.6,-357.7&look=313.5,-351,2.5&treelod=0`; `&eye=1.0` for a low camera at
   the base. Other palms are at `WATER + (cos a * radiusX * r, sin a * radiusZ * r)` for the `angle`/`radius` pairs in
   `TREE_LAYOUT`, `src/oasis-vegetation.js`. `?camp=lit` ignores `?at` (the fire goes near spawn).
