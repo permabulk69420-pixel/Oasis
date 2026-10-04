@@ -10,7 +10,7 @@ frond is one saw-toothed ribbon (the teeth are the leaflets) and, furthest, the 
 handful of pale veils hang from the crownshaft (the veil tree's trick, small). Every level grows its fronds from the same
 seeds, so they have the same length, angle and droop and the tree does not change shape when one level takes over from
 another. Vertex colours and two materials. Every surface has UVs for the shared detail textures that the game puts on
-(src/surface-textures.js): bark u once round, v = height in metres * 2; leaves u across (midrib at 0.5), v along, tip at 1.
+(src/surface-textures.js): bark u once round, v = height in metres * 1.25; leaves u across (midrib at 0.5), v along, tip at 1.
 No image is stored in the files:
   "Banded teal bark"        the trunk and roots, single sided, closed solids
   "Waxy blue leaf tissue"   every leaf and veil, double sided thin sheets
@@ -168,7 +168,7 @@ class Mesh:
 
 
 # ----------------------------------------------------------------------------- the trunk
-BARK_TILES_PER_METRE = 2.0           # must match BARK.tilesPerMetre in src/surface-textures.js
+BARK_TILES_PER_METRE = 1.25          # must match BARK.tilesPerMetre in src/surface-textures.js
 TRUNK_TOP = 3.74
 CROWN_Y = 3.62                       # where the fronds leave the trunk
 SHAFT_Y = 3.14                       # the crownshaft starts here
@@ -200,11 +200,43 @@ def band_amount(y, bands):
     return max((max(0.0, 1.0 - abs(y - b) / BAND_HALF) for b in bands), default=0.0)
 
 
+# Buttress flares: the trunk itself swells into a few low, rounded ridges that run down into the ground (no separate root
+# pieces, so no spikes). Each ridge has its own angle, reach and width.
+RIDGE_REACH = 0.18          # how far a full ridge stands out of the plain trunk at the ground, metres
+RIDGE_HEIGHT = 0.80         # a ridge has faded into the trunk by this height
+
+
+def ridge_params(n):
+    out = []
+    for i in range(n):
+        out.append(dict(
+            phi=math.tau * i / n + 0.35 + 0.30 * noise3((i, 7, 1), 11.0),
+            reach=RIDGE_REACH * (0.75 + 0.30 * (0.5 + 0.5 * noise3((i, 3, 9), 13.0))),
+            width=0.27 + 0.06 * noise3((i, 5, 2), 17.0),      # radians-ish: half width of the ridge round the trunk
+        ))
+    return out
+
+
+def ridge_extra(theta, y, ridges):
+    """How much wider the trunk is at angle `theta` and height `y` because of the ridges (0 above RIDGE_HEIGHT)."""
+    if not ridges or y >= RIDGE_HEIGHT:
+        return 0.0
+    fade = (1.0 - smoothstep(-0.05, RIDGE_HEIGHT, y)) ** 2.4
+    best = 0.0
+    for r in ridges:
+        d = abs((theta - r["phi"] + math.pi) % math.tau - math.pi)
+        best = max(best, r["reach"] * max(0.0, math.cos(min(d / r["width"], 1.0) * math.pi / 2)) ** 2)
+    return best * fade
+
+
 def build_trunk(M, lod):
     bands = band_ys() if lod["bands"] else []
+    ridges = ridge_params(lod["ridges"])
     ys = {-0.12, 0.0, 0.25, 1.0, 2.0, 3.0, SHAFT_Y - 0.05, SHAFT_Y + 0.10, TRUNK_TOP}
     if lod["bands"]:
         ys |= {0.08, 0.2, 0.34}
+        if ridges:
+            ys |= {-0.30, -0.04, 0.04, 0.14, 0.45, 0.62, 0.8}   # -0.30: sunk well into the ground, so a tree on a slope shows no underside
         for b in bands:
             ys |= {b - BAND_HALF, b, b + BAND_HALF}
         ys |= {3.4}
@@ -221,7 +253,8 @@ def build_trunk(M, lod):
         for k in range(K):
             t = math.tau * k / K + 0.3
             wob = 1.0 + 0.045 * noise3((k, math.floor(y * 3.0), 0.5), 2.0)   # not a perfect lathe turning
-            ring.append(c + np.array([math.cos(t) * r * wob, 0.0, math.sin(t) * r * wob]))
+            rr = r * wob + ridge_extra(t, y, ridges)
+            ring.append(c + np.array([math.cos(t) * rr, 0.0, math.sin(t) * rr]))
             streak = 0.5 + 0.5 * noise3((k, 0, 0), 1.3)
             col = mix(BARK, BARK_LIGHT, 0.55 * streak * (0.35 + 0.65 * smoothstep(0.4, 3.0, y)))
             col = mix(col, BAND, 0.85 * band_amount(y, bands))
@@ -513,9 +546,9 @@ def smooth_by_angle(ob, degrees=35):
 
 
 LODS = {
-    0: dict(trunk_k=10, bands=True, roots=5, style="feather", pairs=17, rings=[9, 8, 6, 5], veils=6),
-    1: dict(trunk_k=7, bands=False, roots=0, style="serrated", teeth=7, centre_teeth=4, widen=1.0, tone=0.90, rings=[9, 8, 6, 5], veils=0),
-    2: dict(trunk_k=5, bands=False, roots=0, style="serrated", teeth=3, centre_teeth=2, widen=1.3, tone=0.84, rings=[5, 4, 3, 3], veils=0),
+    0: dict(trunk_k=18, bands=True, roots=0, ridges=6, style="feather", pairs=17, rings=[9, 8, 6, 5], veils=6),
+    1: dict(trunk_k=7, bands=False, roots=0, ridges=0, style="serrated", teeth=7, centre_teeth=4, widen=1.0, tone=0.90, rings=[9, 8, 6, 5], veils=0),
+    2: dict(trunk_k=5, bands=False, roots=0, ridges=0, style="serrated", teeth=3, centre_teeth=2, widen=1.3, tone=0.84, rings=[5, 4, 3, 3], veils=0),
 }
 
 

@@ -259,15 +259,22 @@ twice as far out):
 
 | Level | From | Triangles | What it is |
 | --- | --- | --- | --- |
-| `alien_tree_lod0.glb` | 0 m | 5,544 | every frond a feather: a thin rachis with 17 pairs of tapering, drooping leaflets; four rings of fronds (the outer one older, hanging low); banded, leaning trunk, 5 roots, 6 veils |
-| `alien_tree_lod1.glb` | 20 m | 1,884 | every frond one saw-toothed ribbon (the teeth are the leaflets); plain trunk, no roots or veils |
+| `alien_tree_lod0.glb` | 0 m | 5,920 | every frond a feather: a thin rachis with 17 pairs of tapering, drooping leaflets; four rings of fronds (the outer one older, hanging low); banded, leaning trunk that swells into six low buttress ridges sunk well into the ground, 6 veils |
+| `alien_tree_lod1.glb` | 20 m | 1,884 | every frond one saw-toothed ribbon (the teeth are the leaflets); plain trunk, no ridges or veils |
 | `alien_tree_lod2.glb` | 55 m | 560 | half of the fronds, 3 teeth each, a slightly darker tone (a solid ribbon catches more light than thin leaflets) |
 
-**Textures.** The models carry UVs and vertex colours but no image. The game puts the shared bark and leaf detail from
-`src/surface-textures.js` on any material named `Banded teal bark` or `Waxy blue leaf tissue` (drawn in code: 128 x 128 and 64 x 128 greys,
-seamless, one texture each however many trees; they also carry the model's small emissive floor so the shaded side keeps its detail). To use the
-same bark on a new model, give it UVs with u once round and v = height in metres * 2, and name the material `Banded teal bark` (or add a name to
-`SURFACE_BY_MATERIAL`). The nine outer palms now each have their own size and turn.
+**Textures.** The models carry UVs and vertex colours but no image. The game puts shared bark and leaf detail from
+`src/surface-textures.js` on any material named `Banded teal bark` or `Waxy blue leaf tissue`; the textures also drive the model's small
+emissive floor, so the shaded side keeps its detail. Two versions of the bark:
+- A drawn one (128 x 128 greys, made in code), on screen from the first frame and the fallback.
+- A real photographed palm bark (**Palm Bark** by Charlotte Baglioni, Poly Haven, CC0; see `public/textures/bark/CREDITS.md`): a neutral grey
+  detail map plus a normal map, 1024 x 1024 each, about 0.8 MB, loaded in the background and swapped in when it arrives. The colour comes
+  from the vertices, so the same bark can be teal, brown or grey. `python3 tools/textures/make_bark.py <dir>` makes the two files from the
+  Poly Haven download. The leaf detail stays drawn: the fronds are thin and read by shape, and a photo would not show.
+
+To use the same bark on a new model, give it UVs with u once round and v = height in metres * 1.25 (`BARK.tilesPerMetre`; a test keeps the
+palm builder's constant in step), and name the material `Banded teal bark` (or add a name to `SURFACE_BY_MATERIAL`). The nine outer palms now
+each have their own size and turn.
 
 All three grow their fronds from the same seeds, so a frond has the same length, angle and droop at every level and the tree does not change
 shape when one takes over from another. Each level is one object with two materials, so a tree costs 2 draw calls at any distance, and the

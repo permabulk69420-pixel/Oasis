@@ -97,10 +97,10 @@ The little cyan bead on the tassel keeps its brightness at night through `src/gl
 tell Kane: the butt end reaches the sand in a deep crouch (the hip hangs from the head position).
 
 Blue palms (done, `tools/alien-tree/`, `src/tree-sets.js`; my call on the look, Kane said to make my own visual choices): the sixteen
-regular trees round the pool are now banded blue palms with feathery fronds and a few pale hanging veils, in 3 LODs (5,544, 1,884 and 560 triangles after the texture pass, up from 4,774, 1,584 and 476,
+regular trees round the pool are now banded blue palms with feathery fronds and a few pale hanging veils, in 3 LODs (5,920, 1,884 and 560 triangles after the texture pass, up from 4,774, 1,584 and 476,
 against the first blue trees' 40,000, 24,000 and 12,500). The axe, the wind sway (found by material name) and the projected
 shadow work as before. The first trees' files are still in the repo and `?trees=old` shows them. LOD distances scale with each tree's
-scale. The materials carry a small flat emissive floor in the model so the shaded side of the crown is teal, not black. Bark and leaf detail is shared: `src/surface-textures.js` draws it in code and puts it on any material named `Banded teal bark` / `Waxy blue leaf tissue` (UV rules are in its header), so new trees and logs can reuse the same bark. Oddities to tell
+scale. The materials carry a small flat emissive floor in the model so the shaded side of the crown is teal, not black. Bark and leaf detail is shared: `src/surface-textures.js` draws it in code and puts it on any material named `Banded teal bark` / `Waxy blue leaf tissue` (UV rules are in its header), so new trees and logs can reuse the same bark. The bark is a real CC0 photo (Poly Haven Palm Bark, 1k grey detail + normal, `public/textures/bark/`, made by `tools/textures/make_bark.py`) that loads in the background over a drawn fallback; Kane OK'd real 1k PBR textures where they matter (bark, ground), not on thin leaves. The trunk base is six buttress ridges in the trunk mesh, not separate root pieces (those looked like spikes). Oddities to tell
 Kane: the look is mine (a palm, not the old tiered tree); thin leaflets may shimmer in the headset (if so, widen them in
 `feather()` or lower `pairs`); a felled palm still drops its logs and sticks at the old distances along the fall
 line, so the sticks land a little past where the crown ends.

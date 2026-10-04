@@ -105,7 +105,8 @@ test('every level is the same tree: the same height, reach and crown, so nothing
   });
   for (const { top, bottom, reach } of bounds) {
     assert.ok(top > 4.3 && top < 4.7, `${top.toFixed(2)} m tall`);
-    assert.ok(bottom < 0 && bottom > -0.2, `the foot sinks ${(-bottom).toFixed(2)} m`);
+    // The near level's buttress feet are sunk 0.3 m so a tree on a slope shows no underside; the far levels just a little.
+    assert.ok(bottom < 0 && bottom > -0.35, `the foot sinks ${(-bottom).toFixed(2)} m`);
     assert.ok(reach > 1.9 && reach < 2.6, `the crown reaches ${reach.toFixed(2)} m out`);
   }
   for (const key of ['top', 'bottom', 'reach']) {

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {
-  BARK, LEAF, SURFACE_BY_MATERIAL, barkPixels, leafPixels, barkGrey, surfaceTexture, applySurfaceTextures,
+  BARK, BARK_PHOTO, LEAF, SURFACE_BY_MATERIAL, barkPixels, leafPixels, barkGrey, surfaceTexture, applySurfaceTextures,
 } from '../src/surface-textures.js';
 
 function mean(data) {
@@ -55,4 +55,57 @@ test('applySurfaceTextures textures known materials only, with the same texture 
   assert.equal(d.material.map, null);
   assert.ok(a.material.color.r > 1, 'brightened to make up for the detail grey');
   assert.deepEqual(Object.keys(SURFACE_BY_MATERIAL).sort(), ['Banded teal bark', 'Waxy blue leaf tissue']);
+});
+
+test('the photo bark replaces the drawn bark on every bark material, including ones added later', async () => {
+  const fresh = await import('../src/surface-textures.js?photo-ok');
+  const loaded = [];
+  const loader = { loadAsync: async url => { loaded.push(url); return new THREE.DataTexture(new Uint8Array(4), 1, 1); } };
+  const make = () => new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ name: 'Banded teal bark' }));
+  const early = make();
+  fresh.applySurfaceTextures(early, { photo: false });
+  assert.equal(early.material.normalMap, null, 'drawn bark has no normal map');
+  const photo = await fresh.loadBarkPhoto(loader, '/oasis/');
+  assert.deepEqual(loaded.sort(), [`/oasis/${fresh.BARK_PHOTO.detail}`, `/oasis/${fresh.BARK_PHOTO.normal}`].sort());
+  assert.equal(early.material.map, photo.detail);
+  assert.equal(early.material.emissiveMap, photo.detail);
+  assert.equal(early.material.normalMap, photo.normal);
+  assert.equal(photo.normal.colorSpace, THREE.NoColorSpace);
+  assert.equal(photo.normal.flipY, false);
+  const late = make();
+  fresh.applySurfaceTextures(late, { photo: false });
+  assert.equal(late.material.normalMap, photo.normal, 'a model loaded after the photo gets it straight away');
+  assert.equal(await fresh.loadBarkPhoto(loader), photo, 'loaded once');
+});
+
+test('if the photo bark cannot be loaded the drawn bark stays and nothing throws', async () => {
+  const fresh = await import('../src/surface-textures.js?photo-fail');
+  const mesh = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ name: 'Banded teal bark' }));
+  fresh.applySurfaceTextures(mesh, { photo: false });
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    const result = await fresh.loadBarkPhoto({ loadAsync: async () => { throw new Error('404'); } });
+    assert.equal(result, null);
+  } finally {
+    console.warn = warn;
+  }
+  assert.equal(mesh.material.map, fresh.surfaceTexture('bark'));
+  assert.equal(mesh.material.normalMap, null);
+});
+
+test('the palm builder bakes bark UVs at the same tiles per metre as the texture module', async () => {
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync(new URL('../tools/alien-tree/build_alien_tree.py', import.meta.url), 'utf8');
+  const match = source.match(/^BARK_TILES_PER_METRE = ([0-9.]+)/m);
+  assert.ok(match, 'constant found');
+  assert.equal(Number(match[1]), BARK.tilesPerMetre);
+});
+
+test('the photo bark files exist and are small', async () => {
+  const { statSync } = await import('node:fs');
+  for (const file of [BARK_PHOTO.detail, BARK_PHOTO.normal]) {
+    const { size } = statSync(new URL(`../public/${file}`, import.meta.url));
+    assert.ok(size > 50_000 && size < 700_000, `${file} is ${size} bytes`);
+  }
 });
