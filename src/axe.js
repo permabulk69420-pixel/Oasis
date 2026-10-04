@@ -226,6 +226,8 @@ export function createAxeKind({ scene, onError = console.warn }) {
     heldRotation: heldFlip.clone().multiply(bladeForwardTwist),
     // Head up at the hip, handle hanging down the thigh, blade facing forward.
     holster: { dir: [0.04, -1, 0], edge: [1, 0, 0], along: 0 },
+    // When let go or thrown (src/falling.js): heavy at the head, which lies flat on the ground (model x is the head's long side).
+    fall: { radius: 0.04, landing: 'lie', com: 0.28, edge: [1, 0, 0] },
     spawns: [{ x: SPAWN.x - 0.85, z: SPAWN.z - 1.05 }],
 
     prepareTemplate(root) {

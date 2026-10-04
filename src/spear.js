@@ -73,6 +73,8 @@ export function createSpearKind({ getExposure = () => 1 } = {}) {
     pickupRadius: SPEAR.pickupRadius,
     heldRotation: SPEAR_HELD_ROTATION,
     holster: SPEAR_HOLSTER,
+    // When let go or thrown (src/falling.js): a thin rod, heavier at the stone end, whose point sticks in the sand if it lands point-first and fast.
+    fall: { radius: 0.025, landing: 'stick', com: 0.15 },
     spawns: [{ x: SPEAR.spawn.x, z: SPEAR.spawn.z }],
     createState: () => ({ tilt: SPEAR_THRUST_TILT, switchDown: false }),
 

@@ -5,6 +5,11 @@ import { attachHeldObject } from './grip-contact.js';
 import { isHandAtChest } from './chest-storage.js';
 import { addInventoryItem, getInventoryCount, removeInventoryItem } from './inventory.js';
 import { pulseHaptics } from './haptics.js';
+import { createBody, launch, stepBody, bodyOrigin, isMoving } from './falling.js';
+import { createHandMotion } from './hand-motion.js';
+
+// How close a hand must be to any part of a tool lying on the ground (or stuck in it) to pick it up.
+const LYING_REACH = 0.3;
 
 // Hand tools (axe, torch) as real objects that can be on the ground, in a hand, on a hip
 // or packed in the inventory. Each tool type ("kind") supplies its model and behaviour;
@@ -81,11 +86,23 @@ export function holsterPose(holster = {}, side = 'right') {
   return { position, quaternion };
 }
 
-export function createTools({ scene, states, kinds, renderer = null, camera = null, rig = null, onError = console.warn }) {
+export function createTools({ scene, states, kinds, renderer = null, camera = null, rig = null, heightAt = terrainHeight, onError = console.warn }) {
   if (!scene || !Array.isArray(states) || !Array.isArray(kinds)) throw new Error('Tools require the scene, VR hand states and tool kinds.');
 
   const kindById = new Map(kinds.map(kind => [kind.id, kind]));
   const instances = [];
+  // Tools that have been let go of or thrown and are still in the air or toppling (src/falling.js). Once one is lying still it
+  // costs nothing and is only found again by findNearest, which then reaches along the whole tool, not just its origin.
+  const falling = [];
+  const handMotion = createHandMotion();
+  const fallOrigin = new THREE.Vector3();
+  const fallQuaternion = new THREE.Quaternion();
+  const fallVelocity = new THREE.Vector3();
+  const fallSpin = new THREE.Vector3();
+  const segmentA = new THREE.Vector3();
+  const segmentB = new THREE.Vector3();
+  const segmentPoint = new THREE.Vector3();
+  const segmentAlong = new THREE.Vector3();
   const gripDown = new Map();
   const slots = { left: null, right: null };
   const belt = {};
@@ -139,6 +156,8 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
       const template = gltf.scene;
       template.name = `${kind.name} template`;
       template.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(template);
+      kind.shape = { bottom: box.min.y, top: box.max.y };
       kind.prepareTemplate?.(template);
       kind.template = template;
       for (const spot of kind.spawns || []) toGround(spawn(kind.id), spot.x, spot.z);
@@ -161,6 +180,9 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
 
   function dispose(instance) {
     instance.kind.onDispose?.(instance);
+    const fallingIndex = falling.indexOf(instance);
+    if (fallingIndex >= 0) falling.splice(fallingIndex, 1);
+    instance.fall = null;
     instance.root.removeFromParent();
     if (instance.slot) slots[instance.slot] = null;
     const index = instances.indexOf(instance);
@@ -191,6 +213,9 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
   function grab(instance, state) {
     if (!attachHeldObject(state, instance.root, instance.kind.heldRotation)) return false;
     if (instance.slot) { slots[instance.slot] = null; instance.slot = null; }
+    const fallingIndex = falling.indexOf(instance);
+    if (fallingIndex >= 0) falling.splice(fallingIndex, 1);
+    instance.fall = null;
     instance.heldBy = state;
     instance.kind.onGrab?.(instance);
     return true;
@@ -253,6 +278,38 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     }
   }
 
+  // Let go of a tool in the open: it falls from where it is with the speed and turn of the hand, and lands (src/falling.js).
+  function startFall(instance, state) {
+    const { kind, root } = instance;
+    root.updateWorldMatrix(true, false);
+    root.getWorldPosition(fallOrigin);
+    root.getWorldQuaternion(fallQuaternion);
+    if (!kind.fall || !kind.shape) {
+      toGround(instance, fallOrigin.x, fallOrigin.z);
+      return;
+    }
+    handMotion.measure(state, fallVelocity, fallSpin);
+    scene.attach(root);
+    root.scale.set(1, 1, 1);
+    const body = createBody({ ...kind.shape, ...kind.fall });
+    launch(body, { origin: fallOrigin, quaternion: fallQuaternion, velocity: fallVelocity, spin: fallSpin });
+    instance.fall = body;
+    falling.push(instance);
+  }
+
+  // Throw a new tool out into the world from a pose (used by the dev fixture ?view=throws, and for anything that should drop a tool).
+  // Returns the tool, or null while its model is still loading.
+  function throwTool(id, { origin, quaternion, velocity, spin }) {
+    const instance = spawn(id);
+    if (!instance || !instance.kind.fall || !instance.kind.shape) return null;
+    scene.add(instance.root);
+    const body = createBody({ ...instance.kind.shape, ...instance.kind.fall });
+    launch(body, { origin, quaternion, velocity, spin });
+    instance.fall = body;
+    falling.push(instance);
+    return instance;
+  }
+
   function release(instance) {
     const state = instance.heldBy;
     instance.heldBy = null;
@@ -270,10 +327,18 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
       pulseHaptics(state, ...STORE_HAPTIC);
       return 'stored';
     }
-    instance.root.updateWorldMatrix(true, false);
-    instance.root.getWorldPosition(toolPosition);
-    toGround(instance, toolPosition.x, toolPosition.z);
+    startFall(instance, state);
     return 'ground';
+  }
+
+  const kindShape = instance => instance.kind.shape;
+  function distanceToSegment(point, a, b) {
+    segmentAlong.copy(b).sub(a);
+    const length2 = segmentAlong.lengthSq();
+    segmentPoint.copy(point).sub(a);
+    const t = length2 > 1e-9 ? THREE.MathUtils.clamp(segmentPoint.dot(segmentAlong) / length2, 0, 1) : 0;
+    segmentPoint.copy(a).addScaledVector(segmentAlong, t);
+    return point.distanceTo(segmentPoint);
   }
 
   function findNearest(state) {
@@ -282,6 +347,16 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     let best = null, bestDistance = Infinity;
     for (const instance of instances) {
       if (instance.heldBy) continue;
+      if (instance.fall) {
+        // Lying on the ground or stuck in the sand: reach for any part of it, not just its middle.
+        if (isMoving(instance.fall)) continue;
+        instance.root.updateWorldMatrix(true, false);
+        segmentA.set(0, kindShape(instance).bottom, 0).applyMatrix4(instance.root.matrixWorld);
+        segmentB.set(0, kindShape(instance).top, 0).applyMatrix4(instance.root.matrixWorld);
+        const distance = distanceToSegment(handPosition, segmentA, segmentB);
+        if (distance <= LYING_REACH && distance < bestDistance) { best = instance; bestDistance = distance; }
+        continue;
+      }
       const onHip = Boolean(instance.slot);
       if (onHip && !belt[instance.slot].visible) continue;
       if (onHip) belt[instance.slot].getWorldPosition(toolPosition);
@@ -375,6 +450,13 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     const safeDt = THREE.MathUtils.clamp(Number.isFinite(dt) ? dt : 0, 0, 0.05);
     updateBelt(safeDt);
 
+    // Remember where each hand has been, so that letting go while swinging throws what it holds.
+    for (const state of states) {
+      if (!state.inputSource || !state.objectGrip) continue;
+      state.objectGrip.updateWorldMatrix(true, false);
+      handMotion.record(state, state.objectGrip, safeDt);
+    }
+
     for (const state of states) {
       const grip = Boolean(state.inputSource?.gamepad?.buttons?.[GRIP_BUTTON]?.pressed);
       const wasDown = Boolean(gripDown.get(state));
@@ -388,6 +470,14 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     }
 
     updateMarkers();
+
+    for (let i = falling.length - 1; i >= 0; i--) {
+      const { fall, root } = falling[i];
+      const moving = stepBody(fall, safeDt, heightAt);
+      bodyOrigin(fall, root.position);
+      root.quaternion.copy(fall.quaternion);
+      if (!moving) falling.splice(i, 1);
+    }
 
     for (const kind of kinds) kind.updateShared?.(safeDt, instances.filter(instance => instance.kind === kind));
     for (const instance of instances) instance.kind.update?.(instance, safeDt, { states });
@@ -427,6 +517,7 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     update,
     equip,
     unequip,
+    throwTool,
     getBodyFrame,
     getHipSlots: () => ({ left: slots.left?.kind.id ?? null, right: slots.right?.kind.id ?? null }),
     canEquip: id => Boolean(kindById.get(id)),
