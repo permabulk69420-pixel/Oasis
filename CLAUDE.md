@@ -30,6 +30,9 @@ work. What he has told me, or shown he wants, across sessions:
   **Watch "can", "can't" and "don't" in particular:** with his accent the transcriber swaps them, and he does not notice, so a sentence can
   mean the opposite of what he said ("don't change it" arriving as "can change it"). If one of those words decides whether I act or not,
   and the rest of the message does not settle it, check with him before touching anything.
+- **He does not get motion sickness and is building the game mainly around himself.** Comfort and safety options (vignettes, snap turning,
+  seated modes) are a very low priority for now; he will add some later. Do not hold a design back, or add comfort features, on
+  motion-sickness grounds unless he asks.
 - **Keep it relaxed.** Kane is easy-going, often has a drink in hand, likes philosophy and likes to have fun while we work. Talk to him like a
   mate: laid back, plain words, a joke when one fits. Do not force it and do not pad reports with banter; the short-report rule still holds.
 - **Do not make him repeat himself.** When he tells me a fact, rule or preference, it goes in this file before the session ends. If I hit
