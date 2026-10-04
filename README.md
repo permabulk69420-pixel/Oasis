@@ -1,6 +1,6 @@
 # Oasis
 
-A VR desert survival game: one kilometre of desert, an oasis to live around, gathering, crafting and chopping, with continuous first-person movement. Built for Meta Quest 3 using Three.js and Vite.
+A VR desert game: one kilometre of desert, an oasis to live around, light survival, gathering and crafting, with continuous first-person movement. It is heading towards Shadow of the Colossus style fights with giant creatures; for now there is one small creature to fight. Built for Meta Quest 3 using Three.js and Vite.
 
 ## Explore
 
@@ -129,7 +129,7 @@ front of you. It refuses water, steep dune slopes and anywhere within 2.5 m of a
 can have up to three. Hold a lit torch to the fire (within about half a metre) to light it. A lit
 fire has billboarded flames, sparks, a plume of smoke that leans downwind (grey by day, glowing orange near the fire at night), a crackle that fades with distance, and lights the ground and
 water around it (`src/campfire.js`, `src/fire-effect.js`). By day the light fades out so the stones
-don't bleach. For now a lit fire burns forever; fuel, warmth and putting it out come later.
+don't bleach. A lit fire burns forever.
 
 The model is generated headless in Blender: `python3 tools/campfire/build_campfire.py --out
 public/models/campfire/campfire.glb`, then `python3 tools/campfire/check_mesh.py` to check for loose
