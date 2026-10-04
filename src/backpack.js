@@ -32,7 +32,10 @@ export const PACK = Object.freeze({
   // How bright the glowing trim should look (displayed brightness, so the night exposure is undone): faint by day,
   // a soft cyan beacon at night.
   glow: Object.freeze({ day: 0.85, night: 0.75 }),
-  haptics: Object.freeze({ grab: [0.18, 28], enter: [0.14, 14], wear: [0.34, 45], refuse: [0.45, 70] }),
+  // [strength, milliseconds]. Behind your head there is nothing to see, so the tick when the hand reaches the back zone
+  // is the only sign of where to let go: it has to be one you can feel on a Quest (0.14 for 14 ms was about at the
+  // edge of what the actuator shows), and the pulse that confirms you are wearing it is firmer still.
+  haptics: Object.freeze({ grab: [0.18, 28], enter: [0.4, 35], wear: [0.6, 60], refuse: [0.45, 70] }),
 });
 
 // What the fingers close on: just the top of the carry handle, a flat leather strap. (The whole arch would put the
