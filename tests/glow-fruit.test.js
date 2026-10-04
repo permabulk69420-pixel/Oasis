@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { HERO_TREE, isInPond } from '../src/world.js';
 import {
-  FRUIT, MOUTH_RADIUS, fruitLayout, mouthPosition, createGroundFruit, createHeldFruit,
+  FRUIT, MOUTH_RADIUS, fruitLayout, mouthPosition, createGroundFruit, createHeldFruit, fruitGripSurface,
 } from '../src/glow-fruit.js';
 
 test('fruit layout is deterministic, around the tree, outside the roots and out of the pond', () => {
@@ -171,4 +171,18 @@ test('an empty hand far from any fruit grabs nothing', () => {
   f.press(true);
   assert.equal(f.objectGrip.children.length, 0);
   assert.equal(f.held.isHolding('right'), false);
+});
+
+test('the fruit is held off the palm, mirrored for each hand, with one stable surface per hand', () => {
+  const right = fruitGripSurface('right');
+  const left = fruitGripSurface('left');
+  // The fruit is 5 cm in radius, more than the grip solver's palm shift can clear from a centred grip point.
+  assert.ok(FRUIT.gripOffset > 0 && FRUIT.gripOffset < 0.06);
+  assert.deepEqual(right.point, [-FRUIT.gripOffset, 0, 0]);
+  assert.deepEqual(left.point, [FRUIT.gripOffset, 0, 0]);
+  assert.deepEqual(right.meshes, ['Fruit']);
+  // The solver caches a solved grip against the surface object, so it has to be the same one each time.
+  assert.equal(fruitGripSurface('right'), right);
+  assert.equal(fruitGripSurface('left'), left);
+  assert.equal(fruitGripSurface(undefined), right);
 });
