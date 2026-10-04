@@ -15,6 +15,8 @@ import { createWindSand, WIND_SAND } from './wind-sand.js';
 import { createAlienBirds } from './alien-bird.js';
 import { createDuneStinger } from './dune-stinger.js';
 import { createWeaponHits } from './weapon-hits.js';
+import { createMining } from './mining.js';
+import { registerLooseFindDrops } from './loose-finds.js';
 import { createBackpack, PACK } from './backpack.js';
 import { SPEAR } from './spear.js';
 import { stepBody } from './falling.js';
@@ -89,15 +91,17 @@ const materials = createMaterials(renderer, field);
 const terrain = createTerrain(field, materials.sand);
 scene.add(terrain.group);
 scene.add(createWater(field, materials.water));
-scene.add(createGroundSticks({
+const sticksGroup = createGroundSticks({
   field,
   onError: (message) => console.warn(message)
-}));
-scene.add(createGroundStones({
+});
+scene.add(sticksGroup);
+const stonesGroup = createGroundStones({
   field,
   renderer,
   onError: (message) => console.warn(message)
-}));
+});
+scene.add(stonesGroup);
 // Glow fruit around the veil tree. They follow the live sun vector for their night glow.
 const glowFruit = createGroundFruit({ field, sunDirection: materials.sand.uniforms.uSun.value });
 scene.add(glowFruit.group);
@@ -296,7 +300,16 @@ const duneStinger = createDuneStinger({
     for (const state of hands.states) pulseHaptics(state, ...STINGER_HIT_HAPTIC);
   },
 });
-const weaponHits = createWeaponHits({ tools: hands.tools, rig, targets: [duneStinger] });
+// The things to find out in the dunes: sandstone outcrops and glowing crystal clusters (a pickaxe breaks stone and shards off them) and
+// spiny spire plants (an axe cuts fibre from them). Rocks are solid. What they drop joins the loose stones and sticks.
+const mining = createMining({
+  scene, renderer, heightAt: field.sample,
+  getExposure: () => renderer.toneMappingExposure,
+  onError: message => console.warn(message),
+});
+registerLooseFindDrops({ stonesGroup, sticksGroup, materials: mining.materials, heightAt: field.sample });
+if (import.meta.env.DEV) window.__mining = mining; // dev only: lets a test strike a node without swinging a tool
+const weaponHits = createWeaponHits({ tools: hands.tools, rig, targets: [duneStinger, mining] });
 // Development-only: ?bird=perch|fly|flare puts a bird in view and stops time for it (?birdfreeze=0 lets it move),
 // ?birdd=<metres> sets how far ahead, ?birdseed=<n> makes the bird's choices repeatable.
 const devBirdParams = import.meta.env.DEV ? new URLSearchParams(location.search) : null;
@@ -559,6 +572,7 @@ function frame(time) {
   windSand.update(windTime.value, head, renderer.xr.isPresenting ? WIND_SAND.vrViewHeight : renderer.getDrawingBufferSize(drawingSize).y);
   alienBirds.update(dt, head);
   weaponHits.update(dt);
+  mining.update(dt, head);
   duneStinger.update(dt, head);
   if (devBird && alienBirds.ready) {
     const params = devBirdParams;
@@ -665,6 +679,12 @@ function frame(time) {
     const movedX = nextX - head.x, movedZ = nextZ - head.z;
     rig.position.x += movedX; rig.position.z += movedZ;
     head.x = nextX; head.z = nextZ;
+    // rocks are solid: walk out of any you have walked into
+    const clear = mining.pushOut(head.x, head.z);
+    if (clear) {
+      rig.position.x += clear[0] - head.x; rig.position.z += clear[1] - head.z;
+      head.x = clear[0]; head.z = clear[1];
+    }
 
     // Smooth the terrain-following base separately from seated height, crouch and jump height.
     const ground = field.sample(head.x, head.z);
@@ -697,6 +717,7 @@ function frame(time) {
     canvas.dataset.render = JSON.stringify({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures });
     canvas.dataset.birds = JSON.stringify(alienBirds.list());
     canvas.dataset.stinger = JSON.stringify(duneStinger.list());
+    canvas.dataset.finds = JSON.stringify({ stats: mining.stats(), near: mining.list(head, 60) });
     canvas.dataset.pack = JSON.stringify(backpack.list());
     canvas.dataset.campfires = JSON.stringify(campfires.list().map(fire => ({ x: +fire.x.toFixed(1), z: +fire.z.toFixed(1), lit: fire.lit })));
     canvas.dataset.survival = JSON.stringify(Object.fromEntries(Object.entries(getSurvivalStats()).map(([k, v]) => [k, +v.toFixed(1)])));

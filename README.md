@@ -62,6 +62,7 @@ The menu is three glass panels in the style of Ark:
 | Stone axe | 3 sticks + 2 stones | 1 axe in your inventory |
 | Torch | 2 sticks + 1 stone | 1 torch in your inventory |
 | Stone-tipped spear | 3 sticks + 1 stone | 1 spear in your inventory (see The spear) |
+| Stone pickaxe | 3 sticks + 3 stones | 1 pickaxe in your inventory (see The desert finds) |
 | Campfire | 6 sticks + 5 stones | 1 campfire in your inventory (placeable) |
 
 **Tools in the world** (`src/tools.js`): every axe, torch and spear is a real object. Grab one with
@@ -80,7 +81,7 @@ carries a `fall` entry (radius, landing `lie`/`stick`, centre of mass). `?view=t
 **Chopping:** swing the axe into a blue alien tree. Six solid hits fell it; it drops two logs
 (Wood) and three sticks along where it fell, sinks away, and regrows after three minutes.
 Pick up sticks, stones and logs with grip and let go at your chest to pack them.
-Everything you carry is one shared pool with a weight per item (stick 4, stone 8, wood 6, axe 10, torch 5, spear 10, campfire 25).
+Everything you carry is one shared pool with a weight per item (stick 4, stone 8, wood 6, fibre 1, crystal 4, axe 10, torch 5, spear 10, pickaxe 12, campfire 25).
 Your pockets carry 40; past the limit you walk at half speed, easing off to a standstill at twice the limit. Wearing the
 backpack lifts the limit to 100 (see The backpack). Inventory is session-only; reloading starts with an empty inventory.
 
@@ -198,6 +199,39 @@ no death yet, and nothing drops from it yet.
   windup, aim lock and strike times, damage, health, retreat and respawn), `JOINTS` (how far the legs swing and lift, how the tail
   moves in each pose) and `HITS` in `weapon-hits.js`.
 - The tail was lengthened 2.4 times in `tools/dune-stinger/build_stinger.py` (`TAIL_SCALE`) so a strike can reach a person's head.
+
+## The desert finds and the pickaxe
+
+Something to walk out into the dunes for. About 120 things stand in 25 places across the world (`src/desert-finds.js`, a fixed seed, so the
+world is the same every session): two **sandstone outcrops** and three **spire plants** a short walk from the start, a patch of
+**crystals on the stinger's ground** (the first prize costs a fight), and then 24 far sites 105 to 410 m out, the richer ones further.
+
+| Find | What it is | Tool | Gives |
+| --- | --- | --- | --- |
+| Sandstone outcrop | mesa, hoodoo, boulder or slab, 1.2 to 4.4 m tall. Real CC0 1k PBR sandstone (Poly Haven "Cliff Side": colour + normal in `public/textures/sandstone/`, credited there) wrapped so the beds stay level. **Solid**: you are walked out of it. | pickaxe | stone, a piece for every 30 damage, plus two when it goes |
+| Crystal cluster | violet shards (the odd cyan one) that shine most at the tips and glow at night with a soft violet halo, so a field is a smudge of light across the dunes | pickaxe | crystal shards (hand-sized, weight 4; what they are for is still a mystery) |
+| Spire plant | tall, spiny, teal alien plant ("not a cactus") | axe (a pickaxe half as well, a spear poke less) | fibre (weight 1) |
+
+- **The blow** (`src/weapon-hits.js` -> `src/mining.js`): the pickaxe's point, swung fast enough (2.3 m/s of the point relative to your body to
+  count, 5.8 for full damage 26), takes health off the node, shakes it and throws chips (a crystal throws glowing sparks). The wrong tool just
+  rings off it: sparks, a shake and the jolt in your hand, no damage. When the health is gone a rock sinks and crumbles, a crystal shatters,
+  a spire falls over; it is gone for 900 / 700 / 300 seconds and then grows back (a rock rises, the others grow). A thrown tool bounces off.
+- **The pickaxe** (`src/pickaxe.js`, model `public/models/pickaxe/pickaxe.glb`, 2,344 triangles, built by `tools/pickaxe/build_pickaxe.py`):
+  stands in the sand by the other starting tools (3 m left of the axe) and can be crafted. Held like the axe, long pick forward; carried on a
+  hip leaning back. It also hurts the stinger (26).
+- **What drops** pops out of the node on the side you hit it from and lands beside it: stone joins the loose stones (`src/stones.js`),
+  crystals the same group (`src/loose-finds.js`), fibre the loose sticks. Pick them up with grip, let go at your chest to pack them (the same
+  path as a stone or a stick). At most 90 mined items lie about; the oldest one nobody holds is tidied away past that.
+- **Cost:** about 120 nodes in a few instanced meshes (one per variant and level of detail: 70 m, 190 m, then far; rocks 324 to 756
+  triangles close, 96 to 160 far; crystals 81 to 153; spires about 1,000 close), plus one halo draw and two small particle pools. At the start
+  that is 104 draw calls and 276,000 triangles in all.
+- **Numbers** are in `MINING` (`src/mining.js`): health per kind and variant, damage per drop, what each tool does to each kind, respawn
+  times, shake, level-of-detail distances. The layout numbers are `FINDS` (`src/desert-finds.js`).
+- **Files:** `src/find-shapes.js` (the shapes, pure procedural geometry with three levels each), `src/find-materials.js`, `src/mining.js`,
+  `src/loose-finds.js`, `src/bursts.js` (the flying chips), `tools/finds-lab/` (a scratch page that lays every shape out:
+  `python3 tools/finds-lab/lab_shot.py "what=rock|crystal|spire|held&night=1" out.png`), `tools/props/` (Blender helpers for props).
+- Development only: `window.__mining.debug.strike('r00', 26, 'pickaxe', { x, z })` strikes a node as if swung (the smoke test uses it);
+  `window.__mining.list({x, z}, 60)` lists nearby nodes.
 
 ## The backpack
 

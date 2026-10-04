@@ -261,3 +261,21 @@ texture because the blue read too blue; default look `plant`, mid-dark; Kane ask
 next default, but he has not said which: ask which look he settled on after the headset). #53: the four alien desert plants were near black (vertex colour times texture), now lit properly (night unchanged). #54: three skills split out of this file. #55 to #58: notes on text-to-speech, relaxed tone, no motion sickness. #59 and #60: spear held pointing forward (the hand at the butt in #59, back at the middle in #60). #61: Quest screenshot black boxes are a capture bug. #62: hold the torch button for the spear's throwing grip. #67 and #68: spear throwing grip flips 160 degrees. #69: the dune stinger in the game (passive). #71: the stinger fight (stalk, telegraphed tail strike, spear and axe hurt it, dies and respawns). Waiting on Kane before touching: the backpack back zone (options if it still feels hard: a repeating buzz, a sound, a bigger zone,
 a visual cue). Only if Kane says go: a script and post for his explainer on tokens, API price and plan usage.
 
+
+## Second overnight (4 to 5 Oct 2026, Kane asleep from about 22:30, full authority)
+Kane's words: "you don't ask anything or when I leave you overnight you just merge and do whatever you feel is right that's one hundred percent
+on you... just don't fire off subagent or do anything crazy"; "don't be afraid to throw away hours of work"; no gameplay mechanics ("let's not think
+about gameplay mechanic that's going to be something I really need to test and do myself"), no sound effects yet ("way more intentional later"). He
+wants "something more than just visual" and a reason to go out into the desert: a pickaxe, good stones or crystals, a "not a cactus" alien plant, PBR.
+Plan: pickaxe + desert finds, dune stinger v3 (Blender), fight effects, saving, footprints, giant bones, a direction doc in the Project. Keep the time
+(`TZ=Australia/Sydney date`). Done so far: #75 (smoke test in CI), the pickaxe and desert finds (below).
+
+Pickaxe and desert finds (my call, done; see README "The desert finds and the pickaxe"): `src/pickaxe.js` (a stone pickaxe like the axe, crafted from 3 sticks +
+3 stones, also stands by the starting tools, hurts the stinger for 26), `src/desert-finds.js` (fixed-seed layout of about 120 nodes in 25 sites),
+`src/find-shapes.js` + `src/find-materials.js` (procedural sandstone outcrops with Poly Haven "Cliff Side" 1k PBR, glowing violet and cyan crystal
+clusters, spiny teal spire plants, all with three levels of detail), `src/mining.js` (rules, instanced rendering, hits, drops, regrowing, solid
+rocks), `src/loose-finds.js` (the crystal shard and the fibre bundle you pick up), `src/bursts.js` (flying chips). Tools hit by passing the tool
+instance through `weapon-hits.js`. Oddities to tell Kane: the pickaxe recipe (3 sticks + 3 stones), its 26 damage and where it stands are my numbers;
+stone drops are a piece per 30 damage and a rock gives about 6 to 8 (weight 8 each, so five fill your pockets); crystal shards weigh 4 and do nothing yet
+(my suggestion: alien fuel or light); respawn times 900 s (rock), 700 s (crystal), 300 s (spire); the first crystals sit on the stinger's ground on purpose;
+rocks are solid but the stinger walks through them; the sandstone is a dark red photo lifted warmer in `SANDSTONE.lift`.
