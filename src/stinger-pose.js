@@ -33,6 +33,10 @@ export const POSE_REST = Object.freeze({
   alert: 0, // 0 relaxed, 1 on guard: the tail curled up over the back, the mandibles opening
   headYaw: 0, // radians to the creature's left
   headPitch: 0, // radians, nose down is positive
+  windup: 0, // 0 to 1: crouched, the tail drawn back and up over the body, the eyes and sting flaring (the warning before a strike)
+  strike: 0, // 0 to 1: the tail whipped forward over the head
+  hurt: 0, // 0 to 1: flinching from a blow, the tail thrown up and the mandibles open
+  dead: 0, // 0 to 1: legs curled in, tail drooped, the body down and dark
 });
 
 // Where each joint goes. These are the numbers to tune when a pose looks wrong.
@@ -51,6 +55,18 @@ export const JOINTS = Object.freeze({
   tailBend: 0.05, // radians each tail joint bends into a turn
   mandibleOpen: 0.42, // radians each mandible opens when on guard
   breathe: 0.012, // radians the body segments rock while it stands
+  tailStraight: -0.26, // radians each tail joint uncurls in the windup and the strike: the arched tail becomes a long straight whip
+  stingerStraight: -0.4,
+  strikeSwing: 1.4, // radians the straightened tail swings forward from the base in a strike (from leaning back to arching over the head)
+  strikeCurl: 0.03, // radians each of the other three joints arches over in a strike, so the sting lands just ahead of the nose
+  stingerStrike: 0.05, // and the sting tips down a touch at the end
+  tailHurt: -0.18,
+  crouch: 0.05, // metres (before scaling) the body sinks in the windup
+  bodyStrike: 0.03, // radians each body segment dips forward in the strike
+  deadRoll: 0.7, // radians each hip lifts its leg when dead (the legs curl up and in)
+  deadKnee: -0.9,
+  deadSink: 0.07, // metres (before scaling)
+  deadTail: 0.3, // radians each tail joint curls down, and 0.35 it droops to the side
   stride: 0.34, // metres (before scaling) the body travels per leg cycle; a foot sweeps back about 0.2 m in the 60% of it on the ground, 0.2 / 0.6
 });
 
@@ -87,9 +103,14 @@ export function computePose(pose, time, out, joints = JOINTS) {
   const J = joints;
   const gait = clamp(pose.gait, 0, 1);
   const alert = clamp(pose.alert, 0, 1);
-  const idle = 1 - gait * 0.7;
+  const windup = clamp(pose.windup, 0, 1);
+  const strike = clamp(pose.strike, 0, 1);
+  const hurt = clamp(pose.hurt, 0, 1);
+  const dead = clamp(pose.dead, 0, 1);
+  const straight = Math.max(windup, strike);
+  const idle = (1 - gait * 0.7) * (1 - dead) * (1 - 0.8 * Math.max(windup, strike));
 
-  // --- legs: a ripple of steps along each side, the two sides half a cycle apart
+  // --- legs: a ripple of steps along each side, the two sides half a cycle apart (curled up and in when dead)
   const cycles = pose.phase / TAU;
   for (let i = 0; i < LEGS; i++) {
     const swing = (i >= LEGS - 2 ? J.swingRear : J.swing) * gait;
@@ -101,39 +122,40 @@ export function computePose(pose, time, out, joints = JOINTS) {
       const lower = out[left ? LEG_NAMES[i].lowerL : LEG_NAMES[i].lowerR];
       // A left leg points to +X: a positive turn about Y swings its foot backward and a positive turn about Z lifts it. The right leg is the mirror.
       const yaw = -step.fore * swing;
-      const roll = lift * J.lift;
-      const knee = lift * J.kneeLift;
+      const roll = lift * J.lift + dead * J.deadRoll;
+      const knee = lift * J.kneeLift + dead * J.deadKnee;
       setEuler(upper, 0, left ? yaw : -yaw, left ? roll : -roll, 'ZYX');
       setEuler(lower, 0, 0, left ? knee : -knee);
     }
   }
 
-  // --- body: a ripple of side-to-side sway while walking, bent into a turn, breathing while it stands
+  // --- body: a ripple of side-to-side sway while walking, bent into a turn, breathing while it stands, dipping into a strike
   const turn = clamp(pose.turn, -1, 1);
   const breathe = Math.sin(time * 1.5) * J.breathe * idle;
   for (let k = 0; k < SEGMENTS; k++) {
     const sway = Math.sin(pose.phase - k * J.rippleLag) * J.ripple * gait;
-    setEuler(out[SEG_NAMES[k]], breathe * (k % 2 ? -1 : 1) * 0.6, turn * 0.04 + sway, 0);
+    setEuler(out[SEG_NAMES[k]], breathe * (k % 2 ? -1 : 1) * 0.6 + strike * J.bodyStrike, turn * 0.04 + sway, 0);
   }
 
   // --- head and mandibles
-  setEuler(out.Head, pose.headPitch, pose.headYaw, 0);
+  setEuler(out.Head, pose.headPitch + strike * 0.2 - windup * 0.1 + hurt * -0.2, pose.headYaw * (1 - dead), 0);
   const chew = Math.sin(time * 2.7) * 0.05 * idle;
-  const open = alert * J.mandibleOpen + 0.05 + chew;
+  const open = Math.min(1, alert + windup * 0.6 + strike + hurt) * J.mandibleOpen + 0.05 + chew + dead * 0.25;
   setEuler(out.Mandible_L, 0, open, 0);
   setEuler(out.Mandible_R, 0, -open, 0);
 
-  // --- tail and stinger: a slow sway, bent into a turn, and curled up over the back on guard
+  // --- tail and stinger: a slow sway, bent into a turn, curled up on guard, drawn back to strike, whipped forward, drooping when dead
   for (let k = 0; k < TAILS; k++) {
     const sway = Math.sin(time * 0.9 + k * 0.7) * 0.035 * idle + Math.sin(pose.phase * 1 - k * 0.8) * 0.02 * gait;
     const nod = Math.sin(time * 0.6 + k * 0.5 + 1.3) * 0.025 * idle;
-    setEuler(out[TAIL_NAMES[k]], alert * J.tailAlert + nod, sway - turn * J.tailBend, 0);
+    const curl = alert * J.tailAlert + straight * J.tailStraight + strike * (k === 0 ? J.strikeSwing : J.strikeCurl) + hurt * J.tailHurt + dead * J.deadTail + nod;
+    setEuler(out[TAIL_NAMES[k]], curl, sway - turn * J.tailBend + dead * 0.09 * (k + 1), 0);
   }
   const flick = Math.max(0, Math.sin(time * 0.37 + 2.0)) ** 6; // an occasional twitch of the sting
-  setEuler(out.Stinger, alert * J.stingerAlert + flick * 0.22 * idle, Math.sin(time * 1.1) * 0.04 * idle, 0);
+  setEuler(out.Stinger, alert * J.stingerAlert + straight * J.stingerStraight + strike * J.stingerStrike + dead * 0.2 + flick * 0.22 * idle, Math.sin(time * 1.1) * 0.04 * idle, 0);
 
   out.Root.identity();
-  return Math.abs(Math.sin(pose.phase)) * J.bob * gait;
+  return Math.abs(Math.sin(pose.phase)) * J.bob * gait - windup * J.crouch - dead * J.deadSink;
 }
 
 // Finds the bones of a loaded (and cloned) stinger and poses them. Returns null if a bone is missing.

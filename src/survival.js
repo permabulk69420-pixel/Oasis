@@ -33,6 +33,14 @@ export function resetSurvival() {
   sinceSprint = Infinity;
 }
 
+// Something hurts the player. Health never goes below the floor (there is no death yet). Returns the health left.
+export function damagePlayer(amount) {
+  const value = Number(amount);
+  if (!(value > 0)) return stats.health;
+  stats.health = Math.max(Math.min(stats.health, SURVIVAL_RATES.healthFloor), stats.health - value);
+  return stats.health;
+}
+
 // Snapshot so callers cannot mutate the live stats.
 export function getSurvivalStats() {
   return { ...stats };
