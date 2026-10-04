@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
-// The night sky beyond the stars: a moon with a face and a phase, the Milky Way, and the odd shooting star.
-// All of it is a few lines of the sky shader (no textures, no extra draw calls), added after tone mapping
+// The night sky beyond the stars: a moon with a face and a phase, the Milky Way, the odd shooting star, and the great ringed planet this
+// moon circles. All of it is a few lines of the sky shader (no textures, no extra draw calls), added after tone mapping
 // like the rest of the night's light, and it fades with the sun. The stars themselves are in day-night.js
 // and are scattered thicker along the same band, so the two line up.
 
@@ -43,6 +43,50 @@ export const MOON = Object.freeze({
   radius: 0.030, // radians: about 3.4 degrees across, bigger than the real one so it reads in VR
 });
 
+// The planet this moon circles. The moon always shows it the same face, so it hangs in one place in the sky for ever: it does not rise or set
+// with the sun. It stands to the right of where you first look (the pond), a good way up, and well away from the sun's and the moon's paths
+// (which are in sun-path.js). It is lit by the sun, so it goes through phases, from a thin crescent to nearly half, as the day turns.
+export const PLANET = Object.freeze({
+  azimuth: THREE.MathUtils.degToRad(-28), // the angle of its direction in the x-z plane
+  elevation: THREE.MathUtils.degToRad(21),
+  radius: 0.085, // radians: the disc is about 10 degrees across, three moons, and the rings reach twice as far out again
+  ringInner: 1.22, // the rings, in planet radii from its centre
+  ringOuter: 2.28,
+  tilt: THREE.MathUtils.degToRad(69), // the angle between its spin axis (the rings' normal) and your line of sight: 90 would show the rings edge on
+  roll: THREE.MathUtils.degToRad(22), // how far the axis leans over on the sky, towards the right
+});
+
+// Its frame: dir towards it, right and up across the sky, and the spin axis written in that frame (x right, y up, z towards you).
+const planetDir = new THREE.Vector3(
+  Math.cos(PLANET.elevation) * Math.cos(PLANET.azimuth), Math.sin(PLANET.elevation), Math.cos(PLANET.elevation) * Math.sin(PLANET.azimuth),
+).normalize();
+const planetRight = new THREE.Vector3().crossVectors(planetDir, new THREE.Vector3(0, 1, 0)).normalize();
+const planetUp = new THREE.Vector3().crossVectors(planetRight, planetDir).normalize();
+const planetAxis = new THREE.Vector3(
+  Math.sin(PLANET.tilt) * Math.sin(PLANET.roll), Math.sin(PLANET.tilt) * Math.cos(PLANET.roll), Math.cos(PLANET.tilt),
+).normalize();
+export const PLANET_FRAME = Object.freeze({
+  dir: planetDir,
+  right: planetRight,
+  up: planetUp,
+  axis: planetAxis,
+  bound: Math.cos(Math.min(PLANET.ringOuter * PLANET.radius * 1.12, 0.6)), // cosine of the angle that holds the whole system
+});
+
+// Does the planet (its disc, or the thick of its rings) hide a star in direction `dir` (a unit vector)? The stars use this to leave the
+// planet's patch of sky empty, so none shine through it. The same geometry is in the shader: the planet is drawn as if seen from far away.
+export function planetCovers(dir) {
+  const f = PLANET_FRAME;
+  if (dir.dot(f.dir) < f.bound) return false;
+  const x = dir.dot(f.right) / PLANET.radius;
+  const y = dir.dot(f.up) / PLANET.radius;
+  const r2 = x * x + y * y;
+  if (r2 < 1.1) return true;
+  const z = -(f.axis.x * x + f.axis.y * y) / f.axis.z; // where the line of sight crosses the rings' plane
+  const rho = Math.sqrt(r2 + z * z);
+  return rho > PLANET.ringInner && rho < PLANET.ringOuter;
+}
+
 const vec3 = v => `vec3(${v.x.toFixed(6)}, ${v.y.toFixed(6)}, ${v.z.toFixed(6)})`;
 
 // Needs uSun, uCloudMap and uCloudTime (from the atmosphere chunk) in scope. Returns linear light to ADD after
@@ -54,6 +98,14 @@ export const NIGHT_SKY_GLSL = /* glsl */`
   const float MW_SIGMA = ${MILKY_WAY.sigma.toFixed(4)};
   const float MW_CUT = ${MILKY_WAY.cut.toFixed(4)};
   const float MOON_RADIUS = ${MOON.radius.toFixed(4)};
+  const vec3 PL_DIR = ${vec3(PLANET_FRAME.dir)};
+  const vec3 PL_RIGHT = ${vec3(PLANET_FRAME.right)};
+  const vec3 PL_UP = ${vec3(PLANET_FRAME.up)};
+  const vec3 PL_AXIS = ${vec3(PLANET_FRAME.axis)};
+  const float PL_RADIUS = ${PLANET.radius.toFixed(4)};
+  const float PL_RING_IN = ${PLANET.ringInner.toFixed(4)};
+  const float PL_RING_OUT = ${PLANET.ringOuter.toFixed(4)};
+  const float PL_BOUND = ${PLANET_FRAME.bound.toFixed(6)};
 
   // A hash without sin(): sin of a big number is not reliable across GPUs, and this one is the same everywhere.
   float nightHash(float p) { p = fract(p * 0.1031); p *= p + 33.33; p *= p + p; return fract(p); }
@@ -138,5 +190,88 @@ export const NIGHT_SKY_GLSL = /* glsl */`
     float line = exp(-(g.y * g.y) / (width * width));
     float fade = sin(local * 3.14159);
     return vec3(0.80, 0.88, 1.0) * line * pow(t, 2.4) * fade * 0.85;
+  }
+
+  // How solid the rings are, rho planet radii from its centre (0 outside them): a faint inner ring, a bright wide one, a dark gap, a
+  // thinner outer ring, and a hair-thin gap near the edge, with fine ringlets that are too slow to shimmer.
+  float ringDensity(float rho) {
+    float t = (rho - PL_RING_IN) / (PL_RING_OUT - PL_RING_IN);
+    if (t <= 0.0 || t >= 1.0) return 0.0;
+    float edge = smoothstep(0.0, 0.05, t) * (1.0 - smoothstep(0.93, 1.0, t));
+    float d = mix(0.16, 0.94, smoothstep(0.17, 0.30, t));
+    d *= 1.0 - 0.94 * smoothstep(0.58, 0.63, t) * (1.0 - smoothstep(0.69, 0.74, t));
+    d *= mix(1.0, 0.72, smoothstep(0.72, 0.78, t));
+    d *= 1.0 - 0.80 * smoothstep(0.88, 0.91, t) * (1.0 - smoothstep(0.925, 0.96, t));
+    d *= 0.93 + 0.07 * sin(t * 37.0 + 0.8);
+    return d * edge;
+  }
+
+  // The ringed planet this moon circles: a banded teal gas giant with cream rings, lit by the sun so it has phases, the rings
+  // throwing their shadow on it and it throwing its on them. Drawn as seen from far off (flat, no perspective). Returns premultiplied
+  // colour and coverage to lay over the finished sky: by night all of it, the dark side as a dim disc against the stars; by day
+  // only the sunlit part and the rings, pale, as if seen through the blue.
+  vec4 planetLight(vec3 ray, float daylight) {
+    if (dot(ray, PL_DIR) < PL_BOUND) return vec4(0.0);
+    vec2 p = vec2(dot(ray, PL_RIGHT), dot(ray, PL_UP)) / PL_RADIUS;
+    float r2 = dot(p, p);
+    vec3 L = vec3(dot(uSun, PL_RIGHT), dot(uSun, PL_UP), -dot(uSun, PL_DIR)); // the sun, in the planet's frame
+    vec3 N = PL_AXIS;
+
+    // the rings: where this line of sight crosses their plane
+    float zr = -(N.x * p.x + N.y * p.y) / N.z;
+    float rho = sqrt(r2 + zr * zr);
+    float density = ringDensity(rho);
+    vec3 ringPoint = vec3(p, zr);
+    float underSun = dot(L, N);
+    float sunSide = smoothstep(-0.3, 0.3, underSun * N.z);           // the face you see is the lit one
+    float grazing = 0.30 + 0.70 * smoothstep(0.0, 0.5, abs(underSun)); // lit edge on, they are faint
+    float along = dot(ringPoint, L);
+    float clear = along < 0.0 ? smoothstep(0.93, 1.03, sqrt(max(dot(ringPoint, ringPoint) - along * along, 0.0))) : 1.0; // the planet's shadow
+    float across = clamp((rho - PL_RING_IN) / (PL_RING_OUT - PL_RING_IN), 0.0, 1.0);
+    vec3 ringTint = mix(vec3(0.95, 0.86, 0.68), vec3(0.76, 0.84, 0.82), smoothstep(0.35, 0.9, across));
+    vec3 ringColour = ringTint * (0.30 + 0.70 * sunSide) * grazing * (0.05 + 0.95 * clear);
+
+    // the planet itself
+    float radial = sqrt(r2);
+    float cover = 1.0 - smoothstep(0.985, 1.0, radial);
+    vec3 bodyColour = vec3(0.0);
+    float lit = 0.0;
+    float zs = sqrt(max(1.0 - r2, 0.0));
+    if (cover > 0.0) {
+      vec3 n = vec3(p, zs);
+      lit = smoothstep(-0.05, 0.30, dot(n, L));
+      float lat = dot(n, N);
+      vec3 t1 = normalize(cross(N, vec3(0.0, 0.0, 1.0)));
+      vec3 t2 = cross(N, t1);
+      float lon = atan(dot(n, t2), dot(n, t1)) * 0.3183099;            // -1 to 1 round the planet: two whole texture repeats, so no seam
+      vec2 uv = vec2(lon + uCloudTime * 0.0006, lat * 0.5);
+      float warp = (texture2D(uCloudMap, uv * vec2(1.0, 1.7)).r - 0.5) * 0.9 + (texture2D(uCloudMap, uv * vec2(2.0, 3.1) + 0.3).g - 0.5) * 0.35;
+      float b1 = 0.5 + 0.5 * sin(lat * 17.0 + warp * 4.0 + 0.6);
+      float b2 = 0.5 + 0.5 * sin(lat * 7.0 - warp * 3.0 + 2.2);
+      vec3 col = mix(vec3(0.16, 0.42, 0.50), vec3(0.50, 0.78, 0.74), b1);
+      col = mix(col, vec3(0.86, 0.80, 0.62), smoothstep(0.58, 0.92, b2) * 0.55);
+      col = mix(col, vec3(0.62, 0.40, 0.30), smoothstep(0.86, 1.0, 0.5 + 0.5 * sin(lat * 29.0 + warp * 6.0)) * 0.30);
+      col = mix(col, vec3(0.12, 0.26, 0.34), smoothstep(0.72, 0.97, abs(lat)) * 0.65);
+      // the rings' shadow: follow the sun's ray from this point out to the rings' plane
+      float ringShadow = 0.0;
+      if (abs(underSun) > 0.04) {
+        float s = -dot(n, N) / underSun;
+        if (s > 0.0) ringShadow = ringDensity(length(n + L * s));
+      }
+      float limb = 0.55 + 0.45 * pow(zs, 0.4);
+      float rim = pow(1.0 - zs, 3.0);
+      bodyColour = col * limb * (0.02 + 0.98 * lit * (1.0 - 0.8 * ringShadow)) + vec3(0.25, 0.55, 0.58) * rim * (0.45 * lit + 0.06);
+    }
+
+    float gain = mix(0.30, 0.85, daylight);
+    float bodyAlpha = cover * mix(1.0, 0.62 * smoothstep(0.03, 0.30, lit), daylight);
+    float ringAlpha = density * mix(1.0, 0.55, daylight);
+    vec3 bodyRGB = bodyColour * gain;
+    vec3 ringRGB = ringColour * gain;
+    bool ringInFront = zr > zs;                                         // the near half of the rings crosses in front of the planet
+    float alpha = ringInFront ? ringAlpha + (1.0 - ringAlpha) * bodyAlpha : bodyAlpha + (1.0 - bodyAlpha) * ringAlpha;
+    vec3 premultiplied = ringInFront ? ringRGB * ringAlpha + (1.0 - ringAlpha) * bodyRGB * bodyAlpha
+                                     : bodyRGB * bodyAlpha + (1.0 - bodyAlpha) * ringRGB * ringAlpha;
+    return vec4(premultiplied, alpha);
   }
 `;
