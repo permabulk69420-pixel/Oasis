@@ -94,7 +94,8 @@ work. What he has told me, or shown he wants, across sessions:
    at renders first. **No gameplay, though:** "you can go as crazy as you want with the animations and stuff... let's not think about gameplay
    mechanics, that's something I really need to test and do myself." Animations, art, sound, effects, atmosphere: yes. New mechanics (a pincer
    snap attack, drops, player death, anything that changes how play works): no, and no new numbers for them. He gives this overnight authority
-   when he says so, as he did on both nights; do not assume it in an ordinary daytime session.
+   when he says so, as he did on both nights; do not assume it in an ordinary daytime session. Even then it covers art, atmosphere and animation only: no new
+   mechanics, no plot, and no colossus work unless he says so.
    For that run he also said: do not be afraid to throw away hours of work if it is not good (bin it and redo it, no sunk cost); keep track of the
    time yourself (the clock tool says only the date here, so use `date` in the shell; he is in Sydney, `TZ=Australia/Sydney date`; the run began at
    22:33 AEDT on 4 Oct); his usage and permissions are set to the maximum, so nothing should stop the run; and if I have a question he wants it fired
@@ -111,30 +112,6 @@ work. What he has told me, or shown he wants, across sessions:
    (fuel, cold, how things work). Do not invent game mechanics or UI beyond what he asked for. Visual art
    direction is where he trusts me most. Anything substantial (trees, creatures, big props) needs proper LODs
    (3 levels, with triangle counts checked against a Quest budget). Leave the hero tree alone.
-
-## Overnight plan (4 to 5 Oct 2026, Kane asleep, full authority, art, animation and world content only)
-
-Kane's direction that night: the visuals are in good shape and he is unsure where the game goes next. I said we have no reason to go out into
-the dunes and no stakes; he said "I think we need a pickaxe, and some really good stones or crystals, and maybe something like a cactus but
-alien... a reason to go out there... get some PBR stuff". **No sound effects yet** (his words: audio is "something we can do way more
-intentional later"), so none of the fight, water or insect sounds. In this order (tick them off in the task list; the morning report is short):
-1. A smoke test (headless Chromium loads the real game, fails on page errors or a triangle blowout) run in the Pages workflow before deploy, so an
-   unattended merge cannot ship a broken game.
-2. The pickaxe (recipe like the axe's, held, hip slot, menu icon, breaks mineable nodes like the axe fells trees) and the desert finds that give it a
-   job: sandstone outcrops with a 1k Poly Haven PBR rock (credit file in `public/textures/<name>/`), glowing crystal clusters (visible across the dunes
-   at night, first field near the stinger's patch, richer ones further out), and a spiny alien spire plant that gives fibre (an item with no source yet).
-   Crystals just go in the pack: what they are FOR is his call (current lean: material for what a colossus unlocks).
-3. (Done, #77.) Dune stinger v3 (`tools/dune-stinger/v3/`, built by me in Blender, no paid or AI mesh tools): a plated carapace with a ridge, an eye cluster, four leg
-   pairs (thigh, shin, claw foot, knobbly knee), two jointed pincers (one bigger) that guard, flare open in the windup and close, a five segment tail.
-   3 LODs, close level roughly 30 to 40k triangles (ceiling 50k), 2 draw calls, cyan glow seams in the spear's cyan. Retarget `src/stinger-pose.js` and
-   the hit test (now capsules, `hitParts`); the fight logic and numbers stay. Feet planted on the sand. Claws are animation only, no pincer attack.
-4. Fight effects: sand puffs on the lunge and death, the dead stinger sinks into the sand instead of popping out of the world.
-5. Saving: a silent, versioned autosave of inventory, tools, fires, felled trees, position and time (`?fresh=1` starts clean; mismatched saves discarded).
-6. (Done.) Footprints in the sand (player and creature), filled in by the wind, one instanced draw call.
-7. (Done, #81.) Giant bones half buried in the dunes (Blender model with LODs) as landmarks.
-8. (Done, since rewritten; see Game direction.) A direction doc in the Project (`Projects` tool).
-9. If time: glow motes (done: the pond already had fireflies, so they rise off the crystals), the ringed planet in the night sky (done, with the sun's path fix), dust devils by day, a skittering critter, a dawn and dusk look pass.
-Add a `creature-pipeline` skill (`.claude/skills/`) when the stinger v3 build is done, since the Blender to pose code to game procedure is longer than a few lines.
 
 ## Working on this repo
 
@@ -181,6 +158,8 @@ Campfire (done). Direction is in "Game direction" at the top: Ark-lite plus colo
 and co-op are parked or dropped (5 Oct). Visual direction now: dust and sand, fire smoke and heat haze, night sky, plant sway (done), an
 ambient alien bird (done), a physical backpack (done), a spear (done), newer trees with LODs (done). Next big thing: a colossus, starting with a rough
 climb prototype once Kane says go (how it is beaten is his call). Kane tests on the headset himself: do not keep saying it is untested, say what to look for.
+Art-only extras still open (no decision needed): dust devils by day, a dawn and dusk look, a small skittering critter, a bone texture pass, and a `creature-pipeline`
+skill in `.claude/skills/` (the Blender to pose code to game procedure, written from the stinger v3 build).
 
 Backpack (done, `src/backpack.js`; my call, Kane approved): a physical pack you grab by its handle and put on by letting go
 behind your shoulder (reaching behind your back is the VR habit); it then disappears into the normal menu (a Back slot) and
