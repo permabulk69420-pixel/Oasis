@@ -43,6 +43,9 @@ work. What he has told me, or shown he wants, across sessions:
   wants the creature, I build it myself in Blender (free; mesh-check and render it, send the `.glb` for his OK first).
 - **Keep it relaxed.** Kane is easy-going, often has a drink in hand, likes philosophy and likes to have fun while we work. Talk to him like a
   mate: laid back, plain words, a joke when one fits. Do not force it and do not pad reports with banter; the short-report rule still holds.
+- **Put new things straight into the real game; no dev-only fixtures unless I need one to screenshot.** His words about the stinger: "don't start doing weird stuff with dev only
+  features, just get the scorpion into the game, we can roll back super easy... you don't always have to really check these things, I need to see them in VR." He is fine with
+  me merging a model once he has said go (he did for the stinger). Existing fixtures stay; do not add new ones for a feature he can simply walk up to in the headset.
 - **Do not make him repeat himself.** When he tells me a fact, rule or preference, it goes in this file before the session ends. If I hit
   the same pain twice, add a note here and tell him (he asked for that).
 - Everything above sits on top of the standing rules below (no sub-agents, nothing that costs money, no keys, merge what is verified).
@@ -182,6 +185,11 @@ up to about 50,000. My view: fine as a ceiling for one creature at a time (it ad
 Dune stinger v2 (mine, `tools/dune-stinger/v2/`, script `build_stinger.py`): reworked the first build into a spikier, rust-banded creature with ball-jointed arched legs,
 glowing eyes and flank dashes and a lit stinger: 11,612 / 4,072 / 626 triangles, same skeleton. Passes the checks; sent to Kane for his OK, not in `public/`.
 Kane's rule of thumb: build the high-detail version first, scaling down is easy and scaling up is not.
+Dune stinger in the game (Kane, 4 Oct: "just get the scorpion into the game, we can roll back super easy", and he said not to add dev-only extras, he checks things in VR): v2 models are in `public/models/creatures/`,
+`src/dune-stinger.js` + `src/stinger-brain.js` + `src/stinger-pose.js`. One stinger, home 46 m to the right of the start, scale 2.5 (3.7 m long, my call, easy to change in `DUNE_STINGER.scale`),
+passive: idles, wanders within 22 m of home (not into the pond, the hero tree clearing or steep faces), and when you come within 15 m it stops, faces you and curls its tail up (out at 20 m). It never chases or hurts you and
+nothing hits it: damage, hunting, death and drops are Kane's call. No dev fixture on purpose. Code-driven animation like the bird (ripple of leg steps, body sway, breathing, tail sway, sting flick). Oddities to tell Kane: legs are not IK, so
+feet can skate a little on steep dune faces; the model's 11.6k-triangle close level is the v2 build (the 50k ceiling is not spent); at night only the eyes, flank dashes and sting glow and the rest is a thin moonlit rim like the trees.
 Dune stinger (first creature, `tools/dune-stinger/`): the other model's first build (3 LODs 4,482 / 1,560 / 582 tris, 49 bones) passes my checks
 (`python3 tools/creature/check_glb.py`: numpy + trimesh, no Blender) and loads and bends in three.js, but it is artistically generic and barely
 glows. It is kept in `tools/`, NOT in `public/`, and waits for Kane's OK; the plan I gave him is to use it as a base and improve it myself

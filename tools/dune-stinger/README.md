@@ -1,4 +1,4 @@
-# Dune stinger (first creature, not in the game yet)
+# Dune stinger (first creature; v2 is in the game, see the main README)
 
 `brief.md` is the brief written for another model to build the creature in headless Blender. `astra-v1/` is what came back (3 LODs,
 build script, its own report). It is **not shipped**: nothing here is under `public/`, and Kane has not approved it for the game.
@@ -19,4 +19,4 @@ Same 49-bone skeleton and names as v1, so any pose code works on either. `v2/` h
 `tools/creature/check_glb.py` and the script's own audit. Build it with the bpy venv: `python3.11 -m venv v && v/bin/pip install bpy==4.5.3 numpy pillow trimesh`
 then `python tools/dune-stinger/build_stinger.py --out-dir out [--lod 0] [--no-render]` (Cycles renders are slow here; `QUICK=1 SAMPLES=8 RES_X=900`
 cuts them down). `viewer.html` loads a GLB in three.js with night lighting and test poses (copy it to the repo root, serve with `npm run dev`).
-Still NOT in `public/`: it waits for Kane's OK.
+In the game since Kane's go-ahead (4 Oct 2026): `v2/*.glb` are copied to `public/models/creatures/` and `src/dune-stinger.js` loads them. Rebuilding the models means copying the new files there again.
