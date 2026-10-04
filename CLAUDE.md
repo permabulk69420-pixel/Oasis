@@ -11,7 +11,10 @@ for how the game works. These are standing rules from Kane; they apply to every 
    once botched a complex Blender build. If a helper or a different model or effort level would ever
    help, ask Kane first.
 2. **Nothing that costs money, and nothing odd, without asking.** No paid APIs or services (no Antigravity,
-   Nano Banana, ElevenLabs and so on), no installing or logging into accounts, no surprises.
+   Nano Banana, ElevenLabs and so on), no logging into or creating accounts, no surprises. Free is fine:
+   free APIs and free packages (pip, npm) can be used without asking. If a call needs a key, an account or a
+   card, or might cost anything, that is the line: ask first. The sandbox can reach most sites, so try a
+   thing before assuming it is blocked.
 3. **Never paste, print or commit API keys, tokens or login codes.** Use throwaway keys only.
 4. **Commit only when it makes sense, and if you commit, merge.** Kane's wording: "always just merge if
    you commit" and "use your judgement". So: commit finished, verified work on a branch, open a PR, squash
@@ -54,7 +57,9 @@ for how the game works. These are standing rules from Kane; they apply to every 
 - Day/night uses ACES tone mapping with very low night exposure (~0.035 vs day 0.82). Emissive and light
   levels must compensate for exposure, and night visibility relies on additive fills after tone mapping.
 - Place objects on `createHeightField().sample` (mesh-accurate), not the analytic `terrainHeight`.
-- Blender is headless (`import bpy` before `import bmesh`). glTF winding matters in three.js.
+- Blender is headless (`import bpy` before `import bmesh`). It is not preinstalled in a fresh session, but it is
+  free and installs fine: `pip install bpy --break-system-packages` (a big download, so do it only when a model
+  needs building). Kane has said this is fine, no need to ask. glTF winding matters in three.js.
 - Tests live in `tests/`. Add tests for game logic. Keep constants in one table at the top of a module.
 
 ## Roadmap
