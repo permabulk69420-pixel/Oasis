@@ -266,7 +266,7 @@ world is the same every session): two **sandstone outcrops** and three **spire p
   rings off it: sparks, a shake and the jolt in your hand, no damage. When the health is gone a rock sinks and crumbles, a crystal shatters,
   a spire falls over; it is gone for 900 / 700 / 300 seconds and then grows back (a rock rises, the others grow). A thrown tool bounces off.
 - **The pickaxe** (`src/pickaxe.js`, model `public/models/pickaxe/pickaxe.glb`, 2,344 triangles, built by `tools/pickaxe/build_pickaxe.py`):
-  stands in the sand by the other starting tools (3 m left of the axe) and can be crafted. Held like the axe, long pick forward; carried on a
+  stands in the sand by the other starting tools (3 m left of the axe) and can be crafted. Held like the axe, long pick forward, the fist low on the haft near the butt; carried upside down on a
   hip leaning back. It also hurts the stinger (26).
 - **What drops** pops out of the node on the side you hit it from and lands beside it: stone joins the loose stones (`src/stones.js`),
   crystals the same group (`src/loose-finds.js`), fibre the loose sticks. Pick them up with grip, let go at your chest to pack them (the same
