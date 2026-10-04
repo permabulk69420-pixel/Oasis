@@ -134,11 +134,11 @@ carried on a hip leaning back about 33 degrees, packed at the chest. One LOD on 
 The little cyan bead on the tassel keeps its brightness at night through `src/glow.js` (shared with the backpack). Held (Kane's call, #59, #60): the point goes out in front of the fist like a poke (`SPEAR_THRUST_TILT` 35 degrees about the
 palm normal in `src/spear.js`; the hold lab `item=spear&pitch=-30` shows it). The hand sits at the middle of the shaft near the balance point
 (`SPEAR_GRIP.point` [0,0,0], the leather wrap's centre). #59 tried the butt end for reach and Kane found one hand at the very end weird.
-Throwing grip (#62 Kane's idea, flipped in the next PR at his word: "all you need to do is flip it with that button"): hold the torch's button (B right,
-X left) with the spear in hand and it turns half a turn about the palm normal, `SPEAR_THROW_TILT` = `SPEAR_THRUST_TILT` + 180, so the point goes from
-in front of the fist to behind it (the shaft stays on the same line, so the fingers still close; hold lab `item=spear&pitch=-30&tilt=180` solves on both hands).
-Release the button and it flips back (a buzz marks it; the flip takes 0.2 s, `SPEAR_SWITCH.turnSpeed` 900 deg/s, to tune by feel). #62 first tried 75 degrees and Kane
-said it barely moved: when he says flip, he means the axis reverses. Letting go of grip throws it with the hand's speed (the drop and throw physics, #63); damage and
+Throwing grip (#62 Kane's idea; #67 flipped it 180 degrees at his word "all you need to do is flip it with that button"; then he said 160, "we're close", so `SPEAR_FLIP` = 160):
+hold the torch's button (B right, X left) with the spear in hand and it turns `SPEAR_FLIP` degrees about the palm normal on top of the poke, so the point goes from
+in front of the fist to nearly behind it (hold lab `item=spear&pitch=-30&tilt=160` solves on both hands; 180 solved too). Release the button and it flips back
+(a buzz marks it; 0.2 s, `SPEAR_SWITCH.turnSpeed` 900 deg/s, to tune by feel). #62 first tried 75 degrees and Kane said it barely moved: when he says flip, he means the
+axis reverses; he now wants fine tuning later ("we can sort out those fine details later"). Letting go of grip throws it with the hand's speed (the drop and throw physics, #63); damage and
 what it hits wait for the creature, which is Kane's call. A second hand on the shaft for a two-handed poke is also only an idea. Oddities to tell Kane: the butt end reaches the sand in a deep crouch (the hip hangs from the head position); picking it up
 snaps it to the hand at the wrap wherever you reached; it does no damage yet (the creature will give it a job).
 

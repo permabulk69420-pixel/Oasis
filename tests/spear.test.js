@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createTools, holsterPose } from '../src/tools.js';
-import { createSpearKind, SPEAR, SPEAR_GRIP, SPEAR_HELD_ROTATION, SPEAR_HOLSTER, SPEAR_THRUST_TILT, SPEAR_THROW_TILT, SPEAR_SWITCH, spearHeldRotation } from '../src/spear.js';
+import { createSpearKind, SPEAR, SPEAR_GRIP, SPEAR_HELD_ROTATION, SPEAR_HOLSTER, SPEAR_THRUST_TILT, SPEAR_THROW_TILT, SPEAR_FLIP, SPEAR_SWITCH, spearHeldRotation } from '../src/spear.js';
 import { createTorchKind } from '../src/torch.js';
 import { createAxeKind } from '../src/axe.js';
 import { terrainHeight } from '../src/world.js';
@@ -337,5 +337,6 @@ test('the throwing grip is the same on the left hand (X), a dropped spear starts
   tools.update(0.016);
   buttons[SPEAR_SWITCH.leftButton].pressed = false;
   tools.update(0.016);
-  assert.equal(SPEAR_THROW_TILT - SPEAR_THRUST_TILT, 180, 'the throwing grip is the spear flipped end for end: the same line across the palm, so the fingers still close on it');
+  assert.equal(SPEAR_THROW_TILT - SPEAR_THRUST_TILT, SPEAR_FLIP);
+  assert.ok(SPEAR_FLIP >= 150 && SPEAR_FLIP <= 180, 'the throwing grip is the spear flipped nearly end for end, so the point is behind the hand (the hold lab solves 160 on both hands)');
 });
