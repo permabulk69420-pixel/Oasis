@@ -15,6 +15,7 @@ import { createWindSand, WIND_SAND } from './wind-sand.js';
 import { createAlienBirds } from './alien-bird.js';
 import { createBackpack, PACK } from './backpack.js';
 import { SPEAR } from './spear.js';
+import { stepBody } from './falling.js';
 import { windTime, windStrength } from './wind.js';
 import { installNightFill } from './night-fill.js';
 import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater } from './survival.js';
@@ -68,6 +69,7 @@ const hands = createVRHands({
   camera,
   gripDebug: import.meta.env.DEV && new URLSearchParams(location.search).get('gripDebug') === '1',
   onEat: ({ food, water }) => { restoreFood(food); restoreWater(water); },
+  heightAt: (x, z) => field.sample(x, z), // the mesh-accurate sand, for tools that fall (the field is made a few lines below)
   onError: (message) => console.warn('[Oasis hands]', message)
 });
 const footsteps = createSandFootsteps({
@@ -118,6 +120,7 @@ const drawingSize = new THREE.Vector2();
 rig.position.set(SPAWN.x, field.sample(SPAWN.x, SPAWN.z), SPAWN.z);
 
 let devWindTime = null; // dev only: set by ?windtime=
+let devThrows = null; // dev only: ?view=throws, a function called every frame until it has thrown its tools
 // Development-only camera fixtures for repeatable visual inspection. No travel shortcuts ship.
 if (import.meta.env.DEV) {
   const view = new URLSearchParams(location.search).get('view');
@@ -152,6 +155,56 @@ if (import.meta.env.DEV) {
   const fruit0 = glowFruit.slots[0];
   if (view === 'pack') aimAt(PACK.spawn.x - 0.9, PACK.spawn.z + 1.5, { x: PACK.spawn.x, y: field.sample(PACK.spawn.x, PACK.spawn.z) + 0.3, z: PACK.spawn.z }, 1.2);
   if (view === 'spear') aimAt(SPEAR.spawn.x - 0.7, SPEAR.spawn.z + 1.5, { x: SPEAR.spawn.x, y: field.sample(SPEAR.spawn.x, SPEAR.spawn.z) + 0.55, z: SPEAR.spawn.z }, 1.3);
+  if (view === 'throws') {
+    // Tools thrown and dropped in front of the camera, to look at how they land and lie (src/falling.js).
+    const px = SPEAR.spawn.x + 3, pz = SPEAR.spawn.z + 5;
+    const gy = field.sample(px, pz);
+    const target = { x: px - 5, y: gy + 0.2, z: pz - 12 };
+    aimAt(px, pz, target, 1.6);
+    const fwd = new THREE.Vector3(target.x - px, 0, target.z - pz).normalize();
+    const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
+    const up = new THREE.Vector3(0, 1, 0);
+    // Directions below are written as (sideways, up, forward) and turned into world axes here.
+    const toWorld = d => new THREE.Vector3().addScaledVector(side, d.x).addScaledVector(up, d.y).addScaledVector(fwd, d.z).normalize();
+    const pose = (lateral, dir) => ({
+      origin: new THREE.Vector3(px, gy + 1.5, pz).addScaledVector(side, lateral).addScaledVector(fwd, 0.6),
+      quaternion: new THREE.Quaternion().setFromUnitVectors(up, dir),
+    });
+    const throws = [
+      ['spear', 0, new THREE.Vector3(0, -0.28, 1), 12, 0], // point-first, fast: sticks in the sand
+      ['spear', 1.2, new THREE.Vector3(0, 0.1, 1), 6, 0], // slow and flat: lies where it lands
+      ['axe', -1.0, new THREE.Vector3(0, 0.4, 1), 6, 9], // tumbling
+      ['torch', -2.0, new THREE.Vector3(0, 1, 0.1), 1, 0], // dropped
+      ['spear', 2.4, new THREE.Vector3(0, 1, 0), 0, 0], // dropped upright
+    ];
+    const todo = throws.slice();
+    const landed = [];
+    devThrows = () => {
+      while (todo.length) {
+        const [id, lateral, local, speed, tumble] = todo[0];
+        const dir = toWorld(local);
+        const start = pose(lateral, dir);
+        const tool = hands.tools.throwTool(id, {
+          ...start,
+          velocity: dir.clone().multiplyScalar(speed),
+          spin: side.clone().multiplyScalar(-tumble),
+        });
+        if (!tool) return false;
+        // Headless browsers draw a few frames a second, so play the fall ahead here and the tools are already lying when the picture is taken.
+        for (let i = 0; i < 900 && stepBody(tool.fall, 1 / 60, (x, z) => field.sample(x, z)); i++);
+        landed.push(tool.fall.centre);
+        todo.shift();
+      }
+      // Once they are all down, stand a few metres back from where they landed and look at them.
+      const mid = new THREE.Vector3();
+      const far = landed.slice(0, 3); // the two spears and the axe that flew forward
+      for (const c of far) mid.add(c);
+      mid.divideScalar(far.length);
+      const standX = mid.x - fwd.x * 2.6, standZ = mid.z - fwd.z * 2.6;
+      aimAt(standX, standZ, { x: mid.x, y: mid.y - 0.3, z: mid.z }, 1.6);
+      return true;
+    };
+  }
   if (view === 'fruit' && fruit0) aimAt(fruit0.x + 1.1, fruit0.z + 0.8, { x: fruit0.x, y: field.sample(fruit0.x, fruit0.z) + 0.06, z: fruit0.z }, 1.2);
   if (view === 'orchard') aimAt(HERO_TREE.x - 34, HERO_TREE.z + 22, { x: HERO_TREE.x - 8, y: heroY + 0.2, z: HERO_TREE.z + 2 }, 1.7);
   if (view === 'base') aimAt(HERO_TREE.x - 16, HERO_TREE.z + 17, { x: HERO_TREE.x - 2, y: heroY + 1.5, z: HERO_TREE.z + 2 }, 1.3);
@@ -482,6 +535,7 @@ function frame(time) {
   // Resource storage compares controller and headset WORLD positions. Refresh
   // the XR camera first; its raw pose at frame start is reference-space local.
   hands.update(dt);
+  if (import.meta.env.DEV && devThrows && devThrows()) devThrows = null;
   backpack.update(dt); // after the hands, so a tool or stone in reach is grabbed first
   const activeCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
   activeCamera.getWorldPosition(head);

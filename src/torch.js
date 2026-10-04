@@ -190,6 +190,8 @@ export function createTorchKind({ scene, onError = console.warn }) {
     heldRotation,
     // Rides at the hip, leaning back and out so a lit flame stays clear of your face.
     holster: { dir: [0.04, -1, 0], along: 0 },
+    // When let go or thrown (src/falling.js): a stick with a heavy head that lies where it lands (and stays lit).
+    fall: { radius: 0.04, landing: 'lie', com: 0.2 },
     spawns: [{ x: SPAWN.x + 0.75, z: SPAWN.z - 1.05 }],
 
     prepare(instance) {

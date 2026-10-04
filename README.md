@@ -69,6 +69,14 @@ either hand. Let go next to a hip to holster it there, at your chest to pack it 
 inventory, anywhere else to drop it. Grab it back off the hip whenever you like. Light a held
 torch with **B** (right hand) or **X** (left hand).
 
+**Dropping and throwing** (`src/falling.js`, `src/hand-motion.js`): a tool you let go of in the open no longer snaps to the sand. It falls from
+your hand with the speed and turn your hand had over its last tenth of a second, so letting go while you swing throws it. It is not a physics
+engine: each tool is a thin rod with a centre of mass, gravity and a little drag act on it in the air, it bounces a little, then topples about the
+end that touched until it lies along the ground (an axe also rolls its head flat), so it lies along a slope and never through it. A spear coming
+down point-first at a decent speed sticks in the sand; slower or flatter it lies. Things do not hit each other, and the ground is the mesh-accurate
+height field. Pick a lying tool up by reaching for any part of it (not just the handle end). Constants are in the `FALL` table; each tool kind
+carries a `fall` entry (radius, landing `lie`/`stick`, centre of mass). `?view=throws` (dev) throws and drops a few tools in front of the camera.
+
 **Chopping:** swing the axe into a blue alien tree. Six solid hits fell it; it drops two logs
 (Wood) and three sticks along where it fell, sinks away, and regrows after three minutes.
 Pick up sticks, stones and logs with grip and let go at your chest to pack them.
@@ -103,7 +111,7 @@ vertices, open edges and inside-out faces. `tools/campfire/render_preview.py` re
 
 Development-only camera fixtures: `?view=fruit`, `?view=orchard`, `?view=glade`, `?view=approach`,
 `?view=wade`, `?view=gust` (across the wind on a dune crest), `?eye=<metres>` (a lower camera), `?yaw=<deg>` and `?pitch=<deg>` (look direction), `?skytime=<seconds>` (pin the sky clock, e.g. to catch a shooting star), `?sandgain=<n>` (exaggerate the blowing sand), `?windtime=<seconds>` (pin the wind clock so two screenshots can be compared), `?windgain=<n>` (exaggerate the sway), `?at=x,z` and `?look=x,z[,height]` (stand at a world position and look at a point), `?camp=lit` or `?camp=unlit` (puts a campfire on the flattest ground near spawn, with
-`?campd=<metres>` for the distance), `?bird=perch|fly|flare` (see Alien birds in the game), `?view=pack` (beside the backpack), `?pack=worn` (start wearing it, see The backpack) and `?view=spear` (beside the spear), plus `?hour=N` to fix the time of day.
+`?campd=<metres>` for the distance), `?bird=perch|fly|flare` (see Alien birds in the game), `?view=pack` (beside the backpack), `?pack=worn` (start wearing it, see The backpack) `?view=spear` (beside the spear) and `?view=throws` (tools thrown and dropped, see Dropping and throwing), plus `?hour=N` to fix the time of day.
 
 ## Alien birds in the game
 
