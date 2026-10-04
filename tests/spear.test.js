@@ -277,7 +277,7 @@ test('the menu lists the spear recipe, crafts it, draws its icon, and puts it on
 
     click('crafting');
     assert.ok(body.querySelector('[data-action="recipe:spear"]'), 'the spear is in the crafting list');
-    assert.equal(RECIPES.length, 4, 'the axe, torch, spear and campfire');
+    assert.equal(RECIPES.length, 5, 'the axe, torch, spear, pickaxe and campfire');
     click('recipe:spear');
     assert.ok(drawn.includes('Stone-tipped spear'), 'the recipe page names the spear');
     assert.equal(body.querySelector('[data-action="craft"]').disabled, false, 'three sticks and a stone are enough');

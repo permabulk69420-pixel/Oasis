@@ -19,6 +19,8 @@ const ITEM_WEIGHTS = Object.freeze({
   axe: 10,
   torch: 5,
   spear: 10,
+  pickaxe: 12,
+  crystal: 4,
   campfire: 25,
 });
 

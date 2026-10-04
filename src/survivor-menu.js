@@ -179,6 +179,19 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
       ctx.fillStyle = '#e5603b'; ctx.strokeStyle = '#9b3a22';
       ctx.beginPath(); ctx.moveTo(3, 2); ctx.quadraticCurveTo(15, 9, 16, 26); ctx.quadraticCurveTo(5, 20, 3, 10); ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(0, 5, 3.2, 0, Math.PI * 2); ctx.fill();
+    } else if (type === 'pickaxe') {
+      // a haft leaning right with a dark curved stone pick across the top: a long point one way, a short flat edge the other, cream lashing
+      ctx.rotate(0.35);
+      handle(0, 40, 0, -22, 7);
+      ctx.fillStyle = '#4b4645'; ctx.strokeStyle = '#242021'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(-17, -22); ctx.lineTo(-13, -31); ctx.quadraticCurveTo(0, -34, 14, -32); ctx.quadraticCurveTo(34, -29, 42, -6); ctx.quadraticCurveTo(24, -18, 0, -18); ctx.quadraticCurveTo(-8, -18, -17, -22); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#cbbfa6'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(14, -31); ctx.quadraticCurveTo(32, -27, 40, -8); ctx.stroke();
+      ctx.fillStyle = '#e3d5ac'; ctx.strokeStyle = '#8c7d52'; ctx.lineWidth = 2;
+      ctx.fillRect(-7, -37, 14, 22); ctx.strokeRect(-7, -37, 14, 22);
+      ctx.strokeStyle = '#e5603b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-7, -29); ctx.lineTo(7, -29); ctx.moveTo(-7, -21); ctx.lineTo(7, -21); ctx.stroke();
+      ctx.strokeStyle = '#e5603b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-3.5, 33); ctx.lineTo(3.5, 33); ctx.stroke();
+      ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(8, -8, 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#2fa3a8'; ctx.beginPath(); ctx.moveTo(8, -5); ctx.quadraticCurveTo(14, 4, 11, 16); ctx.quadraticCurveTo(6, 8, 8, -5); ctx.fill();
     } else if (type === 'stone') {
       ctx.fillStyle = '#a9b6b3'; ctx.beginPath(); ctx.moveTo(-30, 10); ctx.lineTo(-16, -22); ctx.lineTo(14, -28); ctx.lineTo(32, -2); ctx.lineTo(20, 22); ctx.lineTo(-10, 27); ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#74898a'; ctx.beginPath(); ctx.moveTo(-16, -22); ctx.lineTo(-4, 10); ctx.lineTo(20, 22); ctx.lineTo(-10, 27); ctx.lineTo(-30, 10); ctx.closePath(); ctx.fill();
@@ -211,6 +224,26 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
       ctx.fillStyle = '#9cc9c0'; ctx.beginPath(); ctx.ellipse(22, 0, 9, 14, 0, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = '#6f9d95'; ctx.beginPath(); ctx.ellipse(22, 0, 4.5, 7, 0, 0, Math.PI * 2); ctx.stroke();
       ctx.restore();
+    } else if (type === 'crystal') {
+      // three glowing shards: a tall one in the middle, two leaning out
+      const shard = (x, y, w, h, lean, fill, light) => {
+        ctx.save(); ctx.translate(x, y); ctx.rotate(lean);
+        ctx.fillStyle = fill; ctx.strokeStyle = '#2b1752'; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(-w / 2, 0); ctx.lineTo(-w / 2, -h * 0.72); ctx.lineTo(0, -h); ctx.lineTo(w / 2, -h * 0.72); ctx.lineTo(w / 2, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = light; ctx.beginPath(); ctx.moveTo(0, -h); ctx.lineTo(w / 2, -h * 0.72); ctx.lineTo(w / 2, 0); ctx.lineTo(w * 0.1, 0); ctx.lineTo(w * 0.1, -h * 0.74); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      };
+      shard(-17, 26, 16, 38, -0.45, '#7a45d8', '#a97cf0');
+      shard(18, 28, 15, 34, 0.5, '#6b4fe0', '#9a86f4');
+      shard(0, 30, 21, 58, 0, '#a64ff0', '#e0a3ff');
+      ctx.fillStyle = 'rgba(255, 240, 255, 0.85)'; ctx.beginPath(); ctx.arc(-4, -14, 2.6, 0, Math.PI * 2); ctx.fill();
+    } else if (type === 'fibre') {
+      // a bundle of pale strands tied with a cord
+      ctx.strokeStyle = '#d9c58f'; ctx.lineWidth = 4;
+      for (let i = -3; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(i * 3.5, 34); ctx.quadraticCurveTo(i * 9, 0, i * 6.5 + 2, -34); ctx.stroke(); }
+      ctx.strokeStyle = '#a3905f'; ctx.lineWidth = 1.5;
+      for (let i = -3; i <= 3; i += 2) { ctx.beginPath(); ctx.moveTo(i * 3.5 + 2, 30); ctx.quadraticCurveTo(i * 9 + 2, 0, i * 6.5 + 4, -30); ctx.stroke(); }
+      ctx.strokeStyle = '#e5603b'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(-17, 5); ctx.lineTo(17, 5); ctx.stroke();
     } else {
       ctx.strokeStyle = C.accent; ctx.lineWidth = 4;
       for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(i * 12, 25); ctx.quadraticCurveTo(20 + i * 10, -5, i * 14, -30); ctx.stroke(); }

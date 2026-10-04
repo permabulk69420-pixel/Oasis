@@ -4,6 +4,7 @@ import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { createTorchKind } from './torch.js';
 import { createAxeKind } from './axe.js';
 import { createSpearKind } from './spear.js';
+import { createPickaxeKind } from './pickaxe.js';
 import { createTools } from './tools.js';
 import { createHeldSticks } from './sticks.js';
 import { createHeldStones } from './stones.js';
@@ -209,7 +210,11 @@ export function createVRHands({ renderer, scene, parent = null, camera = null, g
   // Torch first so overlapping pickups keep their old priority.
   const tools = createTools({
     scene, rig: controllerParent, states, renderer, camera, heightAt, onError,
-    kinds: [createTorchKind({ scene, onError }), createAxeKind({ scene, onError }), createSpearKind({ getExposure: () => renderer.toneMappingExposure })],
+    kinds: [
+      createTorchKind({ scene, onError }), createAxeKind({ scene, onError }),
+      createSpearKind({ getExposure: () => renderer.toneMappingExposure }),
+      createPickaxeKind({ getExposure: () => renderer.toneMappingExposure }),
+    ],
   });
   const firstTool = kind => ({ getObject: () => tools.getInstances(kind)[0]?.root || null });
   const sticks = createHeldSticks({ scene, states, renderer, onError });
