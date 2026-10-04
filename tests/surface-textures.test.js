@@ -109,3 +109,50 @@ test('the photo bark files exist and are small', async () => {
     assert.ok(size > 50_000 && size < 700_000, `${file} is ${size} bytes`);
   }
 });
+
+test('the leaf look comes from the address, and falls back to the default', async () => {
+  const m = await import('../src/surface-textures.js?looks');
+  assert.equal(m.pickLeafLook(''), m.DEFAULT_LEAF_LOOK);
+  assert.equal(m.pickLeafLook('?leaf=plain'), 'plain');
+  assert.equal(m.pickLeafLook('?leaf=dark'), 'dark');
+  assert.equal(m.pickLeafLook('?leaf=nonsense'), m.DEFAULT_LEAF_LOOK);
+  assert.ok(Object.hasOwn(m.LEAF_LOOKS, m.DEFAULT_LEAF_LOOK));
+  assert.equal(m.LEAF_LOOKS.plain, null);
+});
+
+test('the desert plant leaf texture goes on every palm leaf material and takes the pattern colours, not the model blue', async () => {
+  const m = await import('../src/surface-textures.js?leaf-ok');
+  const asked = [];
+  const loader = { loadAsync: async url => { asked.push(url); return new THREE.DataTexture(new Uint8Array(4), 1, 1); } };
+  const make = name => new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ name, vertexColors: true }));
+  const early = make('Waxy blue leaf tissue'), bark = make('Banded teal bark');
+  m.applySurfaceTextures(Object.assign(new THREE.Group(), {}).add(early, bark), { photo: false });
+  const texture = await m.loadLeafPhoto(loader, '/oasis/');
+  assert.deepEqual(asked, ['/oasis/textures/alien_desert_plant/alien_desert_plant_leaf_albedo.png']);
+  const look = m.LEAF_LOOKS[m.DEFAULT_LEAF_LOOK];
+  assert.equal(early.material.map, texture);
+  assert.equal(early.material.emissiveMap, texture);
+  assert.equal(early.material.vertexColors, look.vertexColors);
+  assert.equal(early.material.emissive.r, look.glow);
+  assert.equal(texture.colorSpace, THREE.SRGBColorSpace);
+  assert.equal(texture.wrapS, THREE.MirroredRepeatWrapping);
+  assert.notEqual(bark.material.map, texture, 'the trunk is left alone');
+  const late = make('Waxy blue leaf tissue');
+  m.applySurfaceTextures(late, { photo: false });
+  assert.equal(late.material.map, texture, 'a palm loaded after the photo gets it straight away');
+});
+
+test('if the leaf texture cannot be loaded the drawn leaf stays', async () => {
+  const m = await import('../src/surface-textures.js?leaf-fail');
+  const mesh = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ name: 'Waxy blue leaf tissue' }));
+  m.applySurfaceTextures(mesh, { photo: false });
+  const warn = console.warn;
+  console.warn = () => {};
+  try { assert.equal(await m.loadLeafPhoto({ loadAsync: async () => { throw new Error('404'); } }), null); } finally { console.warn = warn; }
+  assert.equal(mesh.material.map, m.surfaceTexture('leaf'));
+});
+
+test('the leaf texture file the palms borrow exists', async () => {
+  const { statSync } = await import('node:fs');
+  assert.ok(statSync(new URL('../public/textures/alien_desert_plant/alien_desert_plant_leaf_albedo.png', import.meta.url)).size > 100_000);
+});
