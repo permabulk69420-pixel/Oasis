@@ -21,9 +21,17 @@ SHELLS = []
 BONES = []
 SEG_Y = [-.45 + .12*i for i in range(8)]
 WIDTHS = [.116,.134,.142,.136,.121,.103,.085,.066]
-TAIL = [(0,.50,.155),(0,.635,.255),(0,.660,.422),
-        (0,.560,.555),(0,.407,.577)]
-STING_TIP = (0,.263,.420)
+# The tail is scaled about its base so that, thrown forward in a strike, the sting can reach past the head (the first tail was only
+# long enough to reach the middle of the back). Thickness grows a little less than the length.
+TAIL_BASE = (0,.50,.155)
+TAIL_SCALE = 2.4
+TAIL_GIRTH = 1.45
+def tp(p):
+    b = Vector(TAIL_BASE)
+    return tuple(b + (Vector(p) - b) * TAIL_SCALE)
+TAIL = [tp(p) for p in [(0,.50,.155),(0,.635,.255),(0,.660,.422),
+        (0,.560,.555),(0,.407,.577)]]
+STING_TIP = tp((0,.263,.420))
 # Triangle ceilings per level (Kane, 4 Oct: the close-up level may go up to about 50,000; build rich, cut down).
 BUDGET = [50000, 12000, 3000]
 FILE_BUDGET = 2_000_000
@@ -237,15 +245,15 @@ def build_geo(lod):
     for i in range(4):
         bn=f'Tail{i+1}'
         corep.extend([TAIL[i],tuple(Vector(TAIL[i]).lerp(Vector(TAIL[i+1]),.5))])
-        r=lerp(.040,.021,i/3)*(1.25 if lod==2 else 1);corer.extend([r,r*.91])
+        r=lerp(.040,.021,i/3)*TAIL_GIRTH*(1.25 if lod==2 else 1);corer.extend([r,r*.91])
         corew.extend([{bn:1},{bn:1}])
-    corep.append(TAIL[-1]);corer.append(.018);corew.append({'Stinger':1})
+    corep.append(TAIL[-1]);corer.append(.018*TAIL_GIRTH);corew.append({'Stinger':1})
     corep[0]=tuple(Vector(corep[0])-(Vector(corep[1])-Vector(corep[0])).normalized()*.012)
     sweep(g,'continuous_tail',corep,corer,[8,5,4][lod],corew,DARK if lod<2 else SAND)
     for i in range(4 if lod<2 else 0):
         a=Vector(TAIL[i]);b=Vector(TAIL[i+1]);bn=f'Tail{i+1}'
         nxt=f'Tail{i+2}' if i<3 else 'Stinger'
-        r=lerp(.056,.027,i/3)
+        r=lerp(.056,.027,i/3)*TAIL_GIRTH
         pp=[a,a.lerp(b,.20),a.lerp(b,.50),a.lerp(b,.82),b] if lod==0 else [a,a.lerp(b,.48),b]
         rr=[(r*.80,r*.74),(r*1.0,r*.92),(r*1.06,r*.94),(r*.82,r*.74),(r*.68,r*.62)] if lod==0 else [(r*.80,r*.74),(r,r*.88),(r*.66,r*.6)]
         pp[-1]=b+(b-a).normalized()*.009
@@ -257,12 +265,12 @@ def build_geo(lod):
             for t in (.25,.65):
                 base=a.lerp(b,t);blade(g,'tail_spine',base,base+up_dir*(.045*(1.1-i*.15))+(b-a).normalized()*.018,.009,.006,{bn:1},BONE,4)
     # Venom bulb into a long recurved lancet.
-    pp=[TAIL[-1],(0,.352,.568),(0,.320,.536),(0,.292,.497),STING_TIP]
-    sweep(g,'venom_lancet',pp,[(.026,.026),(.040,.029),(.030,.021),(.018,.013),(.001,.001)],[14,8,4][lod],{'Stinger':1},lambda k,j,n: BRONZE if k<2 else tint(BONE,.7) if k==2 else DARK)
+    pp=[TAIL[-1],tp((0,.352,.568)),tp((0,.320,.536)),tp((0,.292,.497)),STING_TIP]
+    sweep(g,'venom_lancet',pp,[(r_ * TAIL_GIRTH, s_ * TAIL_GIRTH) for r_, s_ in [(.026,.026),(.040,.029),(.030,.021),(.018,.013),(.001,.001)]],[14,8,4][lod],{'Stinger':1},lambda k,j,n: BRONZE if k<2 else tint(BONE,.7) if k==2 else DARK)
     # The venom itself: a lit seam in the lancet and a glowing bead at its base.
-    sweep(g,'venom_glow',[(.022,.350,.553),(.018,.314,.521),(.012,.287,.489),(.002,.268,.438)],[(.007,.008),(.007,.007),(.005,.005),(.0015,.0015)],[8,5,3][lod],{'Stinger':1},WHITE,1)
+    sweep(g,'venom_glow',[tp(q_) for q_ in [(.022,.350,.553),(.018,.314,.521),(.012,.287,.489),(.002,.268,.438)]],[(.007,.008),(.007,.007),(.005,.005),(.0015,.0015)],[8,5,3][lod],{'Stinger':1},WHITE,1)
     if lod<2:
-        sweep(g,'venom_bead',[(0,.392,.585),(0,.372,.592),(0,.352,.585)],[(.010,.010),(.014,.014),(.010,.010)],[8,5][lod],{'Stinger':1},WHITE,1)
+        sweep(g,'venom_bead',[tp(q_) for q_ in [(0,.392,.585),(0,.372,.592),(0,.352,.585)]],[(.010,.010),(.014,.014),(.010,.010)],[8,5][lod],{'Stinger':1},WHITE,1)
     # Feet: every leg's last ring is lowered so the claw tips sit exactly on y = 0 in the exported file.
     for part in g.parts:
         if part['name'].startswith('leg_'):

@@ -78,6 +78,14 @@ export function createSpearKind({ getExposure = () => 1 } = {}) {
     holster: SPEAR_HOLSTER,
     // When let go or thrown (src/falling.js): a thin rod, heavier at the stone end, whose point sticks in the sand if it lands point-first and fast.
     fall: { radius: 0.025, landing: 'stick', com: 0.15 },
+    // A blow (src/weapon-hits.js): the stone point, fast enough. Held it is a poke or a swing; thrown, the point leads.
+    hit: {
+      damage: 34, // health taken off a creature by a blow at full speed
+      minSpeed: 1.8, // m/s of the point (relative to your body when held): slower than this does nothing
+      fullSpeed: 6, // m/s: from here up it does the full damage
+      radius: 0.07,
+      point: (out, instance) => out.set(0, instance.kind.shape.top - 0.06, 0),
+    },
     spawns: [{ x: SPEAR.spawn.x, z: SPEAR.spawn.z }],
     createState: () => ({ tilt: SPEAR_THRUST_TILT, switchDown: false }),
 

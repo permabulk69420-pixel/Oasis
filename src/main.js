@@ -14,12 +14,13 @@ import { createCampfires, campfireSpot, campfireSite } from './campfire.js';
 import { createWindSand, WIND_SAND } from './wind-sand.js';
 import { createAlienBirds } from './alien-bird.js';
 import { createDuneStinger } from './dune-stinger.js';
+import { createWeaponHits } from './weapon-hits.js';
 import { createBackpack, PACK } from './backpack.js';
 import { SPEAR } from './spear.js';
 import { stepBody } from './falling.js';
 import { windTime, windStrength } from './wind.js';
 import { installNightFill } from './night-fill.js';
-import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater } from './survival.js';
+import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater, damagePlayer } from './survival.js';
 import { pulseHaptics } from './haptics.js';
 import { createSurvivorMenu } from './survivor-menu.js';
 import { getInventoryWeight, getCarryCapacity, getCarrySpeedMultiplier, removeInventoryItem } from './inventory.js';
@@ -283,12 +284,19 @@ const alienBirds = createAlienBirds({
   getAvoid: () => campfires.list().map(fire => ({ x: fire.x, z: fire.z, r: 6 })),
   onError: message => console.warn(message),
 });
-// The dune stinger: one wanders the dunes to the right of the start and watches you when you come near. It cannot hurt you.
+// The dune stinger: one lives in the dunes to the right of the start. It wanders, stalks you when it sees you, and strikes with its
+// tail (a warning first, and it lands where you were standing). Your spear and axe hurt it; a few good blows kill it.
+const STINGER_HIT_HAPTIC = [1, 220];
 const duneStinger = createDuneStinger({
   scene, renderer, camera, field,
   getExposure: () => renderer.toneMappingExposure,
   onError: message => console.warn(message),
+  onPlayerHit: strike => {
+    damagePlayer(strike.damage);
+    for (const state of hands.states) pulseHaptics(state, ...STINGER_HIT_HAPTIC);
+  },
 });
+const weaponHits = createWeaponHits({ tools: hands.tools, rig, targets: [duneStinger] });
 // Development-only: ?bird=perch|fly|flare puts a bird in view and stops time for it (?birdfreeze=0 lets it move),
 // ?birdd=<metres> sets how far ahead, ?birdseed=<n> makes the bird's choices repeatable.
 const devBirdParams = import.meta.env.DEV ? new URLSearchParams(location.search) : null;
@@ -550,6 +558,7 @@ function frame(time) {
   windTime.value = devWindTime ?? time * 0.001;
   windSand.update(windTime.value, head, renderer.xr.isPresenting ? WIND_SAND.vrViewHeight : renderer.getDrawingBufferSize(drawingSize).y);
   alienBirds.update(dt, head);
+  weaponHits.update(dt);
   duneStinger.update(dt, head);
   if (devBird && alienBirds.ready) {
     const params = devBirdParams;

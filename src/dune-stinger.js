@@ -7,18 +7,18 @@ import { createStinger } from './stinger-brain.js';
 import { createShadowTexture, pickLod } from './alien-bird.js';
 import { exposureGlow } from './glow.js';
 
-// The dune stinger in the game: one of them lives in the dunes to the right of where you start. It stands about, wanders
-// slowly and, when you come near, stops to watch you with its tail curled up. That is all it does: it never chases you and
-// it cannot hurt you (what a stinger does to a player is not decided yet). The behaviour is in src/stinger-brain.js, the
-// poses in src/stinger-pose.js, the model in tools/dune-stinger/ (v2). This file makes the scene objects, puts the model on
-// the ground (tilted to the slope), picks the level of detail, keeps the glowing eyes and sting bright at night, and draws
-// a soft shadow under it.
+// The dune stinger in the game: one of them lives in the dunes to the right of where you start. It wanders slowly; when it
+// sees you it stalks you, rears its tail back (the warning, with its eyes flaring) and strikes where you were standing. It
+// can be hurt by a spear or an axe moving fast enough (src/weapon-hits.js), backs away when hit and dies after a few good
+// blows. The behaviour is in src/stinger-brain.js, the poses in src/stinger-pose.js, the model in tools/dune-stinger/ (v2).
+// This file makes the scene objects, puts the model on the ground (tilted to the slope), picks the level of detail, keeps the
+// glowing eyes and sting bright at night, draws a soft shadow, and answers the question "is this point inside it?" for hits.
 
 const BASE = import.meta.env?.BASE_URL ?? '/';
 
 export const DUNE_STINGER = Object.freeze({
   files: [0, 1, 2].map(level => `${BASE}models/creatures/dune_stinger_lod${level}.glb`),
-  scale: 2.5, // the model is a dog-sized 1.5 m long; at 2.5 it is a 3.7 m predator whose tail stands about 1.5 m high
+  scale: 2.5, // the model is a dog-sized 1.5 m long; at 2.5 it is a 3.7 m predator whose tail arches about 2.8 m high
   lodDistances: [0, 28, 80], // metres at which each model takes over from the one before
   lodHysteresis: 0.08,
   home: Object.freeze({ x: SPAWN.x + 46, z: SPAWN.z - 6 }), // in the dunes to the right of the start (facing the pond)
@@ -28,6 +28,13 @@ export const DUNE_STINGER = Object.freeze({
   feet: Object.freeze({ half: 0.55, side: 0.33 }), // metres at scale 1 from the middle to where the ground is read: ahead/behind and to the sides
   settle: 9, // per second: how quickly its height and tilt follow the ground
   shadow: Object.freeze({ opacity: 0.4, lift: 0.04, length: 1.25, width: 0.95 }), // metres at scale 1 (half of the shadow's size)
+  flare: 1.8, // how much brighter the eyes and sting get in the windup and the strike (a multiple of the usual glow)
+  // Where a blow can land: a ball round each of these bones, radius in metres at scale 1.
+  hitBalls: Object.freeze([
+    ['Head', 0.24], ['Seg02', 0.26], ['Seg04', 0.27], ['Seg06', 0.25], ['Seg08', 0.21],
+    ['Tail1', 0.14], ['Tail2', 0.12], ['Tail3', 0.11], ['Tail4', 0.10], ['Stinger', 0.10],
+  ]),
+  broadRange: 7, // metres: a blow further than this from the middle of its body cannot touch it, so the balls are not worked out
 });
 
 // Keeps it out of the pond, off the shore and clear of the hero tree
@@ -35,11 +42,34 @@ export function isBlocked(x, z) {
   return basinRadius(x, z) < 1.75 || Math.hypot(x - HERO_TREE.x, z - HERO_TREE.z) < HERO_TREE.clearRadius;
 }
 
-export function createDuneStinger({ scene, renderer = null, camera = null, field, getExposure = () => 1, rng = Math.random, onError = () => {} }) {
+// True when no dune rises above the straight line between two points (it samples the ground every couple of metres, and ignores
+// the first and last few so the ground it stands on does not hide it).
+export function lineOfSight(groundAt, ax, ay, az, bx, by, bz, margin = 0.25, skip = 2.5) {
+  const length = Math.hypot(bx - ax, bz - az);
+  if (length < 2 * skip) return true;
+  const steps = Math.ceil(length / 2.5);
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    if (t * length < skip || (1 - t) * length < skip) continue;
+    if (groundAt(ax + (bx - ax) * t, az + (bz - az) * t) > ay + (by - ay) * t - margin) return false;
+  }
+  return true;
+}
+
+export function createDuneStinger({
+  scene, renderer = null, camera = null, field, getExposure = () => 1, rng = Math.random, onError = () => {}, onPlayerHit = () => {},
+}) {
   const cfg = DUNE_STINGER;
   const scale = cfg.scale;
-  const world = { groundAt: field.sample, blocked: (x, z) => isBlocked(x, z) || isInPond(x, z, field.sample(x, z)) };
-  const brain = createStinger({ world, rng, home: cfg.home, scale });
+  const world = {
+    groundAt: field.sample,
+    blocked: (x, z) => isBlocked(x, z) || isInPond(x, z, field.sample(x, z)),
+    canSee: (ax, ay, az, bx, by, bz) => lineOfSight(field.sample, ax, ay, az, bx, by, bz),
+  };
+  const brain = createStinger({
+    world, rng, home: cfg.home, scale,
+    onStrike: strike => { if (strike.hit) onPlayerHit(strike); },
+  });
   const state = brain.state;
   const glowMaterials = [];
   const levels = [];
@@ -79,18 +109,38 @@ export function createDuneStinger({ scene, renderer = null, camera = null, field
   }
 
   function updateGlow() {
-    const intensity = exposureGlow(getExposure(), cfg.glow);
+    const flare = 1 + state.glow * cfg.flare;
+    const alive = 1 - 0.85 * state.pose.dead;
+    const intensity = exposureGlow(getExposure(), cfg.glow) * flare * alive;
     if (Math.abs(intensity - appliedGlow) > 0.01 * intensity) {
       for (const material of glowMaterials) material.emissiveIntensity = intensity;
       appliedGlow = intensity;
     }
   }
 
+  // Is this point (a weapon's tip, say, with a radius for the weapon's own thickness) inside the stinger? Only worked out when it is close.
+  const ballCentre = new THREE.Vector3();
+  function hitTest(point, radius = 0) {
+    if (!ready || !attached || state.mode === 'dead') return false;
+    const broad = cfg.broadRange * scale / 2.5 + radius;
+    if ((point.x - state.x) ** 2 + (point.z - state.z) ** 2 > broad * broad || point.y < height - 0.5 || point.y > height + 4 * scale) return false;
+    const { bones } = levels[lod].poser;
+    for (const [name, size] of cfg.hitBalls) {
+      bones[name].getWorldPosition(ballCentre);
+      const reach = size * scale + radius;
+      if (ballCentre.distanceToSquared(point) <= reach * reach) return true;
+    }
+    return false;
+  }
+
+  // A blow of `amount` health. Returns true if it landed.
+  const hurt = amount => brain.hurt(amount);
+
   function update(dt, head) {
     if (!ready) return;
     brain.update(dt, head);
     const distance = Math.hypot(head.x - state.x, head.z - state.z);
-    const visible = distance < cfg.hideBeyond;
+    const visible = state.active && distance < cfg.hideBeyond;
     if (visible !== attached) {
       if (visible) scene.add(holder, shadow); else scene.remove(holder, shadow);
       attached = visible;
@@ -164,10 +214,13 @@ export function createDuneStinger({ scene, renderer = null, camera = null, field
 
   return {
     update,
+    hitTest,
+    hurt,
     get ready() { return ready; },
+    get alive() { return state.mode !== 'dead'; },
     brain,
     list() {
-      return ready ? [{ mode: state.mode, x: +state.x.toFixed(1), z: +state.z.toFixed(1), yaw: +state.yaw.toFixed(2), speed: +state.speed.toFixed(2), lod }] : [];
+      return ready ? [{ mode: state.mode, health: Math.round(state.health), x: +state.x.toFixed(1), z: +state.z.toFixed(1), yaw: +state.yaw.toFixed(2), speed: +state.speed.toFixed(2), lod }] : [];
     },
   };
 }
