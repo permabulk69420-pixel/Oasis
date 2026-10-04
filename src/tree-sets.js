@@ -1,7 +1,7 @@
 // The models the oasis's regular trees can be drawn with. Each is a list of levels of detail: the file, and the distance (metres
 // from the eye, for a tree at scale 1) from which that level is used.
 //
-//   palm  the banded blue palm made by tools/alien-tree/build_alien_tree.py: about 4,100, 1,400 and 480 triangles.
+//   palm  the banded blue palm made by tools/alien-tree/build_alien_tree.py: about 5,900, 1,900 and 560 triangles.
 //   old   the first blue trees, kept so ?trees=old can show them side by side with the palm: 40,000, 24,000 and 12,500.
 //
 // A palm at scale 2 is twice as big on screen at any distance, so its levels start twice as far away (`scaleDistance`); the old
