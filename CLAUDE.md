@@ -4,6 +4,22 @@ Oasis is a three.js WebXR desert survival game for Meta Quest 3. The owner (Kane
 tests by opening the deployed GitHub Pages URL on the headset. Pushing to `main` deploys. Read `README.md`
 for how the game works. These are standing rules from Kane; they apply to every session and survive compaction.
 
+## Game direction (Kane, 5 Oct 2026; read this before choosing what to build)
+
+His words: it is "very ark lite", "just enough survival crafting stuff to be fun", and "way more like some sort of Shadow of the Colossus thing".
+Beat a colossus and it unlocks something to craft, first idea a **glider that gets you to the next area**. "That's basically all I've got in my head at
+the moment", so keep it loose: he said not to get into too much of the specifics.
+- The loop: gather and craft lightly, go out, face a colossus, unlock a craft (the glider), reach the next area, a bigger colossus. The colossi are the point;
+  survival only feeds them. The stinger is the practice run. Crystals are material for what a colossus unlocks (no fuel system). The giant bones are scenery
+  and later story. VR scale (a creature you look up at) is the thing to protect.
+- My read, which he liked: the hardest part and the biggest risk is the climb (gripping something huge and moving by hand). A rough prototype of that comes
+  before more survival or world detail. How a colossus is beaten, the glider's feel, what dying means and water/stamina pressure are HIS calls: do not
+  invent them.
+- Dropped or parked so they stop competing: base building and shelters, co-op, cold nights and fuel as a survival system, water as a hard leash, and the
+  crashed ship and crystal-beacon ending (my overnight idea, he never asked for it: "crossing a little bit into gameplay"). The ringed planet and the bones
+  stay as atmosphere only; nothing about a ship is in the game.
+- The full write-up is `claude/direction.md` in the Project (the `Projects` tool). Keep it and this section in step.
+
 ## How we work (Kane and me)
 
 Kane is a solo dev. He is casual, often away from the headset (travelling, testing in bursts) and happy to hand me a stretch of
@@ -117,7 +133,7 @@ intentional later"), so none of the fight, water or insect sounds. In this order
 4. Fight effects: sand puffs on the lunge and death, the dead stinger sinks into the sand instead of popping out of the world.
 5. Saving: a silent, versioned autosave of inventory, tools, fires, felled trees, position and time (`?fresh=1` starts clean; mismatched saves discarded).
 6. (Done.) Footprints in the sand (player and creature), filled in by the wind, one instanced draw call.
-7. (Done, #81.) Giant bones half buried in the dunes (Blender model with LODs) as landmarks; a crashed expedition wreck if time.
+7. (Done, #81.) Giant bones half buried in the dunes (Blender model with LODs) as landmarks; the crashed expedition wreck was parked on 5 Oct (see Game direction).
 8. A direction doc in the Project (`Projects` tool): the decisions only Kane can make, each with my one-line take, and the story seed we talked through
    (survivor of an expedition that came down on a desert moon with a ringed planet in the sky; the giant bones are what brought the ship down; the
    boss is its grown up version).
@@ -165,10 +181,10 @@ Add a `creature-pipeline` skill (`.claude/skills/`) when the stinger v3 build is
 
 ## Roadmap
 
-Campfire (done). Kane is not sure about cold nights or fuel yet, so those are parked until he decides how
-they should work. Visual direction now: dust and sand, fire smoke and heat haze, night sky, plant sway (done), an
-ambient alien bird (done), a physical backpack (done), a spear (done), newer trees with LODs (done). Later: first threat (sandworm, titan
-blocker or boss), building and more crafting. Kane tests on the headset himself: do not keep saying it is untested, say what to look for.
+Campfire (done). Direction is in "Game direction" at the top: Ark-lite plus colossi, with a glider as the first unlock. Cold nights, fuel, base building
+and co-op are parked or dropped (5 Oct). Visual direction now: dust and sand, fire smoke and heat haze, night sky, plant sway (done), an
+ambient alien bird (done), a physical backpack (done), a spear (done), newer trees with LODs (done). Next big thing: a colossus, starting with a rough
+climb prototype once Kane says go (how it is beaten is his call). Kane tests on the headset himself: do not keep saying it is untested, say what to look for.
 
 Backpack (done, `src/backpack.js`; my call, Kane approved): a physical pack you grab by its handle and put on by letting go
 behind your shoulder (reaching behind your back is the VR habit); it then disappears into the normal menu (a Back slot) and
@@ -273,7 +289,7 @@ on you... just don't fire off subagent or do anything crazy"; "don't be afraid t
 about gameplay mechanic that's going to be something I really need to test and do myself"), no sound effects yet ("way more intentional later"). He
 wants "something more than just visual" and a reason to go out into the desert: a pickaxe, good stones or crystals, a "not a cactus" alien plant, PBR.
 Plan: pickaxe + desert finds, dune stinger v3 (Blender), fight effects, saving, footprints, giant bones, a direction doc in the Project. Keep the time
-(`TZ=Australia/Sydney date`). Done so far: #75 (smoke test in CI), #76 the pickaxe and desert finds, #77 the dune stinger v3, #78 fight effects (all below), #79 saving, #80 footprints, #81 giant bones, #82 the ringed planet and the smooth sun path, #83 crystal motes (below, last paragraphs). Not done when Kane woke (lost 3.5 hours to a permission prompt, see rule 5): the crashed ship wreck inside the lone ribcage, dust devils by day, a dawn and dusk look pass, a skittering critter, the `creature-pipeline` skill.
+(`TZ=Australia/Sydney date`). Done so far: #75 (smoke test in CI), #76 the pickaxe and desert finds, #77 the dune stinger v3, #78 fight effects (all below), #79 saving, #80 footprints, #81 giant bones, #82 the ringed planet and the smooth sun path, #83 crystal motes (below, last paragraphs). Not done when Kane woke (lost 3.5 hours to a permission prompt, see rule 5): the crashed ship wreck inside the lone ribcage (parked on 5 Oct, see Game direction), dust devils by day, a dawn and dusk look pass, a skittering critter, the `creature-pipeline` skill.
 
 Pickaxe and desert finds (my call, done; see README "The desert finds and the pickaxe"): `src/pickaxe.js` (a stone pickaxe like the axe, crafted from 3 sticks +
 3 stones, also stands by the starting tools, hurts the stinger for 26), `src/desert-finds.js` (fixed-seed layout of about 120 nodes in 25 sites),
