@@ -10,6 +10,10 @@ Moved out of CLAUDE.md so it only loads when needed. Kane's standing rules are s
 - `gh pr create` fails here (GraphQL is blocked). Use the REST API:
   `gh api repos/permabulk69420-pixel/oasis/pulls -X POST -f title=... -f head=BRANCH -f base=main -F body=@file`
   then `gh api repos/permabulk69420-pixel/oasis/pulls/N/merge -X PUT -f merge_method=squash`.
+- Merging right after a push can answer 409 "Head branch is out of date": wait about 6 seconds, then merge again passing the head commit,
+  `-f sha=$(git rev-parse HEAD)`. The Pages workflow now also smoke tests the real game in headless Chromium (`tools/smoke/smoke_test.py`; run it
+  yourself against `npm run dev` before merging anything big) and will not deploy if it fails; look at the run's log (`gh run view --log-failed`
+  needs GraphQL, so use `gh api repos/permabulk69420-pixel/oasis/actions/runs/<id>/jobs` and the job's logs URL) if a deploy does not appear.
 - Stop the dev server with `fuser -k 4173/tcp`. `pkill -f vite` or `pgrep -f` matches its own shell and kills the command.
 - After a squash merge, `git checkout -B main origin/main` and `git branch -D` the feature branch. The stop hook counts
   the unsquashed local commit as unpushed and nags, even though the work is already on `main`.
