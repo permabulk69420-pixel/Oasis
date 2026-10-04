@@ -10,7 +10,8 @@ a game that does not start. It checks, by day and by night:
   - the picture is not blank,
   - the scene stays inside a blow-out budget (draw calls and triangles at the spawn point; this catches a runaway, it is not a Quest budget),
   - the stinger's model loads and it shows up in the telemetry,
-  - the desert finds (src/mining.js) are laid out, and striking one with a pickaxe takes health off it and drops a stone.
+  - the desert finds (src/mining.js) are laid out, and striking one with a pickaxe takes health off it and drops a stone,
+  - saving (src/save-game.js): what you carry, a lit campfire and where you stand come back after a reload, and ?fresh=1 starts clean.
 Add a check here when a new system could silently fail to load. Exit code 0 is a pass.
 """
 import argparse
@@ -103,6 +104,74 @@ def check_finds(page, hour):
     return problems
 
 
+def check_save(browser, base):
+    """Saving: carry something, light a fire and move, reload, and it is all still there; ?fresh=1 then starts a new game.
+    The dev build only saves when the address says ?save=1, so the other checks never touch a save. This page has storage of its own."""
+    problems = []
+    context = browser.new_context(viewport={"width": 640, "height": 360})
+    page = context.new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append("PAGEERROR " + str(e)))
+    page.on("console", lambda m: errors.append("console.error " + m.text) if m.type == "error" and not any(s in m.text for s in IGNORED_CONSOLE) else None)
+
+    def open_game(query):
+        page.goto(f"{base}/?save=1{query}")
+        page.wait_for_function("window.__save && window.__save.autosave.status().active", timeout=LOAD_TIMEOUT_MS)
+
+    try:
+        open_game("")
+        put = page.evaluate("""async () => {
+          const inventory = await import('/src/inventory.js');
+          const w = window.__save.world;
+          inventory.importInventoryItems([{ type: 'stick', count: 4 }, { type: 'crystal', count: 2 }]);
+          let fire = null;
+          for (let r = 0; r < 14 && !fire; r += 1.5) for (let a = 0; a < 6.3 && !fire; a += 0.7) {
+            const x = 336 + Math.cos(a) * r, z = -304 + Math.sin(a) * r;
+            if (w.campfires.canPlace(x, z).ok) fire = w.campfires.place(x, z, { lit: true });
+          }
+          w.rig.position.x = 338; w.rig.position.z = -308; w.rig.rotation.y = 0.8;
+          w.dayNight.setTimeOfDay(20.5);
+          return { fire: Boolean(fire), flushed: window.__save.autosave.flush(), bytes: (localStorage.getItem('oasis-save') || '').length };
+        }""")
+        if not put["fire"] or not put["flushed"] or not (100 < put["bytes"] < 20_000):
+            problems.append(f"save: nothing sensible was written ({put})")
+        open_game("")
+        back = page.evaluate("""async () => {
+          const inventory = await import('/src/inventory.js');
+          const w = window.__save.world;
+          return {
+            start: window.__save.start,
+            sticks: inventory.getInventoryCount('stick'), crystals: inventory.getInventoryCount('crystal'),
+            fires: w.campfires.list().map(f => f.lit),
+            at: [w.rig.position.x, w.rig.position.z, w.rig.rotation.y],
+            hours: w.dayNight.getState().hours,
+          };
+        }""")
+        if back["start"] != "loaded":
+            problems.append(f"save: the second start did not load the save ({back['start']})")
+        if back["sticks"] != 4 or back["crystals"] != 2:
+            problems.append(f"save: what you carried did not come back ({back['sticks']} sticks, {back['crystals']} crystals)")
+        if back["fires"] != [True]:
+            problems.append(f"save: the lit campfire did not come back ({back['fires']})")
+        if abs(back["at"][0] - 338) > 0.5 or abs(back["at"][1] + 308) > 0.5 or abs(back["at"][2] - 0.8) > 0.05:
+            problems.append(f"save: you did not come back where you were ({back['at']})")
+        if abs(back["hours"] - 20.5) > 1.0:
+            problems.append(f"save: the time of day did not come back ({back['hours']})")
+        open_game("&fresh=1")
+        fresh = page.evaluate("""async () => {
+          const inventory = await import('/src/inventory.js');
+          return { start: window.__save.start, items: inventory.getInventoryItems().length, search: location.search, kept: Boolean(window.__save.store.kept()) };
+        }""")
+        if fresh["start"] != "fresh" or fresh["items"] != 0 or "fresh" in fresh["search"] or not fresh["kept"]:
+            problems.append(f"save: ?fresh=1 did not start a new game and keep the old save aside ({fresh})")
+    except Exception as exc:  # a timeout waiting for the game, or a script error
+        problems.append(f"save: the check could not finish ({exc.__class__.__name__}: {str(exc)[:200]})")
+    for e in errors[:8]:
+        problems.append(f"save: {e}")
+    context.close()
+    return problems
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", default="http://localhost:4173")
@@ -119,6 +188,9 @@ def main():
             found, info = check_view(browser, args.url.rstrip("/"), hour, args.shots)
             print(f"hour {hour}: {json.dumps(info)}")
             problems += found
+        found = check_save(browser, args.url.rstrip("/"))
+        print(f"save: {'ok' if not found else 'PROBLEMS'}")
+        problems += found
         browser.close()
     if problems:
         print("\nSMOKE TEST FAILED")

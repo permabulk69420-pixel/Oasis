@@ -107,6 +107,23 @@ export function getInventoryItems() {
   return Array.from(counts, ([type, count]) => ({ type, count }));
 }
 
+// For the save: the whole pool as plain data, and back again. Whatever is not a sensible count is left out.
+export const INVENTORY_LIMITS = Object.freeze({ maxTypes: 64, maxCount: 9999, maxTypeLength: 40 });
+
+export function importInventoryItems(items) {
+  counts.clear();
+  if (!Array.isArray(items)) return 0;
+  for (const item of items) {
+    if (counts.size >= INVENTORY_LIMITS.maxTypes) break;
+    const type = item?.type;
+    const count = Number(item?.count);
+    if (typeof type !== 'string' || !type || type.length > INVENTORY_LIMITS.maxTypeLength) continue;
+    if (!Number.isSafeInteger(count) || count <= 0) continue;
+    counts.set(type, Math.min(INVENTORY_LIMITS.maxCount, (counts.get(type) || 0) + count));
+  }
+  return counts.size;
+}
+
 // Validate the whole transaction before touching any count: no partial spending.
 export function exchangeInventoryItems(cost, output) {
   const spent = Object.entries(cost);

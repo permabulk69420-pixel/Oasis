@@ -33,6 +33,22 @@ export function resetSurvival() {
   sinceSprint = Infinity;
 }
 
+// For the save: the four numbers, and back. Only a stat that is a real number is put back; the rest keep their value.
+export function exportSurvival() {
+  return Object.fromEntries(Object.entries(stats).map(([name, value]) => [name, Math.round(value * 10) / 10]));
+}
+
+export function importSurvival(data) {
+  if (!data || typeof data !== 'object') return false;
+  for (const name of Object.keys(stats)) {
+    const value = Number(data[name]);
+    if (data[name] != null && Number.isFinite(value)) stats[name] = clampStat(value);
+  }
+  exhausted = false;
+  sinceSprint = Infinity;
+  return true;
+}
+
 // Something hurts the player. Health never goes below the floor (there is no death yet). Returns the health left.
 export function damagePlayer(amount) {
   const value = Number(amount);

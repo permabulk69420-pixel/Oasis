@@ -83,7 +83,7 @@ carries a `fall` entry (radius, landing `lie`/`stick`, centre of mass). `?view=t
 Pick up sticks, stones and logs with grip and let go at your chest to pack them.
 Everything you carry is one shared pool with a weight per item (stick 4, stone 8, wood 6, fibre 1, crystal 4, axe 10, torch 5, spear 10, pickaxe 12, campfire 25).
 Your pockets carry 40; past the limit you walk at half speed, easing off to a standstill at twice the limit. Wearing the
-backpack lifts the limit to 100 (see The backpack). Inventory is session-only; reloading starts with an empty inventory.
+backpack lifts the limit to 100 (see The backpack). The inventory is saved with the rest of the game (see Saving).
 
 ## Survival
 
@@ -96,6 +96,31 @@ Deliberately light (`src/survival.js`, rates in one table at the top):
   spot at night) and regrow slowly where they were picked.
 - **Health** only slides down if food or water hit zero, and recovers when both are comfortable.
   There is no death yet: health stops at a low floor.
+
+## Saving
+
+The game saves itself, quietly (`src/save-game.js`): no button and no menu. The Quest browser reloads a page now and then (for instance
+after the headset has been off), and with this a reload puts you back where you were.
+
+- **What is saved**: what you carry, health, food, water and stamina, the time of day, where you stand and which way you face, every
+  tool (on a hip, lying in the sand, still burning if it is a lit torch, or still standing where it was planted), campfires and whether
+  they are lit, the backpack (worn, or lying where you left it), and which rocks you have broken.
+- **What is not**: trees (they regrow within minutes anyway), loose sticks, stones and fruit (they are scattered again), and the
+  creatures (the stinger starts at home).
+- **When**: every 10 seconds while playing, and at once when the page is hidden, the headset comes off, a VR session ends or the menu
+  is closed. Nothing is written until everything saved has been put back, and the models (tools, campfire, backpack) have loaded, so a
+  slow load can never save an empty world over a full one.
+- **A new game**: open the page with `?fresh=1`. The old save is kept aside, not deleted (`oasis-save-kept` in local storage). A save
+  that cannot be read, is from another version of the format (`SAVE.version`), or has been through two starts that never got as far as
+  drawing for 3 seconds is set aside the same way and the game starts clean. Local storage that is missing or refuses is fine: the game
+  just does not save.
+- **A VR session starts where the saved game left you** (not at the start of the world). Leaving VR and entering again continues from
+  where you left off.
+- **Development**: a dev build saves nothing unless the address has `?save=1` (so the screenshot fixtures stay repeatable). The browser
+  check is in `tools/smoke/smoke_test.py`. Tools take part with `snapshot()` / `restoreSnapshot()` in `src/tools.js` (a kind adds
+  `saveState` / `loadState` for what it keeps about itself, e.g. the torch's flame); the backpack with `snapshot()` / `restore()`;
+  the mined rocks with `serialize()` / `restore()` in `src/mining.js`. When a part of the game changes what it holds, add it to the
+  list in `src/main.js` and to `CLEANERS` in `src/save-game.js`, and bump `SAVE.version` only if an old save can no longer be read.
 
 ## Campfire
 
@@ -112,7 +137,7 @@ vertices, open edges and inside-out faces. `tools/campfire/render_preview.py` re
 
 Development-only camera fixtures: `?view=fruit`, `?view=orchard`, `?view=glade`, `?view=approach`,
 `?view=wade`, `?view=gust` (across the wind on a dune crest), `?eye=<metres>` (a lower camera), `?yaw=<deg>` and `?pitch=<deg>` (look direction), `?skytime=<seconds>` (pin the sky clock, e.g. to catch a shooting star), `?sandgain=<n>` (exaggerate the blowing sand), `?windtime=<seconds>` (pin the wind clock so two screenshots can be compared), `?windgain=<n>` (exaggerate the sway), `?at=x,z` and `?look=x,z[,height]` (stand at a world position and look at a point), `?camp=lit` or `?camp=unlit` (puts a campfire on the flattest ground near spawn, with
-`?campd=<metres>` for the distance), `?bird=perch|fly|flare` (see Alien birds in the game), `?view=pack` (beside the backpack), `?pack=worn` (start wearing it, see The backpack) `?view=spear` (beside the spear) and `?view=throws` (tools thrown and dropped, see Dropping and throwing), plus `?hour=N` to fix the time of day.
+`?campd=<metres>` for the distance), `?bird=perch|fly|flare` (see Alien birds in the game), `?view=pack` (beside the backpack), `?pack=worn` (start wearing it, see The backpack) `?view=spear` (beside the spear) and `?view=throws` (tools thrown and dropped, see Dropping and throwing), plus `?hour=N` to fix the time of day, and `?save=1` (turn saving on in a dev build, see Saving). `?fresh=1` (a new game) works in production too.
 
 ## Alien birds in the game
 

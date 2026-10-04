@@ -5,7 +5,7 @@ import { attachHeldObject } from './grip-contact.js';
 import { isHandAtChest } from './chest-storage.js';
 import { addInventoryItem, getInventoryCount, removeInventoryItem } from './inventory.js';
 import { pulseHaptics } from './haptics.js';
-import { createBody, launch, stepBody, bodyOrigin, isMoving } from './falling.js';
+import { createBody, launch, stepBody, bodyOrigin, isMoving, placeAtRest } from './falling.js';
 import { createHandMotion } from './hand-motion.js';
 
 // How close a hand must be to any part of a tool lying on the ground (or stuck in it) to pick it up.
@@ -160,7 +160,11 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
       kind.shape = { bottom: box.min.y, top: box.max.y };
       kind.prepareTemplate?.(template);
       kind.template = template;
-      for (const spot of kind.spawns || []) toGround(spawn(kind.id), spot.x, spot.z);
+      for (const spot of kind.spawns || []) {
+        const instance = spawn(kind.id);
+        if (instance) instance.defaultSpawn = true; // standing where the game puts it at the start; a saved game replaces these
+        toGround(instance, spot.x, spot.z);
+      }
     }, undefined, error => {
       onError(`[Oasis tools] ${kind.name} model failed to load: ${error?.message || error}`);
     });
@@ -503,6 +507,84 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     return true;
   }
 
+  // ---- the save (src/save-game.js) ----------------------------------------------------------------------------------------------
+  // Every tool in the world: on a hip, or in the world with its pose (and, if it has fallen, whether it is still falling, lying or stuck
+  // in the sand). A tool in a hand is saved as dropped from where it is. What a tool keeps about itself (a torch: lit) comes from the kind.
+  const savePosition = new THREE.Vector3();
+  const saveQuaternion = new THREE.Quaternion();
+  const noMotion = new THREE.Vector3();
+  const millimetres = value => Math.round(value * 1000) / 1000;
+  const tenThousandths = value => Math.round(value * 10000) / 10000;
+
+  function snapshot() {
+    const items = [];
+    for (const instance of instances) {
+      const { kind, root } = instance;
+      const entry = { id: kind.id };
+      const extra = kind.saveState?.(instance);
+      if (extra) entry.data = extra;
+      if (instance.slot) {
+        entry.at = 'hip';
+        entry.side = instance.slot;
+      } else {
+        root.updateWorldMatrix(true, false);
+        root.getWorldPosition(savePosition);
+        root.getWorldQuaternion(saveQuaternion);
+        entry.at = 'ground';
+        entry.p = savePosition.toArray().map(millimetres);
+        entry.q = saveQuaternion.toArray().map(tenThousandths);
+        if (instance.heldBy) entry.fall = 'air';
+        else if (instance.fall && instance.fall.phase !== 'idle') entry.fall = instance.fall.phase;
+      }
+      items.push(entry);
+    }
+    return { kinds: kinds.map(kind => kind.id), items };
+  }
+
+  function placeSaved(kind, entry) {
+    const instance = spawn(kind.id);
+    if (!instance) return null;
+    if (entry.data) kind.loadState?.(instance, entry.data);
+    if (entry.at === 'hip') {
+      if (HIP_SIDES.includes(entry.side) && toHip(instance, entry.side)) return instance;
+      // That hip is taken (a damaged save): into the pockets, so the tool is never lost.
+      addInventoryItem(kind.id, 1);
+      dispose(instance);
+      return null;
+    }
+    if (!Array.isArray(entry.p) || entry.p.length !== 3 || !Array.isArray(entry.q) || entry.q.length !== 4) { dispose(instance); return null; }
+    scene.add(instance.root);
+    instance.root.position.fromArray(entry.p);
+    instance.root.quaternion.fromArray(entry.q).normalize();
+    instance.root.scale.set(1, 1, 1);
+    instance.root.updateMatrixWorld(true);
+    if (entry.fall && kind.fall && kind.shape) {
+      const body = createBody({ ...kind.shape, ...kind.fall });
+      const pose = { origin: instance.root.position, quaternion: instance.root.quaternion };
+      if (entry.fall === 'rest' || entry.fall === 'stuck') placeAtRest(body, pose, entry.fall);
+      else launch(body, { ...pose, velocity: noMotion, spin: noMotion });
+      instance.fall = body;
+      if (isMoving(body)) falling.push(instance);
+    }
+    return instance;
+  }
+
+  // Put the saved tools back: the ones standing in the sand at the start are taken away, except for kinds the save never heard of
+  // (added since), which keep theirs. Needs every model loaded (ready). Returns how many tools were put back.
+  function restoreSnapshot(data) {
+    if (!data || !Array.isArray(data.items)) return 0;
+    const known = new Set(Array.isArray(data.kinds) ? data.kinds : data.items.map(item => item?.id));
+    for (const instance of instances.slice()) {
+      if (instance.defaultSpawn && known.has(instance.kind.id)) dispose(instance);
+    }
+    let placed = 0;
+    for (const entry of data.items) {
+      const kind = kindById.get(entry?.id);
+      if (kind?.template && placeSaved(kind, entry)) placed++;
+    }
+    return placed;
+  }
+
   // Where the body is, for things that hang off it besides the hips (the pack on your back): the point the belt hangs
   // from under the head, in the rig's space, and the way the body faces. out is { center: Vector3, yaw }. False until
   // the first frame in VR (there is no body on desktop).
@@ -519,6 +601,9 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     unequip,
     throwTool,
     getBodyFrame,
+    snapshot,
+    restoreSnapshot,
+    get ready() { return kinds.every(kind => kind.template); },
     getHipSlots: () => ({ left: slots.left?.kind.id ?? null, right: slots.right?.kind.id ?? null }),
     canEquip: id => Boolean(kindById.get(id)),
     getInstances: kind => instances.filter(instance => !kind || instance.kind.id === kind),
