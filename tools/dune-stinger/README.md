@@ -20,3 +20,8 @@ Same 49-bone skeleton and names as v1, so any pose code works on either. `v2/` h
 then `python tools/dune-stinger/build_stinger.py --out-dir out [--lod 0] [--no-render]` (Cycles renders are slow here; `QUICK=1 SAMPLES=8 RES_X=900`
 cuts them down). `viewer.html` loads a GLB in three.js with night lighting and test poses (copy it to the repo root, serve with `npm run dev`).
 In the game since Kane's go-ahead (4 Oct 2026): `v2/*.glb` are copied to `public/models/creatures/` and `src/dune-stinger.js` loads them. Rebuilding the models means copying the new files there again.
+
+The combat build (same day) lengthened the tail: `TAIL_SCALE = 2.4` (and `TAIL_GIRTH = 1.45`) in `build_stinger.py` stretch the four tail pieces
+from `TAIL_BASE` and carry the lancet, glow and bead points with them (`tp()`), because with the original tail the sting could never reach past
+the head in a strike. Same skeleton, same triangle counts. The tail's poses (rest arch, straight windup, whip, flinch, death curl) are in
+`src/stinger-pose.js`; `tests/stinger-pose.test.js` checks the sting reaches ahead of the head in the strike.

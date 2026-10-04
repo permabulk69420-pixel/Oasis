@@ -101,3 +101,19 @@ test('bad dt values do nothing', () => {
   updateSurvival(NaN); updateSurvival(-1); updateSurvival(0);
   assert.deepEqual(getSurvivalStats(), { health: 100, stamina: 100, food: 100, water: 100 });
 });
+
+test('damagePlayer takes health off but never below the floor, and ignores nonsense', async () => {
+  const { damagePlayer } = await import('../src/survival.js');
+  resetSurvival();
+  assert.equal(damagePlayer(18), 82);
+  assert.equal(damagePlayer(-5), 82);
+  assert.equal(damagePlayer(NaN), 82);
+  assert.equal(damagePlayer('x'), 82);
+  for (let i = 0; i < 10; i++) damagePlayer(18);
+  assert.equal(getSurvivalStats().health, SURVIVAL_RATES.healthFloor, 'no death yet');
+  // already under the floor (starving): a blow does not push it lower, or lift it
+  resetSurvival();
+  updateSurvival(0.0001);
+  assert.equal(damagePlayer(0), 100);
+  resetSurvival();
+});
