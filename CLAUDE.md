@@ -64,49 +64,24 @@ work. What he has told me, or shown he wants, across sessions:
 ## Working on this repo
 
 - Tests: `npm test` (node --test, no browser). Build: `npx vite build`. Dev: `npm run dev`.
-- `gh pr create` fails here (GraphQL is blocked). Use the REST API:
-  `gh api repos/permabulk69420-pixel/oasis/pulls -X POST -f title=... -f head=BRANCH -f base=main -F body=@file`
-  then `gh api repos/permabulk69420-pixel/oasis/pulls/N/merge -X PUT -f merge_method=squash`.
+- Long procedures live in project skills (`.claude/skills/`): `ship-a-change`, `grip-debug`, `perf-triangles`. Load one when the job matches; add a new
+  skill when a procedure needs more than a few lines here (Kane gave me full authority over this file and the skills).
+- `gh pr create` fails here (GraphQL is blocked): use the REST API. Commands, merge routine and stop-hook notes are in the `ship-a-change` skill.
 - Dev-only URL fixtures (stripped from production): `?view=...`, `?hour=N` (0 night, 14 day),
   `?camp=lit|unlit`, `?campd=<metres>`, `?bird=perch|fly|flare`, `?view=pack`, `?pack=worn`, `?view=spear`, `?treelod=0|1|2` (every tree at
   one level of detail). `?trees=old` also works in production (the first blue trees, for comparison). Add one when a new
   feature needs a repeatable screenshot.
-- `tools/hold-lab/hold-lab.html` (with `npm run dev`; `?item=pack|spear|torch|axe&side=right&player=1`) shows how a hand takes a held
-  thing. Probing the real hands in a headless page needs a temporary `window.__oasis` hook in `src/main.js` (fake controllers,
-  fake `renderer.xr.isPresenting`); never commit it. After editing a `src/` file that scratch scripts import with a bare
-  `import('/src/x.js')`, restart the dev server, because Vite then serves the app a `?t=` copy and the script gets a second module.
+- Held things (grip clipping, the hold lab, `lab_shot.py`, `probe_grip_point.py`): see the `grip-debug` skill.
 - Screenshots: Playwright with Chromium (SwiftShader) against `npm run dev`. Look at them; do not assume.
-- Where the triangles go: with the same temporary `window.__oasis` hook (just `scene, camera, renderer, THREE`), walk `scene.traverseVisible`,
-  keep the meshes whose bounding sphere meets the camera frustum, add each one's draw-range index count / 3 (times `count` for an
-  InstancedMesh) and group by the first three names up the parents. It agrees with `renderer.info` to within 1%.
+- Triangle and draw-call counts per object: see the `perf-triangles` skill.
 - Day/night uses ACES tone mapping with very low night exposure (~0.035 vs day 0.82). Emissive and light
   levels must compensate for exposure, and night visibility relies on additive fills after tone mapping.
 - Place objects on `createHeightField().sample` (mesh-accurate), not the analytic `terrainHeight`.
 - Blender is headless (`import bpy` before `import bmesh`). It is not preinstalled in a fresh session, but it is
   free and installs fine: `pip install bpy --break-system-packages` (a big download, so do it only when a model
   needs building). Kane has said this is fine, no need to ask. glTF winding matters in three.js.
-- **Something clips through the fingers when held?** Nearly always the grip solver (`src/adaptive-grip.js`) gave up. It
-  shifts the object off the palm by at most 6 cm (`MAX_PALM_SHIFT`); if the open hand still intersects it, `solve`
-  returns false and the hand closes on the plain authored pose, with no fitting and no warning. Find out first: the hold
-  lab logs `solved true|false` (`item=fruit` and the others; `debug=1` draws the contact outline). Fix it with a grip
-  offset on the object, not by touching the solver: the palm normal is the grip socket's X axis, so the point goes
-  along X, and the two hands are mirrored (the fruit needs -X on the right hand and +X on the left, see
-  `FRUIT.gripOffset` in `src/glow-fruit.js`). Keep one frozen surface object per hand so the solved grip is cached, and
-  check both hands. `python3 tools/hold-lab/probe_grip_point.py <item> <side>` tries offsets on every axis (solving is
-  not the same as looking right, so render the winners with `tools/hold-lab/lab_shot.py` and look). The solver is
-  independent of arm pose, so one good lab render covers the pose in the game.
-- Screenshots of the hold lab: `python3 tools/hold-lab/lab_shot.py "<hold-lab query>" out.png` with `npm run dev` running
-  (Playwright for Python, Chromium in `/opt/pw-browsers`, SwiftShader flags are in the script).
-- Stop the dev server with `fuser -k 4173/tcp`. `pkill -f vite` or `pgrep -f` matches its own shell and kills the command.
-- After a squash merge, `git checkout -B main origin/main` and `git branch -D` the feature branch. The stop hook counts
-  the unsquashed local commit as unpushed and nags, even though the work is already on `main`.
-- **Stop-hook "N unpushed commits and no remote branch" is usually this clone's fault, not a real problem.** The hook
-  (`~/.claude/stop-hook-git-check.sh`) looks for a local `origin/<branch>` ref and, if there is none, counts every commit that is not on
-  `origin/HEAD` as unpushed. This clone's fetch rule only covers `main` (`remote.origin.fetch = +refs/heads/main:refs/remotes/origin/main`), so
-  a pushed feature branch never gets that ref and always looks unpushed. At the start of a session run
-  `git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*' && git fetch origin`; after that a push updates the ref and the hook
-  stays quiet. If it still fires, compare `git ls-remote --heads origin BRANCH` with `git rev-parse HEAD`: if they match, nothing is unpushed.
-  Never re-push or re-do work because of it, and it is not Kane asking for anything.
+- Stop-hook "N unpushed commits and no remote branch" is this clone's fault, not a real problem: run
+  `git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*' && git fetch origin` once per session. Details in the `ship-a-change` skill. It is never Kane asking for anything.
 - Palm close-up for a screenshot (dev build): `?hour=14&at=311.6,-357.7&look=313.5,-351,2.5&treelod=0`; `&eye=1.0` for a low camera at
   the base. Other palms are at `WATER + (cos a * radiusX * r, sin a * radiusZ * r)` for the `angle`/`radius` pairs in
   `TREE_LAYOUT`, `src/oasis-vegetation.js`. `?camp=lit` ignores `?at` (the fire goes near spawn).
@@ -179,6 +154,6 @@ CC0 palm bark with a normal map, buttress base instead of root spikes, a fourth 
 and turn). Then #47 and #48 (this file: how we work, palms merged), #49 (every model and texture request carries `?v=<build id>`, so a deploy
 is not hidden by the 10 minute Pages cache), #50 (the stop-hook false alarm and its fix), #51 (palm fronds wear the alien desert plant's leaf
 texture because the blue read too blue; default look `plant`, mid-dark; Kane asked about "the much darker one", so `?leaf=dark` is the likely
-next default, but he has not said which: ask which look he settled on after the headset). Waiting on Kane before touching: the backpack back zone (options if it still feels hard: a repeating buzz, a sound, a bigger zone,
+next default, but he has not said which: ask which look he settled on after the headset). #53: the four alien desert plants were near black (vertex colour times texture), now lit properly (night unchanged). #54: three skills split out of this file. Waiting on Kane before touching: the backpack back zone (options if it still feels hard: a repeating buzz, a sound, a bigger zone,
 a visual cue). Only if Kane says go: a script and post for his explainer on tokens, API price and plan usage.
 
