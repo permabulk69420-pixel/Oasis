@@ -9,7 +9,9 @@ new spear leaf. Close up the fronds are feathers: a thin rachis with two rows of
 frond is one saw-toothed ribbon (the teeth are the leaflets) and, furthest, the far levels draw only half of the fronds. A
 handful of pale veils hang from the crownshaft (the veil tree's trick, small). Every level grows its fronds from the same
 seeds, so they have the same length, angle and droop and the tree does not change shape when one level takes over from
-another. Vertex colours and two materials, no textures:
+another. Vertex colours and two materials. Every surface has UVs for the shared detail textures that the game puts on
+(src/surface-textures.js): bark u once round, v = height in metres * 2; leaves u across (midrib at 0.5), v along, tip at 1.
+No image is stored in the files:
   "Banded teal bark"        the trunk and roots, single sided, closed solids
   "Waxy blue leaf tissue"   every leaf and veil, double sided thin sheets
 The material names are what src/oasis-vegetation.js picks the wind sway by.
@@ -76,8 +78,8 @@ def noise3(p, seed=0.0):
 
 
 # Palette (sRGB hex).
-BARK = srgb(0x3A6062)          # dark teal-slate
-BARK_LIGHT = srgb(0x6C9C92)
+BARK = srgb(0x4F7F78)          # dark teal-slate
+BARK_LIGHT = srgb(0x93C2B0)
 BARK_DARK = srgb(0x1B2D30)
 BAND = srgb(0x9DBFB0)          # the pale rings round the trunk
 SHAFT = srgb(0x86BFB0)         # the crownshaft: the smooth pale sleeve the fronds grow from
@@ -86,10 +88,11 @@ LEAF = [
     dict(base=srgb(0x1B7A9E), mid=srgb(0x1F5CB8), tip=srgb(0x30B2DA), rib=srgb(0x7FDDE9), edge=srgb(0x17317E)),
     dict(base=srgb(0x1F8AA8), mid=srgb(0x2870CC), tip=srgb(0x44C2EA), rib=srgb(0x8AE4EE), edge=srgb(0x1B3C90)),
     dict(base=srgb(0x23A0AE), mid=srgb(0x3488DC), tip=srgb(0x6ED8F0), rib=srgb(0x9EEDF4), edge=srgb(0x224EA2)),
+    dict(base=srgb(0x1A6070), mid=srgb(0x1D4F8C), tip=srgb(0x2F8FA8), rib=srgb(0x5FB8B8), edge=srgb(0x143060)),   # older, duller
 ]
 SPEAR_LEAF = dict(base=srgb(0x45C2C9), mid=srgb(0x86E2EC), tip=srgb(0xD2FAFF), rib=srgb(0xF2FFFF), edge=srgb(0x4FA8D8))
-BARK_FLOOR = (0.004, 0.012, 0.012)   # linear light the materials give off by themselves (see make_materials)
-LEAF_FLOOR = (0.010, 0.045, 0.065)
+BARK_FLOOR = (0.020, 0.052, 0.050)   # linear light the materials give off by themselves (see make_materials)
+LEAF_FLOOR = (0.030, 0.095, 0.098)
 VEIL = srgb(0x93E6EE)
 VEIL_END = srgb(0x5FC4E2)
 
@@ -101,7 +104,7 @@ class Mesh:
     """Vertices with a colour each, and faces (triangles or quads) with a material."""
 
     def __init__(self):
-        self.V, self.C, self.F, self.M = [], [], [], []
+        self.V, self.C, self.F, self.M, self.UV = [], [], [], [], []   # UV: one (u, v) per face corner
 
     def tris(self, mat=None):
         return sum(len(f) - 2 for f, m in zip(self.F, self.M) if mat is None or m == mat)
@@ -111,12 +114,13 @@ class Mesh:
         self.C.append(np.asarray(c, float))
         return len(self.V) - 1
 
-    def shell(self, rings, colours, mat=MAT_BARK):
+    def shell(self, rings, colours, mat=MAT_BARK, vs=None):
         """A closed tube through `rings` (equal-length rings of 3D points), capped at both ends. Faces are wound outward
         whatever order the rings came in."""
         base = len(self.V)
         K = len(rings[0])
-        faces = []
+        faces, uvs = [], []
+        vs = vs if vs is not None else [float(i) for i in range(len(rings))]
         for ring, cols in zip(rings, colours):
             for p, c in zip(ring, cols):
                 self.vertex(p, c)
@@ -125,11 +129,14 @@ class Mesh:
             for k in range(K):
                 k2 = (k + 1) % K
                 faces.append((base + i * K + k, base + i * K + k2, base + (i + 1) * K + k2, base + (i + 1) * K + k))
+                u0, u1 = k / K, (k + 1) / K            # the last quad ends at u = 1, so the texture wraps without a smear
+                uvs.append(((u0, vs[i]), (u1, vs[i]), (u1, vs[i + 1]), (u0, vs[i + 1])))
         for end in (0, n - 1):
             ci = self.vertex(np.asarray(rings[end], float).mean(axis=0), np.asarray(colours[end], float).mean(axis=0))
             for k in range(K):
                 k2 = (k + 1) % K
                 faces.append((ci, base + end * K + k, base + end * K + k2))
+                uvs.append(((0.5, vs[end]), (k / K, vs[end]), ((k + 1) / K, vs[end])))
         volume = 0.0
         for f in faces:
             p = [self.V[i] for i in f]
@@ -137,7 +144,9 @@ class Mesh:
                 volume += np.dot(p[0], np.cross(p[j], p[j + 1])) / 6.0
         if volume < 0:
             faces = [tuple(reversed(f)) for f in faces]
+            uvs = [tuple(reversed(u)) for u in uvs]
         self.F.extend(faces)
+        self.UV.extend(uvs)
         self.M.extend([mat] * len(faces))
 
     def sheet(self, rows, colours, mat=MAT_LEAF):
@@ -153,9 +162,13 @@ class Mesh:
                 a = base + i * J + j
                 self.F.append((a, a + 1, a + J + 1, a + J))
                 self.M.append(mat)
+                u0, u1 = j / (J - 1), (j + 1) / (J - 1)
+                v0, v1 = i / (len(rows) - 1), (i + 1) / (len(rows) - 1)
+                self.UV.append(((u0, v0), (u1, v0), (u1, v1), (u0, v1)))
 
 
 # ----------------------------------------------------------------------------- the trunk
+BARK_TILES_PER_METRE = 2.0           # must match BARK.tilesPerMetre in src/surface-textures.js
 TRUNK_TOP = 3.74
 CROWN_Y = 3.62                       # where the fronds leave the trunk
 SHAFT_Y = 3.14                       # the crownshaft starts here
@@ -173,7 +186,7 @@ def band_ys():
 def trunk_center(y):
     """Straight and on the origin up to 1.9 m (the axe's chop zone is centred on it), then leaning away a little."""
     s = smoothstep(1.9, TRUNK_TOP, y)
-    return np.array([0.22 * s ** 1.4, y, -0.08 * s ** 1.2])
+    return np.array([0.40 * s ** 1.4, y, -0.15 * s ** 1.2])
 
 
 def trunk_radius(y):
@@ -217,7 +230,7 @@ def build_trunk(M, lod):
             rc.append(shade(col, 1.0 + 0.05 * noise3((k, i, 1), 4.0)))
         rings.append(np.array(ring))
         cols.append(rc)
-    M.shell(rings, cols, MAT_BARK)
+    M.shell(rings, cols, MAT_BARK, vs=[y * BARK_TILES_PER_METRE for y in ys])
 
 
 def build_roots(M, lod):
@@ -250,16 +263,17 @@ def build_roots(M, lod):
                 rc.append(shade(col, 1.0 + 0.05 * noise3((k, s, i), 6.0)))
             rings.append(np.array(ring))
             cols.append(rc)
-        M.shell(rings, cols, MAT_BARK)
+        M.shell(rings, cols, MAT_BARK, vs=[7.3 + i * 0.9 + s * (reach / (steps - 1)) * BARK_TILES_PER_METRE for s in range(steps)])
 
 
 # ----------------------------------------------------------------------------- the fronds
 # Three rings of fronds round the top of the trunk. n fronds each; length along the rachis; elevation of the first part
 # (radians above level); droop (radians gained along the frond: the fronds arch over); and the longest leaflet.
 RINGS = [
-    dict(n=9, L=2.15, a0=0.30, droop=1.45, leaflet=0.44),
-    dict(n=8, L=1.85, a0=0.78, droop=1.25, leaflet=0.38),
+    dict(n=9, L=2.25, a0=0.50, droop=1.62, leaflet=0.46),
+    dict(n=8, L=1.90, a0=0.88, droop=1.40, leaflet=0.40),
     dict(n=6, L=1.40, a0=1.15, droop=1.00, leaflet=0.30),
+    dict(n=5, L=1.95, a0=0.12, droop=0.70, leaflet=0.36),   # old fronds, hanging low round the crownshaft
 ]
 CENTRE_LEAF = dict(L=0.95, a0=1.50, droop=0.25, leaflet=0.15)
 GOLDEN = 2.399963
@@ -476,8 +490,11 @@ def make_object(M, name, mats):
     ca.data.foreach_set("color", rgba.ravel())
     for m in mats:
         me.materials.append(m)
-    for poly, mat in zip(me.polygons, M.M):
+    uv = me.uv_layers.new(name="UVMap")
+    for poly, mat, corners in zip(me.polygons, M.M, M.UV):
         poly.material_index = mat
+        for loop, c in zip(range(poly.loop_start, poly.loop_start + poly.loop_total), corners):
+            uv.data[loop].uv = c
     me.update()
     ob = bpy.data.objects.new(name, me)
     bpy.context.scene.collection.objects.link(ob)
@@ -496,9 +513,9 @@ def smooth_by_angle(ob, degrees=35):
 
 
 LODS = {
-    0: dict(trunk_k=10, bands=True, roots=5, style="feather", pairs=17, rings=[9, 8, 6], veils=6),
-    1: dict(trunk_k=7, bands=False, roots=0, style="serrated", teeth=7, centre_teeth=4, widen=1.0, tone=0.90, rings=[9, 8, 6], veils=0),
-    2: dict(trunk_k=5, bands=False, roots=0, style="serrated", teeth=3, centre_teeth=2, widen=1.3, tone=0.84, rings=[5, 4, 3], veils=0),
+    0: dict(trunk_k=10, bands=True, roots=5, style="feather", pairs=17, rings=[9, 8, 6, 5], veils=6),
+    1: dict(trunk_k=7, bands=False, roots=0, style="serrated", teeth=7, centre_teeth=4, widen=1.0, tone=0.90, rings=[9, 8, 6, 5], veils=0),
+    2: dict(trunk_k=5, bands=False, roots=0, style="serrated", teeth=3, centre_teeth=2, widen=1.3, tone=0.84, rings=[5, 4, 3, 3], veils=0),
 }
 
 
@@ -526,7 +543,7 @@ def build(level):
     bpy.ops.export_scene.gltf(
         filepath=out, export_format="GLB", export_yup=False, export_apply=False,
         export_lights=False, export_cameras=False, export_animations=False, export_skins=False,
-        export_vertex_color="MATERIAL", export_normals=True, export_tangents=False, export_texcoords=False,
+        export_vertex_color="MATERIAL", export_normals=True, export_tangents=False, export_texcoords=True,
         export_materials="EXPORT", export_extras=False)
     print("EXPORTED", out, f"{os.path.getsize(out)} bytes")
 
