@@ -81,6 +81,10 @@ work. What he has told me, or shown he wants, across sessions:
    mechanics, that's something I really need to test and do myself." Animations, art, sound, effects, atmosphere: yes. New mechanics (a pincer
    snap attack, drops, player death, anything that changes how play works): no, and no new numbers for them. He gives this overnight authority
    when he says so, as he did on both nights; do not assume it in an ordinary daytime session.
+   For that run he also said: do not be afraid to throw away hours of work if it is not good (bin it and redo it, no sunk cost); keep track of the
+   time yourself (the clock tool says only the date here, so use `date` in the shell; he is in Sydney, `TZ=Australia/Sydney date`; the run began at
+   22:33 AEDT on 4 Oct); his usage and permissions are set to the maximum, so nothing should stop the run; and if I have a question he wants it fired
+   off straight away because he closes the app after his last message (then decide it myself).
 6. **Quest performance comes first.** No post-processing passes, no big shadow maps, no per-frame
    allocations, keep triangle counts and draw calls modest. Kane knows desktop checks cannot prove how
    something looks, feels or runs on the headset, so never add "not tested on a headset" to a report or a
@@ -119,6 +123,8 @@ Add a `creature-pipeline` skill (`.claude/skills/`) when the stinger v3 build is
 ## Working on this repo
 
 - Tests: `npm test` (node --test, no browser). Build: `npx vite build`. Dev: `npm run dev`.
+- Smoke test (loads the real game headless, day and night, fails on page errors, a blank picture or a blown draw-call/triangle budget; also runs in the
+  Pages workflow before every deploy): `python3 tools/smoke/smoke_test.py --shots <dir>` against `npm run dev`. Use the system `/usr/bin/python3` (it has Playwright).
 - Long procedures live in project skills (`.claude/skills/`): `ship-a-change`, `grip-debug`, `perf-triangles`. Load one when the job matches; add a new
   skill when a procedure needs more than a few lines here (Kane gave me full authority over this file and the skills).
 - `gh pr create` fails here (GraphQL is blocked): use the REST API. Commands, merge routine and stop-hook notes are in the `ship-a-change` skill.
