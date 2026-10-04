@@ -109,6 +109,19 @@ for (const [type, factory] of [['stick', createHeldSticks], ['stone', createHeld
   });
 }
 
+test('a crystal shard among the stones, or a fibre bundle among the sticks, is stored as what it is', () => {
+  for (const [type, factory, resource] of [['stone', createHeldStones, 'crystal'], ['stick', createHeldSticks, 'fibre']]) {
+    const f = fixture(type, factory);
+    f.item.userData.collectibleResource = resource;
+    const before = getInventoryCount(resource), baseBefore = getInventoryCount(type);
+    f.update(true);
+    f.toChest();
+    f.update(false);
+    assert.equal(getInventoryCount(resource), before + 1, `${resource} stored`);
+    assert.equal(getInventoryCount(type), baseBefore, `and not counted as a ${type}`);
+  }
+});
+
 test('chest storage is disabled outside immersive VR', () => {
   const f = fixture('stone', createHeldStones);
   f.toChest();

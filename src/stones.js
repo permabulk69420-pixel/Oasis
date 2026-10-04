@@ -4,6 +4,7 @@ import { WATER, terrainHeight } from './world.js';
 import { addInventoryItem, getInventoryCount } from './inventory.js';
 import { isHandAtChest } from './chest-storage.js';
 import { attachHeldObject, setGripSurface } from './grip-contact.js';
+import { registerDropSpawner } from './resource-drops.js';
 
 const STONE_URL = `${import.meta.env?.BASE_URL ?? '/'}models/stone/vr_pickup_stone_uv_200.glb`;
 const ROCK_TEXTURE = `${import.meta.env?.BASE_URL ?? '/'}textures/rocks/pickup-rock/pickup_rock_albedo.png`;
@@ -79,28 +80,43 @@ export function createGroundStones({ field, renderer = null, onError = console.w
     const bounds = new THREE.Box3().setFromObject(source);
     const sourceBottom = bounds.min.y;
 
+    function makeStone(name, scale, yaw) {
+      const stone = source.clone(true);
+      stone.name = name;
+      stone.rotation.set(0, yaw, 0);
+      stone.scale.setScalar(scale);
+      stone.userData.collectibleResource = 'stone';
+      stone.userData.looseStone = true;
+      stone.userData.groundYaw = yaw;
+      stone.userData.sourceBottom = sourceBottom;
+      stone.userData.gripProfile = 'large';
+      setGripSurface(stone, { meshes: ['Stone'], point: [0, 0, 0] });
+      stone.userData.held = false;
+      return stone;
+    }
+
     for (let i = 0; i < STONE_LAYOUT.length; i++) {
       const item = STONE_LAYOUT[i];
-      const stone = source.clone(true);
       const x = WATER.x + Math.cos(item.angle) * WATER.radiusX * item.radius;
       const z = WATER.z + Math.sin(item.angle) * WATER.radiusZ * item.radius;
-      stone.name = `Loose oasis stone ${i + 1}`;
+      const stone = makeStone(`Loose oasis stone ${i + 1}`, item.scale, item.yaw);
       stone.position.set(
         x,
         field.sample(x, z) - sourceBottom * item.scale + 0.003,
         z,
       );
-      stone.rotation.set(0, item.yaw, 0);
-      stone.scale.setScalar(item.scale);
-      stone.userData.collectibleResource = 'stone';
-      stone.userData.looseStone = true;
-      stone.userData.groundYaw = item.yaw;
-      stone.userData.sourceBottom = sourceBottom;
-      stone.userData.gripProfile = 'large';
-      setGripSurface(stone, { meshes: ['Stone'], point: [0, 0, 0] });
-      stone.userData.held = false;
       group.add(stone);
     }
+
+    // Stone broken off a rock (src/mining.js) appears through the same drop path as logs and sticks.
+    let dropped = 0;
+    registerDropSpawner('stone', (x, z, yaw) => {
+      const scale = 0.86 + (dropped % 4) * 0.07;
+      const stone = makeStone(`Broken stone ${++dropped}`, scale, yaw);
+      stone.position.set(x, field.sample(x, z) - sourceBottom * scale + 0.003, z);
+      group.add(stone);
+      return stone;
+    });
   }, undefined, error => {
     onError(`[Oasis stones] Stone model failed to load: ${error?.message || error}`);
   });
@@ -138,7 +154,7 @@ export function createHeldStones({ scene, states, renderer = null, onError = con
     stone.userData.held = false;
     stone.userData.collected = true;
     heldByState.delete(state);
-    addInventoryItem('stone', 1);
+    addInventoryItem(stone.userData.collectibleResource || 'stone', 1); // a crystal shard lives in this group too (src/loose-finds.js)
     return true;
   }
 
