@@ -93,7 +93,7 @@ test('a real spear: about a metre and a half long, the grip at the origin, stone
   assert.ok(shaft.min[1] < -0.3 && shaft.max[1] > 0.5, 'the origin is on the shaft');
 });
 
-test('the leather grip wrap the hand closes on is at the butt end, where the game puts the hand', async () => {
+test('the leather grip wrap the hand closes on covers the whole fist, where the game puts the hand', async () => {
   const { readFileSync } = await import('node:fs');
   const source = readFileSync(new URL('../tools/spear/build_spear.py', import.meta.url), 'utf8');
   const match = source.match(/^GRIP_LO, GRIP_HI = (-?[0-9.]+), (-?[0-9.]+)/m);
