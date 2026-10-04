@@ -16,7 +16,22 @@ export const FRUIT = Object.freeze({
   water: 6,
   respawnSeconds: 240,
   count: 14,
+  // Metres the fruit's centre sits off the palm socket, along the palm normal. A fruit centred on the
+  // socket cannot be cleared from the open hand by the grip solver's 6 cm palm shift (the fruit is 5 cm
+  // in radius), so the solver gave up and the fingers closed straight through it.
+  gripOffset: 0.04,
 });
+
+// The palm normal is the socket's X axis, and the two hands are mirrored, so the offset flips with the
+// hand. One frozen surface per hand, so a hand's solved grip is cached and reused on later grabs.
+const FRUIT_GRIP = Object.freeze({
+  right: Object.freeze({ meshes: ['Fruit'], point: [-FRUIT.gripOffset, 0, 0] }),
+  left: Object.freeze({ meshes: ['Fruit'], point: [FRUIT.gripOffset, 0, 0] }),
+});
+
+export function fruitGripSurface(handedness) {
+  return handedness === 'left' ? FRUIT_GRIP.left : FRUIT_GRIP.right;
+}
 
 const GRIP_BUTTON = 1;
 const PICKUP_RADIUS = 0.30;
@@ -157,7 +172,7 @@ export function createGroundFruit({ field, sunDirection = null, layout = null } 
     fruit.userData.slot = slot.index;
     fruit.userData.held = false;
     fruit.userData.grow = grow ? 0 : 1;
-    setGripSurface(fruit, { meshes: ['Fruit'], point: [0, 0, 0] });
+    setGripSurface(fruit, fruitGripSurface('right')); // grab() picks the surface for the hand that takes it
     fruit.scale.setScalar(grow ? 0.01 : 1);
     slot.fruit = fruit;
     group.add(fruit);
@@ -231,6 +246,8 @@ export function createHeldFruit({ scene, states, renderer = null, camera = null,
 
   function grab(state, fruit) {
     if (!state?.objectGrip || !fruit || fruit.userData.held) return false;
+    if (state.objectGrip.children.length > 0) return false;
+    setGripSurface(fruit, fruitGripSurface(state.handedness));
     if (!attachHeldObject(state, fruit)) return false;
     fruit.userData.held = true;
     heldByState.set(state, fruit);
