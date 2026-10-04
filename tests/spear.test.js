@@ -97,15 +97,14 @@ test('the spear stands planted in the sand a little way from the axe and torch, 
   }
 });
 
-test('gripped by the wrap at the butt end, flipped like the torch and then tilted so the point goes forward, and nothing else on it casts a shadow', t => {
+test('gripped by the wrap in the middle, flipped like the torch and then tilted so the point goes forward, and nothing else on it casts a shadow', t => {
   const { tools, state, handTo, squeeze } = fixture(t);
   const [spear] = tools.getInstances('spear');
   assert.deepEqual(spear.root.userData.gripSurface, SPEAR_GRIP);
   assert.deepEqual(SPEAR_GRIP.meshes, ['Shaft'], 'the hand closes on the shaft, never the stone point or the tassel');
-  assert.ok(SPEAR_GRIP.point[1] < -0.3 && SPEAR_GRIP.point[1] > -0.45, `the hand holds the back of the shaft (${SPEAR_GRIP.point[1]} m from the origin)`);
+  assert.ok(Math.abs(SPEAR_GRIP.point[1]) < 0.15, `the hand holds the middle of the shaft, near the balance point (${SPEAR_GRIP.point[1]} m from the origin)`);
   assert.equal(SPEAR_GRIP.point[0], 0);
   assert.equal(SPEAR_GRIP.point[2], 0);
-  assert.ok(0.52 + SPEAR_GRIP.point[1] > 0.06, 'a few centimetres of butt stay behind the fist');
   spear.root.traverse(object => { if (object.isMesh) assert.equal(object.castShadow || object.receiveShadow, false); });
 
   handTo(worldOf(spear.root).add(new THREE.Vector3(0.05, 0.1, 0.05)));
