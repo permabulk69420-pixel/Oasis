@@ -20,7 +20,18 @@ export const MILKY_WAY = Object.freeze({
   axisB,
   core,
   sigma: 0.16, // the band's width: sine of the angle from its centre line (about 9 degrees)
+  // Far from the centre line the band is skipped (no texture reads). Where it stops it has to have faded to exactly zero:
+  // it used to stop at 0.02 of its peak, a step of a few levels of brightness that showed as a hard outline against the
+  // dark sky, and very plainly in a headset. So this much is taken off the whole profile (see bandFalloff), which leaves
+  // the look alone and brings the edge down to nothing.
+  cut: 0.004,
 });
+
+// The band's brightness across its width, from the plain bell curve (1 on the centre line) to 0 at the cut. The same
+// arithmetic is in the sky shader below.
+export function bandFalloff(bell, cut = MILKY_WAY.cut) {
+  return Math.max(0, (bell - cut) / (1 - cut));
+}
 
 // A point on the sky at galactic longitude `lon` and latitude `lat` (radians), as a unit vector.
 export function milkyWayPoint(lon, lat, target = new THREE.Vector3()) {
@@ -41,6 +52,7 @@ export const NIGHT_SKY_GLSL = /* glsl */`
   const vec3 MW_A = ${vec3(MILKY_WAY.axisA)};
   const vec3 MW_CORE = ${vec3(MILKY_WAY.core)};
   const float MW_SIGMA = ${MILKY_WAY.sigma.toFixed(4)};
+  const float MW_CUT = ${MILKY_WAY.cut.toFixed(4)};
   const float MOON_RADIUS = ${MOON.radius.toFixed(4)};
 
   // A hash without sin(): sin of a big number is not reliable across GPUs, and this one is the same everywhere.
@@ -79,7 +91,9 @@ export const NIGHT_SKY_GLSL = /* glsl */`
   vec3 milkyWayLight(vec3 ray) {
     float lat = dot(ray, MW_N);
     float band = exp(-lat * lat / (2.0 * MW_SIGMA * MW_SIGMA));
-    if (band < 0.02 || ray.y < -0.05) return vec3(0.0);
+    // fades to exactly zero where the band is skipped, so there is no edge (see MILKY_WAY.cut)
+    band = (band - MW_CUT) / (1.0 - MW_CUT);
+    if (band <= 0.0 || ray.y < -0.05) return vec3(0.0);
     float a = dot(ray, MW_A);
     float b = dot(ray, cross(MW_N, MW_A));
     vec2 uv = vec2(a * 2.1, b * 2.1 + lat * 3.0);
