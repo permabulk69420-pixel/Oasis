@@ -99,7 +99,8 @@ class Shape:
             ci = len(self.V) - 1
             for k in range(K):
                 k2 = (k + 1) % K
-                faces.append((ci, base + end * K + k, base + end * K + k2))
+                # the two caps face opposite ways: the far end looks along the way the rings run, the near end looks back
+                faces.append((ci, base + end * K + k, base + end * K + k2) if end else (ci, base + end * K + k2, base + end * K + k))
         volume = 0.0
         for f in faces:
             p = [self.V[i] for i in f]
