@@ -156,3 +156,21 @@ test('the leaf texture file the palms borrow exists', async () => {
   const { statSync } = await import('node:fs');
   assert.ok(statSync(new URL('../public/textures/alien_desert_plant/alien_desert_plant_leaf_albedo.png', import.meta.url)).size > 100_000);
 });
+
+test('before the leaf tile arrives (or if it never does) a palm leaf is the look\'s colour, not the model blue', async () => {
+  const m = await import('../src/surface-textures.js?leaf-fallback');
+  const make = () => new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({ name: 'Waxy blue leaf tissue', vertexColors: true, emissive: new THREE.Color(0.03, 0.095, 0.098) }));
+  const leaf = make();
+  m.applySurfaceTextures(leaf, { photo: false });
+  const { color, emissive } = leaf.material;
+  assert.equal(leaf.material.vertexColors, false, 'the blue lives in the vertex colours');
+  assert.ok(color.r > color.b * 4 && color.r > color.g, `warm, not blue: ${color.r.toFixed(2)} ${color.g.toFixed(2)} ${color.b.toFixed(2)}`);
+  assert.ok(emissive.r > emissive.b * 4, 'and the glow is warm too');
+  assert.ok(leaf.material.map === m.surfaceTexture('leaf'), 'the drawn leaf pattern is still on it');
+  // the plain look keeps the models' blue on purpose
+  m.setLeafLook('plain');
+  const blue = make();
+  m.applySurfaceTextures(blue, { photo: false });
+  assert.equal(blue.material.vertexColors, true);
+  assert.ok(blue.material.emissive.b > blue.material.emissive.r);
+});
