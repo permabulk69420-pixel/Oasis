@@ -3,8 +3,8 @@
 //
 //   npm run dev, then open /tools/hold-lab/hold-lab.html?item=spear&side=right&pitch=-90
 //
-//   item    pack (the default, held by its carry handle) | spear | torch | axe | fruit: the game's own definitions, from
-//           src/backpack.js, src/spear.js, src/torch.js, src/axe.js and src/glow-fruit.js
+//   item    pack (the default, held by its carry handle) | spear | torch | axe | pickaxe | fruit: the game's own definitions, from
+//           src/backpack.js, src/spear.js, src/torch.js, src/axe.js, src/pickaxe.js and src/glow-fruit.js
 //   side    right | left
 //   map     pack only: where the pack's X and Y axes point in the hand's grip-socket frame, e.g. "%2By,%2Bz" (a + must be
 //           written %2B in a URL). The default is the game's own pose. The pack's Z follows from the other two.
@@ -26,6 +26,7 @@ import { PACK_GRIP, PACK_HELD_ROTATION } from '../../src/backpack.js';
 import { createSpearKind } from '../../src/spear.js';
 import { createTorchKind } from '../../src/torch.js';
 import { createAxeKind } from '../../src/axe.js';
+import { createPickaxeKind } from '../../src/pickaxe.js';
 import { createGroundFruit, fruitGripSurface } from '../../src/glow-fruit.js';
 
 const params = new URLSearchParams(location.search);
@@ -45,7 +46,7 @@ function axisVector(token) {
 }
 
 // What is held: its model, how the game sets it up, and the rotation the game holds it with.
-const kinds = { spear: createSpearKind, torch: createTorchKind, axe: createAxeKind };
+const kinds = { spear: createSpearKind, torch: createTorchKind, axe: createAxeKind, pickaxe: createPickaxeKind };
 const kind = kinds[item]?.({ scene: new THREE.Scene(), onError: console.warn }) ?? null;
 // The glow fruit has no model file: it is built in code, so take one of the game's own loose fruit.
 const fruitMesh = item === 'fruit' ? createGroundFruit({ field: { sample: () => 0 } }).slots[0].fruit : null;

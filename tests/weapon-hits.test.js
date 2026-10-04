@@ -147,3 +147,28 @@ test('the spear and the axe carry hit entries: the spear hurts at the stone end,
   // four-ish spear pokes or three or four axe swings kill a 100 health creature at full speed
   assert.ok(Math.ceil(100 / spear.hit.damage) >= 3 && Math.ceil(100 / axe.hit.damage) >= 3, 'a fight is more than one blow');
 });
+
+test('targets are told which tool struck them (a pickaxe is not an axe to a rock)', () => {
+  const rig = new THREE.Group();
+  const root = new THREE.Group();
+  rig.add(root);
+  rig.updateMatrixWorld(true);
+  const instance = {
+    root,
+    kind: { id: 'pickaxe', hit: { ...HIT, point: out => out.set(0, 0, 0) } },
+    heldBy: { handedness: 'right', inputSource: null },
+    fall: { phase: 'held', velocity: new THREE.Vector3(), spin: new THREE.Vector3() },
+  };
+  const seen = [];
+  const target = {
+    hitTest: (point, radius, tool) => { seen.push(['test', tool]); return true; },
+    hurt: (amount, tool) => { seen.push(['hurt', tool]); return true; },
+  };
+  const hits = createWeaponHits({ tools: { getInstances: () => [instance] }, rig, targets: [target] });
+  const step = z => { root.position.z = z; rig.updateMatrixWorld(true); hits.update(0.05); };
+  step(0);
+  step(-0.5);
+  assert.deepEqual(seen.map(([what]) => what), ['test', 'hurt']);
+  assert.ok(seen.every(([, tool]) => tool === instance), 'both calls get the tool that struck');
+  assert.equal(seen[0][1].kind.id, 'pickaxe');
+});

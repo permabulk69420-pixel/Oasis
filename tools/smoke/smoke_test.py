@@ -9,7 +9,8 @@ a game that does not start. It checks, by day and by night:
   - the first frame is drawn and the telemetry appears,
   - the picture is not blank,
   - the scene stays inside a blow-out budget (draw calls and triangles at the spawn point; this catches a runaway, it is not a Quest budget),
-  - the stinger's model loads and it shows up in the telemetry.
+  - the stinger's model loads and it shows up in the telemetry,
+  - the desert finds (src/mining.js) are laid out, and striking one with a pickaxe takes health off it and drops a stone.
 Add a check here when a new system could silently fail to load. Exit code 0 is a pass.
 """
 import argparse
@@ -53,6 +54,7 @@ def check_view(browser, base, hour, shots):
     render = json.loads(page.evaluate("document.querySelector('canvas').dataset.render"))
     if not stinger:
         problems.append(f"hour {hour}: the dune stinger never loaded")
+    problems += check_finds(page, hour)
     for key, limit in BUDGET.items():
         if render.get(key, 0) > limit:
             problems.append(f"hour {hour}: {key} {render[key]} is over the blow-out budget {limit}")
@@ -69,6 +71,36 @@ def check_view(browser, base, hour, shots):
     info = {"first_frame_s": round(drawn, 1), "render": render, "stinger": bool(stinger), "pixel_spread": round(spread, 1)}
     page.close()
     return problems, info
+
+
+def check_finds(page, hour):
+    """The things to mine: laid out, struck by a pickaxe, and the stone they drop gets made once its model has loaded."""
+    problems = []
+    if hour != 14:
+        return problems
+    finds = json.loads(page.evaluate("document.querySelector('canvas').dataset.finds || '{}'") or "{}")
+    stats = finds.get("stats", {})
+    if stats.get("nodes", 0) < 80:
+        problems.append(f"hour {hour}: only {stats.get('nodes', 0)} desert finds were laid out")
+        return problems
+    hit = page.evaluate("window.__mining && window.__mining.debug.strike('r00', 26, 'pickaxe', { x: 281, z: -306 })")
+    if not hit or not hit.get("hit") or hit.get("health", 999) >= 138:
+        problems.append(f"hour {hour}: a pickaxe blow on the first outcrop did nothing ({hit})")
+    # a few more blows: items must be made (the stone model loads in the background, so the debt is paid once it has)
+    for _ in range(3):
+        page.evaluate("window.__mining.debug.strike('r00', 26, 'pickaxe', { x: 281, z: -306 })")
+    owed = 99
+    for _ in range(60):
+        owed = page.evaluate("window.__mining.stats().owed")
+        if owed == 0:
+            break
+        page.wait_for_timeout(1000)
+    if owed != 0:
+        problems.append(f"hour {hour}: broken stone was never made ({owed} drops still owed)")
+    wrong = page.evaluate("window.__mining.debug.strike('r01', 30, 'axe', { x: 299, z: -270 })")
+    if not wrong or wrong.get("health", 0) < 100:
+        problems.append(f"hour {hour}: an axe should only ring off a rock ({wrong})")
+    return problems
 
 
 def main():

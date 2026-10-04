@@ -6,7 +6,8 @@ import { pulseHaptics } from './haptics.js';
 // Each frame the speed of that point is measured; if it is fast enough and inside a target, the target is hurt, by more the faster it
 // was going. A held tool's speed is measured relative to your body, so walking into something with a spear out does nothing, and a
 // thrown tool's in the world. It cannot hurt the same thing twice in half a second, so one swing is one blow. Nothing is allocated
-// per frame. A target is anything with `hitTest(point, radius)` and `hurt(amount)`.
+// per frame. A target is anything with `hitTest(point, radius, instance)` and `hurt(amount, instance)` (the stinger ignores the last argument; the
+// mining nodes use it to tell a pickaxe from an axe).
 
 export const HITS = Object.freeze({
   cooldown: 0.5, // seconds before the same tool can land another blow
@@ -60,8 +61,8 @@ export function createWeaponHits({ tools, rig = null, targets = [] }) {
       if (record.cool > 0 || speed < hit.minSpeed) continue;
       const amount = blowDamage(hit, speed);
       for (const target of targets) {
-        if (!target.hitTest(world, hit.radius)) continue;
-        if (!target.hurt(amount)) continue;
+        if (!target.hitTest(world, hit.radius, instance)) continue;
+        if (!target.hurt(amount, instance)) continue;
         record.cool = HITS.cooldown;
         if (held) pulseHaptics(instance.heldBy, ...HITS.heldHaptic);
         else if (flying) {
