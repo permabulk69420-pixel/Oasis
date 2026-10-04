@@ -18,6 +18,7 @@ import { createSandPuffs } from './sand-puffs.js';
 import { createFootprints } from './footprints.js';
 import { createWeaponHits } from './weapon-hits.js';
 import { createMining } from './mining.js';
+import { createCrystalMotes } from './crystal-motes.js';
 import { createGiantBones } from './giant-bones.js';
 import { registerLooseFindDrops } from './loose-finds.js';
 import { createBackpack, PACK } from './backpack.js';
@@ -316,6 +317,8 @@ const mining = createMining({
   onError: message => console.warn(message),
 });
 registerLooseFindDrops({ stonesGroup, sticksGroup, materials: mining.materials, heightAt: field.sample });
+// Motes of light that lift off the crystal fields at night (one draw; a crystal that is broken takes its motes with it).
+const crystalMotes = createCrystalMotes({ scene, nodes: mining.nodes, getExposure: () => renderer.toneMappingExposure });
 // The giant bones: the skull and ribs of something enormous, half buried far out in the dunes. Landmarks to walk to; nothing about them
 // affects play (you can walk through them, and they make no sound). Only the smallest model is fetched at first, the rest as you near.
 const giantBones = createGiantBones({ scene, camera, heightAt: field.sample, onError: message => console.warn(message) });
@@ -629,10 +632,12 @@ function frame(time) {
   activeCamera.getWorldPosition(head);
   // One wind clock for the sand and the swaying plants, so their gusts line up.
   windTime.value = devWindTime ?? time * 0.001;
-  windSand.update(windTime.value, head, renderer.xr.isPresenting ? WIND_SAND.vrViewHeight : renderer.getDrawingBufferSize(drawingSize).y);
+  const viewHeight = renderer.xr.isPresenting ? WIND_SAND.vrViewHeight : renderer.getDrawingBufferSize(drawingSize).y;
+  windSand.update(windTime.value, head, viewHeight);
   alienBirds.update(dt, head);
   weaponHits.update(dt);
   mining.update(dt, head);
+  crystalMotes.update(dt, viewHeight);
   duneStinger.update(dt, head);
   sandPuffs.update(dt);
   footprints.update(time * 0.001);

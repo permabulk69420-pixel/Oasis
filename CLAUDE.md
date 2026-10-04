@@ -117,7 +117,7 @@ intentional later"), so none of the fight, water or insect sounds. In this order
 8. A direction doc in the Project (`Projects` tool): the decisions only Kane can make, each with my one-line take, and the story seed we talked through
    (survivor of an expedition that came down on a desert moon with a ringed planet in the sky; the giant bones are what brought the ship down; the
    boss is its grown up version).
-9. If time: glow motes by the pond, the ringed planet in the night sky (done, with the sun's path fix), dust devils by day, a skittering critter, a dawn and dusk look pass.
+9. If time: glow motes (done: the pond already had fireflies, so they rise off the crystals), the ringed planet in the night sky (done, with the sun's path fix), dust devils by day, a skittering critter, a dawn and dusk look pass.
 Add a `creature-pipeline` skill (`.claude/skills/`) when the stinger v3 build is done, since the Blender to pose code to game procedure is longer than a few lines.
 
 ## Working on this repo
@@ -323,6 +323,8 @@ list comprehension is drawn once PER POINT; I drew the ribs' sideways nudge that
 When a mesh looks faceted in the game, render a close-up of the GLB in Blender first (`tools/props/render_preview.py ... --views close --focus x,y,z --dist 9`) to see whether the geometry or the shading is at fault.
 Oddities to tell Kane: you can walk through the bones (no collision), they cast no shadow, there is no sound; they are big (the skull about 18 m long, the ribs about 14 m tall with spines above); the close level is a 1.1 MB download that only
 starts when you are about 190 m from the ribs; at night they are a thin moonlit silhouette against the stars like the trees. The skull's mouth is dark inside and the bone is plain ivory with a faint mottle, so a texture pass (cracks, a real bone photo) is the obvious next step if he wants it closer.
+
+Crystal motes (my call, done; README "The desert finds and the pickaxe", `src/crystal-motes.js`, `tests/crystal-motes.test.js`): at night small violet specks (a fifth of them cyan) rise off every standing crystal, wander, lean with the wind's gusts and fade out; one `Points` draw, all the motion in the vertex shader, none by day, thinned out from 70 m and gone by 150 m. A broken crystal takes its motes with it and they return as it regrows. The point size is in metres through `uViewHeight` (so the Quest and a monitor agree), not a fixed pixel count. They are meant to be subtle: if they are too faint or too many in the headset, `MOTES` (`perNode`, `size`, `brightness`) is the whole dial. To see one in a screenshot: `?hour=0&at=262,-155&look=263,-163,3.2` (the crystal field 160 m up the dunes). The pond already had fireflies, which is why these are at the crystals.
 
 Ringed planet and the sun's path (my call, done; README "The ringed planet and the sun's path", `src/night-sky.js`, `src/sun-path.js`, `tests/sun-path.test.js`): a teal banded gas giant with cream rings hangs in the sky 25 degrees right of the way you first look and 21 degrees up, fixed for ever (the moon is locked to it),
 lit by the sun so it has phases, with ring shadows both ways; all in the sky shader (`planetLight`, early-out for the rest of the sky), star points behind it are zeroed in `createNightStars`. Day: pale ghost, only the lit side and the rings. The sky shader composites it over everything else
