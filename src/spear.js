@@ -36,15 +36,16 @@ export const SPEAR_GRIP = Object.freeze({ meshes: ['Shaft'], axis: [0, 1, 0], po
 export const SPEAR_THRUST_TILT = 35;
 
 // The throwing grip. Hold the same button that lights a torch (B on the right controller, X on the left) with the spear in your
-// hand and it turns in your fist to THROW_TILT, so with your arm cocked back (forearm up) the point still faces forward and
-// a little up, like a javelin over the shoulder; let go of the button and it turns back to the poke. About 75 degrees is as far as the
-// fingers still close round the shaft (90 does not), so this is the biggest turn there is. It is one number to tune by feel.
-// Nothing is thrown yet: letting go of grip still just drops it (or holsters it).
-export const SPEAR_THROW_TILT = 75;
+// hand and the spear flips end for end in your fist: the point that stuck out in front for a poke now points back behind the hand, the
+// way a javelin is carried cocked back, ready to be thrown forward. It is exactly half a turn about the palm normal (THRUST_TILT + 180),
+// so the shaft lies along the same line across the palm and the fingers close on it just the same (the hold lab solves it on both
+// hands: `item=spear&pitch=-30&tilt=180`). Let go of the button and it flips back to the poke. (A first try turned it only 40 degrees,
+// the most the fingers allow when the tilt is kept small; Kane wanted the real flip.) Letting go of the grip throws it (src/falling.js).
+export const SPEAR_THROW_TILT = SPEAR_THRUST_TILT + 180;
 export const SPEAR_SWITCH = Object.freeze({
   rightButton: 5, // the same buttons as the torch's toggle (src/torch.js)
   leftButton: 4,
-  turnSpeed: 500, // degrees per second, so the 40 degree turn takes under a tenth of a second
+  turnSpeed: 900, // degrees per second, so the half turn takes a fifth of a second
   haptics: Object.freeze({ on: [0.35, 45], off: [0.2, 28] }),
 });
 

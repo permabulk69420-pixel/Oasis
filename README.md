@@ -180,10 +180,11 @@ are in one table, `PACK`, at the top; the carry limits are in `src/inventory.js`
   controller pitched about 30 degrees down the shaft is level; pointed straight ahead it rises about 35 degrees. Right and left hands are
   the same. (It was held at the butt end for one build, #59, and that felt odd with one hand.)
 - **Throwing grip:** with the spear in your hand, hold the button that lights a torch (B on the right controller, X on the left) and it
-  turns in your fist to a javelin grip (`SPEAR_THROW_TILT`, 75 degrees about the palm; a buzz marks the switch). With your arm cocked
-  back and the forearm up, the point then faces forward and about 40 degrees up, over the shoulder. Let go of the button and it turns back
-  to the poke. Nothing is thrown yet: letting go of grip still drops it. (The number and the turn speed are in `SPEAR_SWITCH` and
-  `SPEAR_THROW_TILT` in `src/spear.js`; the hold lab shows it with `item=spear&pitch=55&tilt=40`, the 40 added to the 35 of the poke.)
+  flips end for end in your fist (`SPEAR_THROW_TILT` is the poke's 35 degrees plus 180, a half turn about the palm, so the shaft stays on
+  the same line across your fingers and the point swings from in front of the fist to behind it; a buzz marks the switch, the turn takes
+  about a fifth of a second). Let go of the button and it flips back to the poke. Let go of grip to throw it (see Dropping and throwing).
+  (The angle and the turn speed are `SPEAR_THROW_TILT` and `SPEAR_SWITCH` in `src/spear.js`; the hold lab shows it with
+  `item=spear&pitch=-30&tilt=180`, the 180 added to the 35 of the poke.)
 - **Carry it:** let go next to a hip and it holsters there, leaning back about 33 degrees with the point behind your shoulder and the butt
   end about 30 cm off the ground (it only reaches the sand when your head drops below roughly 1.4 m, in a deep crouch). Draw it from the
   hip by grabbing there. Let go at your chest to pack it into the inventory (weight 10); the menu can put it on a hip too.
