@@ -106,10 +106,10 @@ intentional later"), so none of the fight, water or insect sounds. In this order
    job: sandstone outcrops with a 1k Poly Haven PBR rock (credit file in `public/textures/<name>/`), glowing crystal clusters (visible across the dunes
    at night, first field near the stinger's patch, richer ones further out), and a spiny alien spire plant that gives fibre (an item with no source yet).
    Crystals just go in the pack: what they are FOR (my suggestion to him: alien fuel and light, which would answer cold nights and fuel) is his call.
-3. Dune stinger v3 (`tools/dune-stinger/v3/`, built by me in Blender, no paid or AI mesh tools): a plated carapace with a ridge, an eye cluster, four leg
+3. (Done, #77.) Dune stinger v3 (`tools/dune-stinger/v3/`, built by me in Blender, no paid or AI mesh tools): a plated carapace with a ridge, an eye cluster, four leg
    pairs (thigh, shin, claw foot, knobbly knee), two jointed pincers (one bigger) that guard, flare open in the windup and close, a five segment tail.
    3 LODs, close level roughly 30 to 40k triangles (ceiling 50k), 2 draw calls, cyan glow seams in the spear's cyan. Retarget `src/stinger-pose.js` and
-   the `hitBalls`; the fight logic and numbers stay. Feet planted on the sand. Claws are animation only, no pincer attack.
+   the hit test (now capsules, `hitParts`); the fight logic and numbers stay. Feet planted on the sand. Claws are animation only, no pincer attack.
 4. Fight effects: sand puffs on the lunge and death, the dead stinger sinks into the sand instead of popping out of the world.
 5. Saving: a silent, versioned autosave of inventory, tools, fires, felled trees, position and time (`?fresh=1` starts clean; mismatched saves discarded).
 6. Footprints in the sand (player and creature), filled in by the wind, one instanced draw call.
@@ -237,7 +237,7 @@ feet can skate a little on steep dune faces; the model's 11.6k-triangle close le
 Stinger verdict after Kane saw it in VR (4 Oct): "the centipede thing, we need to make it way more complex". It reads as a centipede because the v2 skeleton has 8 leg pairs (16 legs) and no pincers.
 Plan I gave him: a real redesign (4 leg pairs with three-part legs, two pincers that open and close, a heavy plated carapace, curved segmented tail, a close-up level well above 11.6k toward the 50k ceiling, 3 levels),
 built by me in Blender. He first agreed the AI should wait for the final model, then (after feeling the passive version) said "this is basically our rat" and told me to go ahead with the fight on this model, so the fight is in. A new model must keep or retarget
-the same skeleton: `tools/creature/check_glb.py`, then retarget `src/stinger-pose.js` and the `hitBalls` bone names in `src/dune-stinger.js` to its bones. Do not start the redesign, or any paid or AI-mesh tool, without his say-so.
+the same skeleton: `tools/creature/check_glb.py`, then retarget `src/stinger-pose.js` and the `hitParts` bone names in `src/dune-stinger.js` to its bones. (The redesign was done on the night of 4 to 5 Oct under his blanket go-ahead, see "Second overnight"; no paid or AI-mesh tool without his say-so still stands.)
 Dune stinger (first creature, `tools/dune-stinger/`): the other model's first build (3 LODs 4,482 / 1,560 / 582 tris, 49 bones) passes my checks
 (`python3 tools/creature/check_glb.py`: numpy + trimesh, no Blender) and loads and bends in three.js, but it is artistically generic and barely
 glows. It is kept in `tools/`, NOT in `public/`, and waits for Kane's OK; the plan I gave him is to use it as a base and improve it myself
@@ -268,7 +268,7 @@ on you... just don't fire off subagent or do anything crazy"; "don't be afraid t
 about gameplay mechanic that's going to be something I really need to test and do myself"), no sound effects yet ("way more intentional later"). He
 wants "something more than just visual" and a reason to go out into the desert: a pickaxe, good stones or crystals, a "not a cactus" alien plant, PBR.
 Plan: pickaxe + desert finds, dune stinger v3 (Blender), fight effects, saving, footprints, giant bones, a direction doc in the Project. Keep the time
-(`TZ=Australia/Sydney date`). Done so far: #75 (smoke test in CI), the pickaxe and desert finds (below).
+(`TZ=Australia/Sydney date`). Done so far: #75 (smoke test in CI), #76 the pickaxe and desert finds, #77 the dune stinger v3 (both below).
 
 Pickaxe and desert finds (my call, done; see README "The desert finds and the pickaxe"): `src/pickaxe.js` (a stone pickaxe like the axe, crafted from 3 sticks +
 3 stones, also stands by the starting tools, hurts the stinger for 26), `src/desert-finds.js` (fixed-seed layout of about 120 nodes in 25 sites),
@@ -279,3 +279,14 @@ instance through `weapon-hits.js`. Oddities to tell Kane: the pickaxe recipe (3 
 stone drops are a piece per 30 damage and a rock gives about 6 to 8 (weight 8 each, so five fill your pockets); crystal shards weigh 4 and do nothing yet
 (my suggestion: alien fuel or light); respawn times 900 s (rock), 700 s (crystal), 300 s (spire); the first crystals sit on the stinger's ground on purpose;
 rocks are solid but the stinger walks through them; the sandstone is a dark red photo lifted warmer in `SANDSTONE.lift`.
+
+Dune stinger v3 (my call, built from scratch in Blender, done; `tools/dune-stinger/v3/build_stinger_v3.py` on the shared `tools/creature/kit.py`, models in `public/models/creatures/`, README
+"The dune stinger in the game"): a real scorpion instead of v2's 16-legged centipede: plated carapace with a ridge and an eye cluster (two big eyes, a ring of small ones), four pairs of three-part legs
+(thigh, shin, claw foot, knobbly knees), two jointed pincers (left a size bigger) that raise, spread and snap, toothed jaws, six abdomen plates and a five segment tail about 2 m long with a lancet sting.
+33,088 / 10,988 / 1,992 triangles (ceiling 50k, 1.4 MB / 0.5 MB / 0.15 MB), 55 bones, 2 draw calls a level, cyan glow in the eyes, flank dashes, tail seams and sting (`glow` brightness 0.5 day, 0.4 night:
+brighter than about 0.5 clips the cyan to white; the windup flare is what takes it to white). `src/stinger-pose.js` was rewritten for it: **the legs are solved, not swung** (two-bone solver per leg on the loaded skeleton,
+feet stay planted on the sand, legs bend deeper in the crouch and fold when it dies), the tail poses were found by search (`node tools/stinger-lab/tail_explore.mjs strike|dead`) so the strike arcs over the body and lands the
+sting on the ground 0.94 m (2.35 m in the game) ahead of the middle, which is what `BRAIN.strikeReach` assumed, and the dead tail lies on the sand curled to one side. The fight logic and every `BRAIN` number are unchanged.
+Hit test is capsules along the head, body, tail pieces, sting and claws (`DUNE_STINGER.hitParts`; a test checks they cover 94%+ of the skin). Dev: `window.__stinger` in the dev build, the pose lab `tools/stinger-lab/`
+(`stinger-lab.html?poses=rest,alert,windup,strike&cam=side`, `lab_shot.py`), `tests/helpers/stinger-model.js` reads the real GLB for tests. Oddities to tell Kane: its body and claws are as long as v2's (about 3.8 m at scale 2.5) but it is wider (the legs span about 3 m) and the tail rears higher (3.5 m at rest, 4 m cocked; v2's was 2.8 m):
+`DUNE_STINGER.scale` is the knob (2.2 brings the cocked tail to about 3.6 m); the legs are thin spikes and may shimmer at a distance; the claws are animation only (no pincer attack); the feet read the ground at four points so they can float or sink a few cm on steep faces; it still walks through rocks and has no sound; the glow is dimmer than v2's on purpose.

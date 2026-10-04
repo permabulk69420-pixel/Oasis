@@ -5,3 +5,4 @@ dist/
 !.env.example
 smoke-shots/
 dev.log
+__pycache__/

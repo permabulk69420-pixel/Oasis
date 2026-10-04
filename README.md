@@ -164,7 +164,7 @@ colour per vertex and a tiny second material for the glow: no textures, two draw
 
 ## The dune stinger in the game
 
-One dune stinger (the scorpion-like creature, model v2 from `tools/dune-stinger/v2/`) lives in the dunes to the right of where you
+One dune stinger (the scorpion, model v3 from `tools/dune-stinger/v3/`: plated carapace, eight three-part legs, two pincers, a long jointed tail) lives in the dunes to the right of where you
 start, about 46 m away, and it is a fight (Kane: "this is basically our rat"). It patrols (stands about, glances round, walks a short
 way, never further than about 22 m from its patch, never into the pond, the hero tree's clearing or up a steep face). If you come
 within 22 m **and it can see you** (a dune between you hides you) it stops, faces you and goes on guard (tail curled up, mandibles
@@ -177,28 +177,33 @@ about 1.3 s, and winds up again if you are still close.
 You hurt it with the **spear** (34 at full speed) or the **axe** (28), held or thrown. What counts is how fast the point or head is
 moving relative to your body (so walking into it does nothing), and a blow does between 35% and 100% of the damage by speed. A thrown
 tool bounces off. The same tool cannot land two blows within half a second. It has 100 health: a blow makes it flinch (stops what it
-was doing), and when it is low it backs off for 3 to 5 s, then comes back. At zero it dies (legs curled in, tail drooped, eyes dark),
+was doing), and when it is low it backs off for 3 to 5 s, then comes back. At zero it dies (legs curled in, tail lying on the sand, eyes dark),
 lies there for 40 s and then is gone; it **comes back at its home 150 s after dying**. Your health stops at 10 (`healthFloor`), there is
 no death yet, and nothing drops from it yet.
 
 - `src/dune-stinger.js` is the scene side: loads the three levels of detail (`public/models/creatures/dune_stinger_lod0..2.glb`,
-  11,612 / 4,072 / 626 triangles, 49 bones each, switched at 28 m and 80 m), scales it up 2.5 times (`DUNE_STINGER.scale`; the model
-  is 1.5 m long, so it is about 3.7 m long in the game, and its tail arches about 2.8 m high), stands it on the ground tilted to the slope
+  33,088 / 10,988 / 1,992 triangles, 55 bones each, switched at 28 m and 80 m), scales it up 2.5 times (`DUNE_STINGER.scale`; the body and
+  claws are 1.5 m long in the model, so about 3.8 m in the game, and the tail rears about 3.5 m high), stands it on the ground tilted to the slope
   under its four corners, keeps the glowing eyes and sting at the same look by day and night (`exposureGlow`, like the backpack's trim,
   and flared in the windup and strike), draws a soft shadow under it, checks line of sight over the dunes (`lineOfSight`), and answers
-  `hitTest(point, radius)` for blows: a ball round each of ten bones (`DUNE_STINGER.hitBalls`), only worked out when the blow is within 7 m.
+  `hitTest(point, radius)` for blows: a capsule along each part (`DUNE_STINGER.hitParts`: head, body, tail pieces, sting, both claws), only worked out
+  when the blow is within 7 m, with the bone positions read once per frame.
 - `src/stinger-brain.js` is the behaviour with no three.js in it: modes idle, turn, walk, alert, stalk, windup, strike, recover, hurt,
   retreat, return, dead. `src/stinger-pose.js` turns a handful of numbers (gait, phase, turn, alert, head, windup, strike, hurt, dead)
-  into bone rotations: a ripple of steps along each side (the legs lift and swing, no baked animation), the body swaying as it walks,
-  breathing, the tail's slow sway, the windup crouch, the straight whip of the tail, the flinch and the death curl. The walking cycle
-  follows the ground covered (`JOINTS.stride`), so the feet do not skate.
+  into bone rotations, with no baked animation. The eight legs are **solved**: each foot has a spot on the ground and a path (slide back, lift, swing
+  forward) and a two-bone solver bends the hip and knee to put the claw tip there, so a foot stays planted while the body walks over it, the legs bend
+  deeper in the windup crouch and fold up under the body when it dies. The rest is the body swaying as it walks, breathing, the pincers (raised and open
+  on guard, flung wide in the windup, snapping shut in the strike), the jaws, the tail's slow sway, the windup (tail cocked up and back), the strike (the
+  tail arches over the body and the sting lands on the ground about 2.3 m ahead of its middle), the flinch and the death (the tail lies on the sand behind it, curled to one side).
+  The walking cycle follows the ground covered (`JOINTS.stride`), so the feet do not skate.
 - `src/weapon-hits.js` is the other half of a fight: any tool kind with a `hit` entry (`src/spear.js`, `src/axe.js`: the point that does
   the damage, its radius, the speed it must reach and the damage at full speed) is checked every frame against anything with
   `hitTest` and `hurt`. `src/survival.js` has `damagePlayer`.
-- Tuning is in the tables at the top of those files: `DUNE_STINGER` (scale, home, glow, hit balls), `BRAIN` (speeds, distances, the
+- Tuning is in the tables at the top of those files: `DUNE_STINGER` (scale, home, glow, hit parts), `BRAIN` (speeds, distances, the
   windup, aim lock and strike times, damage, health, retreat and respawn), `JOINTS` (how far the legs swing and lift, how the tail
   moves in each pose) and `HITS` in `weapon-hits.js`.
-- The tail was lengthened 2.4 times in `tools/dune-stinger/build_stinger.py` (`TAIL_SCALE`) so a strike can reach a person's head.
+- The model is built in Blender by `tools/dune-stinger/v3/build_stinger_v3.py` (see `tools/dune-stinger/README.md`); `tools/stinger-lab/` is a page for judging its poses
+  without walking out to it. The tail is 2 m long in the model so a strike can reach a person's head.
 
 ## The desert finds and the pickaxe
 

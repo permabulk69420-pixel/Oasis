@@ -1,99 +1,59 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import * as THREE from 'three';
-import { STINGER_BONES, POSE_REST, JOINTS, computePose, createStingerPoser, footCycle } from '../src/stinger-pose.js';
+import { STINGER_BONES, LEG_NAMES, CLAW_NAMES, POSE_REST, JOINTS, computePose, createStingerPoser, footCycle } from '../src/stinger-pose.js';
+import { DUNE_STINGER } from '../src/dune-stinger.js';
+import { loadStingerModel } from './helpers/stinger-model.js';
 
-// The real skeleton and skin weights, read from the model file, so a pose can be checked in metres.
-function loadModel(level = 0) {
-  const buf = fs.readFileSync(new URL(`../public/models/creatures/dune_stinger_lod${level}.glb`, import.meta.url));
-  const jsonLength = buf.readUInt32LE(12);
-  const json = JSON.parse(buf.subarray(20, 20 + jsonLength).toString('utf8'));
-  const bin = buf.subarray(20 + jsonLength + 8);
-  const read = index => {
-    const a = json.accessors[index];
-    const view = json.bufferViews[a.bufferView];
-    const width = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 }[a.type];
-    const Type = { 5126: Float32Array, 5121: Uint8Array, 5123: Uint16Array }[a.componentType];
-    const stride = view.byteStride || width * Type.BYTES_PER_ELEMENT;
-    const start = (view.byteOffset || 0) + (a.byteOffset || 0);
-    return Array.from({ length: a.count }, (_, k) => Array.from({ length: width }, (_, c) => {
-      const at = start + k * stride + c * Type.BYTES_PER_ELEMENT;
-      return a.componentType === 5126 ? bin.readFloatLE(at) : a.componentType === 5121 ? bin.readUInt8(at) : bin.readUInt16LE(at);
-    }));
-  };
-  const attributes = json.meshes[0].primitives[0].attributes;
-  const positions = read(attributes.POSITION);
-  const joints = read(attributes.JOINTS_0);
-  const weights = read(attributes.WEIGHTS_0);
-  const skin = json.skins[0];
-  const names = skin.joints.map(j => json.nodes[j].name);
-  const jointSet = new Set(skin.joints);
-  const make = index => {
-    const node = json.nodes[index];
-    const bone = new THREE.Bone();
-    bone.name = node.name;
-    if (node.translation) bone.position.fromArray(node.translation);
-    for (const child of node.children ?? []) if (jointSet.has(child)) bone.add(make(child));
-    return bone;
-  };
-  const rootIndex = skin.joints.find(j => !json.nodes.some((n, i) => (n.children ?? []).includes(j) && jointSet.has(i)));
-  const group = new THREE.Group();
-  group.add(make(rootIndex));
-  group.updateMatrixWorld(true);
-  // the tip of each leg: the lowest vertex that its Lower bone moves most
-  const tips = {};
-  positions.forEach((p, k) => {
-    let best = 0;
-    for (let c = 1; c < 4; c++) if (weights[k][c] > weights[k][best]) best = c;
-    const name = names[joints[k][best]];
-    if (/^Leg0\d_[LR]_Lower$/.test(name) && (!tips[name] || p[1] < tips[name].y)) tips[name] = new THREE.Vector3(...p);
-  });
-  return { group, names, tips };
-}
-
+// The real skeleton and skin weights, read from the model file, so a pose can be checked in metres (model scale 1, the nose at +Z, feet on y = 0).
 function quaternions() {
   return Object.fromEntries(STINGER_BONES.map(name => [name, new THREE.Quaternion()]));
 }
 
+function posed(pose, { level = 0, time = 0, joints = JOINTS } = {}) {
+  const model = loadStingerModel(level);
+  const poser = createStingerPoser(model.group);
+  poser.apply({ ...POSE_REST, ...pose }, time, joints);
+  model.group.updateMatrixWorld(true);
+  const at = name => poser.bones[name].getWorldPosition(new THREE.Vector3());
+  const tip = poser.bones.Stinger.localToWorld(model.tipOf('Stinger'));
+  return { model, poser, at, tip };
+}
+
 test('every level of detail has every bone the poses move', () => {
+  assert.equal(STINGER_BONES.length, 55);
   for (const level of [0, 1, 2]) {
-    const { group } = loadModel(level);
-    const poser = createStingerPoser(group);
-    assert.ok(poser, `level ${level} has all ${STINGER_BONES.length} bones`);
-    assert.equal(STINGER_BONES.length, 49);
+    const { group } = loadStingerModel(level);
+    assert.ok(createStingerPoser(group), `level ${level} has all ${STINGER_BONES.length} bones`);
   }
-  const { group } = loadModel(0);
+  const { group } = loadStingerModel(0);
   group.getObjectByName('Mandible_R').removeFromParent();
   assert.equal(createStingerPoser(group), null, 'a model with a bone missing is refused, not half posed');
 });
 
 test('a pose gives a unit rotation for every bone', () => {
+  const { group } = loadStingerModel(0);
+  const rig = createStingerPoser(group).rig;
   const out = quaternions();
   for (const pose of [{}, { gait: 1, phase: 2.2 }, { gait: 0.5, phase: 6, turn: 1, alert: 1, headYaw: 1, headPitch: -0.3 }, { alert: 1, turn: -1 }]) {
     for (const time of [0, 3.3, 97]) {
-      computePose({ ...POSE_REST, ...pose }, time, out);
+      computePose({ ...POSE_REST, ...pose }, time, out, JOINTS, rig);
       for (const name of STINGER_BONES) assert.ok(Math.abs(out[name].length() - 1) < 1e-6, `${name}`);
     }
   }
 });
 
-test('standing still, the legs do not move at all and the left and right mirror each other', () => {
-  const rest = quaternions();
-  computePose({ ...POSE_REST, gait: 0, phase: 0 }, 0, rest);
-  const out = quaternions();
+test('standing still, the feet do not move and the left and right mirror each other', () => {
+  const standing = posed({ gait: 0, phase: 0 }, { time: 2.1 });
   for (const phase of [1, 2.5, 5]) {
-    computePose({ ...POSE_REST, gait: 0, phase }, 4.4, out);
-    for (const name of STINGER_BONES.filter(n => n.startsWith('Leg'))) assert.ok(out[name].angleTo(rest[name]) < 1e-9, `${name} stays put`);
+    const later = posed({ gait: 0, phase }, { time: 2.1 });
+    for (const leg of LEG_NAMES) assert.ok(later.at(leg.toe).distanceTo(standing.at(leg.toe)) < 1e-9, `${leg.toe} stays put`);
   }
-  const { group } = loadModel(0);
-  const poser = createStingerPoser(group);
-  poser.apply({ ...POSE_REST, alert: 1, headYaw: 0 }, 2.1);
-  group.updateMatrixWorld(true);
-  const at = name => poser.bones[name].getWorldPosition(new THREE.Vector3());
-  for (const [l, r] of [['Mandible_L', 'Mandible_R'], ['Leg03_L_Lower', 'Leg03_R_Lower'], ['Leg08_L_Lower', 'Leg08_R_Lower']]) {
-    const a = at(l);
-    const b = at(r);
+  const alert = posed({ alert: 1, headYaw: 0 }, { time: 2.1 });
+  const pairs = [['Mandible_L', 'Mandible_R'], ...[1, 2, 3, 4].flatMap(i => [[`Leg${i}_L_Foot`, `Leg${i}_R_Foot`], [`Leg${i}_L_Toe`, `Leg${i}_R_Toe`]])];
+  for (const [l, r] of pairs) {
+    const a = alert.at(l);
+    const b = alert.at(r);
     assert.ok(Math.abs(a.x + b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6 && Math.abs(a.z - b.z) < 1e-6, `${l} mirrors ${r}`);
   }
 });
@@ -109,50 +69,58 @@ test('a foot slides back at an even pace on the ground, then lifts and swings fo
   const swing = cycle.filter((s, i) => i / 20 > JOINTS.stanceFraction + 1e-9 && i < 20);
   assert.ok(swing.every(s => s.lift > 0), 'lifted while swinging');
   assert.ok(Math.abs(cycle[0].fore - 1) < 1e-9 && Math.abs(cycle[20].fore - 1) < 1e-9, 'a cycle starts and ends at the front');
+  assert.ok(Math.abs(JOINTS.stride - (2 * JOINTS.sweep) / JOINTS.stanceFraction) < 1e-9, 'the body advances exactly as far as a planted foot slides back');
 });
 
-test('walking, no foot goes into the ground, it lifts a hand-width while swinging, and a planted foot only moves backward', () => {
-  const { group, tips } = loadModel(0);
-  const poser = createStingerPoser(group);
-  const local = {};
-  for (const [name, tip] of Object.entries(tips)) local[name] = poser.bones[name].worldToLocal(tip.clone());
-  const tipAt = name => local[name].clone().applyMatrix4(poser.bones[name].matrixWorld);
-  for (const name of Object.keys(tips)) {
+test('the feet stand on the ground: at rest, on guard, crouched in the windup and in the strike, every toe touches y = 0', () => {
+  for (const pose of [{}, { alert: 1 }, { windup: 1, alert: 1 }, { windup: 1, strike: 1, alert: 1 }, { hurt: 1 }]) {
+    const stance = posed(pose, { time: 0.7 });
+    for (const leg of LEG_NAMES) {
+      const y = stance.at(leg.toe).y;
+      assert.ok(Math.abs(y) < 0.004, `${leg.toe} is ${y.toFixed(4)} m off the ground in ${JSON.stringify(pose)}`);
+    }
+  }
+});
+
+test('walking, no foot goes into the ground, it lifts a hand-width while swinging, and a planted foot slides back by exactly one stride', () => {
+  const { poser, model } = posed({});
+  const toeY = leg => poser.bones[leg.toe].getWorldPosition(new THREE.Vector3());
+  for (const leg of LEG_NAMES) {
     let highest = 0;
     let lowest = 0;
-    let last = null;
     for (let i = 0; i < 60; i++) {
       poser.apply({ ...POSE_REST, gait: 1, phase: (i / 60) * Math.PI * 2 }, 0);
-      group.updateMatrixWorld(true);
-      const p = tipAt(name);
-      highest = Math.max(highest, p.y);
-      lowest = Math.min(lowest, p.y);
-      last = p;
+      model.group.updateMatrixWorld(true);
+      const y = toeY(leg).y;
+      highest = Math.max(highest, y);
+      lowest = Math.min(lowest, y);
     }
-    assert.ok(lowest > -0.02, `${name} stays above the ground (lowest ${lowest.toFixed(3)} m)`);
-    assert.ok(highest > 0.05 && highest < 0.2, `${name} lifts ${highest.toFixed(3)} m while swinging`);
-    assert.ok(last, name);
+    assert.ok(lowest > -0.01, `${leg.toe} stays above the ground (lowest ${lowest.toFixed(3)} m)`);
+    assert.ok(highest > 0.05 && highest < 0.12, `${leg.toe} lifts ${highest.toFixed(3)} m while swinging`);
   }
-  // front left leg: while its foot is planted (the first 60% of its cycle) it moves back along the body
-  let previous = null;
-  for (let i = 0; i < 30; i++) {
-    poser.apply({ ...POSE_REST, gait: 1, phase: (i / 60) * Math.PI * 2 }, 0);
-    group.updateMatrixWorld(true);
-    const z = tipAt('Leg01_L_Lower').z;
-    if (previous !== null) assert.ok(z < previous, 'planted foot moves back');
-    previous = z;
+  // front left leg: while its foot is planted (the first 60% of its cycle) it moves back along the body, 2 x sweep in all
+  const first = LEG_NAMES.find(leg => leg.index === 0 && leg.left);
+  const zs = [];
+  const cycles = 60;
+  for (let i = 0; i <= cycles * JOINTS.stanceFraction - 1e-9; i++) {
+    poser.apply({ ...POSE_REST, gait: 1, phase: (i / cycles) * Math.PI * 2 }, 0);
+    model.group.updateMatrixWorld(true);
+    zs.push(toeY(first).z);
   }
+  for (let i = 1; i < zs.length; i++) assert.ok(zs[i] < zs[i - 1] + 1e-9, 'planted foot moves back');
+  const slid = zs[0] - zs[zs.length - 1];
+  assert.ok(Math.abs(slid - 2 * JOINTS.sweep) < 0.02, `the planted foot slides back ${slid.toFixed(3)} m (2 x sweep is ${2 * JOINTS.sweep})`);
 });
 
 test('the whole body ripples while it walks, bends into a turn, and curls the tail up on guard', () => {
+  const { group } = loadStingerModel(0);
+  const rig = createStingerPoser(group).rig;
   const out = quaternions();
-  computePose({ ...POSE_REST }, 0, out);
+  computePose({ ...POSE_REST }, 0, out, JOINTS, rig);
   const flatTail = out.Tail2.clone();
-  computePose({ ...POSE_REST, alert: 1 }, 0, out);
-  assert.ok(out.Tail2.angleTo(flatTail) > 0.1, 'tail curls');
-  const { group } = loadModel(0);
-  const poser = createStingerPoser(group);
-  const stingAt = pose => { poser.apply({ ...POSE_REST, ...pose }, 0); group.updateMatrixWorld(true); return poser.bones.Stinger.getWorldPosition(new THREE.Vector3()); };
+  computePose({ ...POSE_REST, alert: 1 }, 0, out, JOINTS, rig);
+  assert.ok(out.Tail2.angleTo(flatTail) > 0.05, 'tail curls');
+  const stingAt = pose => posed(pose).at('Stinger');
   const straight = stingAt({});
   const left = stingAt({ turn: 1 });
   assert.ok(left.x < straight.x - 0.02, 'bending to the left swings the tail out to the right');
@@ -160,55 +128,97 @@ test('the whole body ripples while it walks, bends into a turn, and curls the ta
 });
 
 test('the fight poses give unit rotations for every bone', () => {
+  const { group } = loadStingerModel(0);
+  const rig = createStingerPoser(group).rig;
   const out = quaternions();
   for (const pose of [{ windup: 1 }, { strike: 1 }, { windup: 0.5, strike: 0.5 }, { hurt: 1 }, { dead: 1 }, { hurt: 1, gait: 1, phase: 3, turn: -1 }, { windup: 3, strike: -2, hurt: 9, dead: -1 }]) {
     for (const time of [0, 12.5]) {
-      computePose({ ...POSE_REST, ...pose }, time, out);
+      computePose({ ...POSE_REST, ...pose }, time, out, JOINTS, rig);
       for (const name of STINGER_BONES) assert.ok(Math.abs(out[name].length() - 1) < 1e-6, `${name}`);
     }
   }
 });
 
-// where the sting and the nose are, in metres (model scale 1, the nose at +Z), for a pose
-function pointsFor(pose, level = 0) {
-  const { group } = loadModel(level);
-  const poser = createStingerPoser(group);
-  poser.apply({ ...POSE_REST, ...pose }, 0);
-  group.updateMatrixWorld(true);
-  const at = name => poser.bones[name].getWorldPosition(new THREE.Vector3());
-  const tail = poser.bones.Stinger;
-  // the sting's point: the end of the Stinger bone's tip, as far along the bone as the model's lancet reaches
-  return { sting: at('Stinger'), head: at('Head'), root: at('Root'), tail1: at('Tail1'), tail4: at('Tail4'), tail };
+// the lowest height the tail's centre line passes over the body, minus the body's top (with its spikes) at about 0.5 m
+function tailClearance(stinger) {
+  const names = ['Tail1', 'Tail2', 'Tail3', 'Tail4', 'Tail5', 'Stinger'];
+  const points = [...names.map(stinger.at), stinger.tip];
+  let worst = Infinity;
+  for (let i = 0; i < points.length - 1; i++) {
+    for (let s = 0; s <= 1; s += 0.1) {
+      const p = points[i].clone().lerp(points[i + 1], s);
+      if (p.z > -0.5 && p.z < 0.5) worst = Math.min(worst, p.y - 0.5);
+    }
+  }
+  return worst;
 }
 
-test('the windup draws the tail back and up, high over the body, and the strike swings the sting out past the nose', () => {
-  const rest = pointsFor({ alert: 0 });
-  const windup = pointsFor({ windup: 1 });
-  const strike = pointsFor({ strike: 1 });
-  assert.ok(windup.sting.y > rest.sting.y - 0.05, `the sting is held up in the windup (${windup.sting.y.toFixed(2)} vs ${rest.sting.y.toFixed(2)})`);
-  assert.ok(windup.sting.z < strike.sting.z - 0.5, 'drawn back, then thrown forward');
-  assert.ok(strike.sting.z > strike.head.z, `the strike reaches past the head (${strike.sting.z.toFixed(2)} vs ${strike.head.z.toFixed(2)})`);
-  assert.ok(Math.abs(strike.sting.x) < 0.1, 'and straight ahead, not sideways');
-  assert.ok(strike.sting.y < windup.sting.y, 'it comes down onto the target');
+test('the windup cocks the tail high and back, and the strike arcs it over the body to land the sting ahead of the nose on the ground', () => {
+  const rest = posed({});
+  const windup = posed({ windup: 1, alert: 1 });
+  const strike = posed({ windup: 1, strike: 1, alert: 1 });
+  assert.ok(windup.at('Tail5').y > rest.at('Tail5').y - 0.05, 'the tail is held up in the windup');
+  assert.ok(windup.tip.y > 1.3, `the sting is high in the windup (${windup.tip.y.toFixed(2)} m)`);
+  assert.ok(windup.tip.z < 0.1 && strike.tip.z > 0.7, `drawn back, then thrown forward (${windup.tip.z.toFixed(2)} then ${strike.tip.z.toFixed(2)})`);
+  assert.ok(strike.tip.z > strike.at('Head').z + 0.5, `the strike reaches well past the head (${strike.tip.z.toFixed(2)} vs ${strike.at('Head').z.toFixed(2)})`);
+  assert.ok(Math.abs(strike.tip.x) < 0.1, 'and straight ahead, not sideways');
+  assert.ok(strike.tip.y < 0.2 && strike.tip.y > -0.05, `it comes down onto the ground (${strike.tip.y.toFixed(2)} m)`);
+  assert.ok(tailClearance(strike) > 0.05, `the tail goes over the body, not through it (clearance ${tailClearance(strike).toFixed(2)} m)`);
+  assert.ok(tailClearance(rest) > 0.4 && tailClearance(windup) > 0.4, 'and at rest and in the windup it is well clear');
 });
 
-test('hurt throws the tail up and dead leaves it low, with the legs curled in and the body down', () => {
-  const rest = pointsFor({});
-  const hurt = pointsFor({ hurt: 1 });
-  const dead = pointsFor({ dead: 1 });
-  assert.ok(hurt.sting.y !== rest.sting.y, 'a flinch moves the tail');
-  assert.ok(dead.sting.y < rest.sting.y - 0.1, `the tail droops when dead (${dead.sting.y.toFixed(2)} vs ${rest.sting.y.toFixed(2)})`);
+test('hurt throws the tail up, and dead lays it on the sand behind, with the legs curled in and the body down', () => {
+  const rest = posed({});
+  const hurt = posed({ hurt: 1 });
+  const dead = posed({ dead: 1 });
+  assert.ok(hurt.tip.y > rest.tip.y + 0.15, `a flinch throws the tail up (${hurt.tip.y.toFixed(2)} vs ${rest.tip.y.toFixed(2)})`);
+  assert.ok(dead.tip.y < 0.3 && dead.tip.z < -1.0, `the tail lies low behind it when dead (${dead.tip.y.toFixed(2)} m up, ${dead.tip.z.toFixed(2)} m behind the middle)`);
+  const { group } = loadStingerModel(0);
+  const rig = createStingerPoser(group).rig;
   const out = quaternions();
   const living = quaternions();
-  computePose({ ...POSE_REST }, 0, living);
-  const sink = computePose({ ...POSE_REST, dead: 1 }, 0, out);
+  computePose({ ...POSE_REST }, 0, living, JOINTS, rig);
+  const sink = computePose({ ...POSE_REST, dead: 1 }, 0, out, JOINTS, rig);
   assert.ok(sink < -0.05, 'the body sinks');
-  assert.ok(out.Leg01_L_Upper.angleTo(living.Leg01_L_Upper) > 0.3, 'the legs curl up');
+  assert.ok(out.Leg1_L_Thigh.angleTo(living.Leg1_L_Thigh) > 0.2, 'the legs curl up');
+  for (const leg of LEG_NAMES) assert.ok(dead.at(leg.toe).y > 0.08, `${leg.toe} is lifted off the ground when dead`);
 });
 
-test('the lengthened tail lets the strike reach: the sting is ahead of the head, and the tail at rest is tall but not absurd', () => {
-  const rest = pointsFor({});
-  const strike = pointsFor({ strike: 1 });
-  assert.ok(strike.sting.z - strike.head.z > 0.2, 'the sting base is ahead of the head bone, the tip further (the old short tail only got to z = 0.4)');
-  assert.ok(rest.sting.y > 0.9 && rest.sting.y < 1.4, `the resting sting is about 1.1 m up before scaling (${rest.sting.y.toFixed(2)} m; 2.8 m at scale 2.5)`);
+test('the claws lift on guard and swing wide in the windup', () => {
+  // the finger's height above the body's own joint, so the crouch of the windup does not count
+  const finger = pose => { const p = posed(pose, { time: 3 }); const f = p.at('Claw_L_Finger'); f.y -= p.at('Body').y; return f; };
+  const rest = finger({});
+  const guard = finger({ alert: 1 });
+  const wind = finger({ windup: 1, alert: 1 });
+  assert.ok(guard.y > rest.y + 0.05, `the claws lift on guard (${guard.y.toFixed(2)} vs ${rest.y.toFixed(2)})`);
+  assert.ok(wind.y > guard.y - 0.001, `and stay up in the windup (${wind.y.toFixed(2)})`);
+  assert.ok(wind.x > guard.x + 0.03 && guard.x > rest.x, `the claws swing wider on guard, and wider again in the windup (${rest.x.toFixed(2)}, ${guard.x.toFixed(2)}, ${wind.x.toFixed(2)})`);
+  assert.equal(CLAW_NAMES.length, 2);
+});
+
+test('hit capsules: every bone they name exists, and together they cover the body, the tail and the claws', () => {
+  const model = loadStingerModel(0);
+  const names = new Set(STINGER_BONES);
+  const rest = model.restOrigin;
+  const point = spec => {
+    if (typeof spec === 'string') { assert.ok(names.has(spec), `${spec} is a bone`); return rest[spec].clone(); }
+    assert.ok(names.has(spec[0]), `${spec[0]} is a bone`);
+    return new THREE.Vector3(spec[1], spec[2], spec[3]).add(rest[spec[0]]);
+  };
+  const capsules = DUNE_STINGER.hitParts.map(([a, b, r]) => ({ a: point(a), b: point(b), r }));
+  const distance = (p, c) => {
+    const ab = c.b.clone().sub(c.a);
+    const t = Math.max(0, Math.min(1, p.clone().sub(c.a).dot(ab) / Math.max(ab.lengthSq(), 1e-9)));
+    return p.distanceTo(c.a.clone().addScaledVector(ab, t)) - c.r;
+  };
+  for (const [label, pattern] of [['body', /^(Body|Head|Seg\d+)$/], ['tail', /^(Tail\d|Stinger)$/], ['claws', /^Claw_/]]) {
+    let total = 0;
+    let inside = 0;
+    model.positions.forEach((p, k) => {
+      if (!pattern.test(model.owners[k])) return;
+      total++;
+      if (capsules.some(c => distance(p, c) <= 0)) inside++;
+    });
+    assert.ok(inside / total > 0.94, `${label}: ${(100 * inside / total).toFixed(0)}% of the skin is inside a hit capsule`);
+  }
 });
