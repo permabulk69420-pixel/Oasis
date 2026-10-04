@@ -39,6 +39,9 @@ export const BARK_PHOTO = Object.freeze({
 export const LEAF_PHOTO = Object.freeze({
   file: 'textures/alien_desert_plant/alien_desert_plant_leaf_albedo.png',
   anisotropy: 4,
+  // The tile's average colour in linear light. The tile is 2.9 MB, so on a slow connection it arrives late; until it does (and if it
+  // never does) the palms are painted this colour instead of the models' own blue.
+  average: Object.freeze([0.1786, 0.1043, 0.0122]),
 });
 
 // Each look: how often the tile repeats across and along a leaflet (u across, v along), whether the model's own vertex colours still
@@ -206,6 +209,16 @@ let leafPhoto = null; // the texture once loaded
 let leafPhotoRequest = null;
 let leafLook = pickLeafLook(globalThis.location?.search || '');
 
+// The look's colour without the tile, so a palm is never blue while the tile loads: the tile's average, over the drawn leaf pattern.
+function setLeafFallback(material) {
+  const look = LEAF_LOOKS[leafLook];
+  if (!look) return; // plain: the model's own blue, on purpose
+  const [r, g, b] = LEAF_PHOTO.average;
+  material.vertexColors = look.vertexColors;
+  material.color.setRGB(r, g, b).multiplyScalar(look.boost / LEAF.mean);
+  material.emissive.setRGB(r, g, b).multiplyScalar(look.glow / LEAF.mean);
+}
+
 function setLeafPhoto(material) {
   const look = LEAF_LOOKS[leafLook];
   if (!look || !leafPhoto) return;
@@ -261,7 +274,7 @@ export function applySurfaceTextures(root, { photo = typeof document !== 'undefi
         if (barkPhoto) setBarkPhoto(material);
       } else if (kind === 'leaf') {
         leafMaterials.add(material);
-        if (leafPhoto) setLeafPhoto(material);
+        if (leafPhoto) setLeafPhoto(material); else setLeafFallback(material);
       }
       material.needsUpdate = true;
     }
