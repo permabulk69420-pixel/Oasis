@@ -90,19 +90,30 @@ work. What he has told me, or shown he wants, across sessions:
    direction is where he trusts me most. Anything substantial (trees, creatures, big props) needs proper LODs
    (3 levels, with triangle counts checked against a Quest budget). Leave the hero tree alone.
 
-## Overnight plan (4 to 5 Oct 2026, Kane asleep, full authority, art and animation only)
+## Overnight plan (4 to 5 Oct 2026, Kane asleep, full authority, art, animation and world content only)
 
-In this order (tick them off in the task list; the morning report is short, rule above):
-1. Dune stinger v3 (`tools/dune-stinger/v3/`, built by me in Blender, no paid or AI mesh tools): a plated carapace with a ridge, an eye cluster, four leg pairs
-   (thigh, shin, claw foot, knobbly knee), two jointed pincers (one bigger) that guard, flare open in the windup and close, a five segment tail. 3 LODs, close
-   level roughly 30 to 40k triangles (ceiling 50k), 2 draw calls, cyan glow seams in the spear's cyan. Retarget `src/stinger-pose.js` and the `hitBalls`; the fight
-   logic and numbers stay as they are. Feet planted on the sand (no skating on dunes). Claws are animation only, no pincer attack.
-2. Fight sounds, synthesised in code (free): windup rattle, tail whoosh, blow thud, flinch, death, player grunt. Positional at the creature.
-3. Fight effects: sand puffs on the lunge and death, the dead stinger sinks into the sand instead of popping out of the world.
-4. Footprints in the sand (player and creature), fading as the wind fills them in. One instanced draw call.
-5. Night life: drifting glow motes by the pond and the glow plants, a ringed planet low in the night sky, water lapping and night insect sound.
-6. Giant bones half buried in the dunes: a landmark and a hint of the big thing to come. Blender model with LODs.
-7. If time: dust devils by day, a small skittering critter, a dawn and dusk look pass.
+Kane's direction that night: the visuals are in good shape and he is unsure where the game goes next. I said we have no reason to go out into
+the dunes and no stakes; he said "I think we need a pickaxe, and some really good stones or crystals, and maybe something like a cactus but
+alien... a reason to go out there... get some PBR stuff". **No sound effects yet** (his words: audio is "something we can do way more
+intentional later"), so none of the fight, water or insect sounds. In this order (tick them off in the task list; the morning report is short):
+1. A smoke test (headless Chromium loads the real game, fails on page errors or a triangle blowout) run in the Pages workflow before deploy, so an
+   unattended merge cannot ship a broken game.
+2. The pickaxe (recipe like the axe's, held, hip slot, menu icon, breaks mineable nodes like the axe fells trees) and the desert finds that give it a
+   job: sandstone outcrops with a 1k Poly Haven PBR rock (credit file in `public/textures/<name>/`), glowing crystal clusters (visible across the dunes
+   at night, first field near the stinger's patch, richer ones further out), and a spiny alien spire plant that gives fibre (an item with no source yet).
+   Crystals just go in the pack: what they are FOR (my suggestion to him: alien fuel and light, which would answer cold nights and fuel) is his call.
+3. Dune stinger v3 (`tools/dune-stinger/v3/`, built by me in Blender, no paid or AI mesh tools): a plated carapace with a ridge, an eye cluster, four leg
+   pairs (thigh, shin, claw foot, knobbly knee), two jointed pincers (one bigger) that guard, flare open in the windup and close, a five segment tail.
+   3 LODs, close level roughly 30 to 40k triangles (ceiling 50k), 2 draw calls, cyan glow seams in the spear's cyan. Retarget `src/stinger-pose.js` and
+   the `hitBalls`; the fight logic and numbers stay. Feet planted on the sand. Claws are animation only, no pincer attack.
+4. Fight effects: sand puffs on the lunge and death, the dead stinger sinks into the sand instead of popping out of the world.
+5. Saving: a silent, versioned autosave of inventory, tools, fires, felled trees, position and time (`?fresh=1` starts clean; mismatched saves discarded).
+6. Footprints in the sand (player and creature), filled in by the wind, one instanced draw call.
+7. Giant bones half buried in the dunes (Blender model with LODs) as landmarks; a crashed expedition wreck if time.
+8. A direction doc in the Project (`Projects` tool): the decisions only Kane can make, each with my one-line take, and the story seed we talked through
+   (survivor of an expedition that came down on a desert moon with a ringed planet in the sky; the giant bones are what brought the ship down; the
+   boss is its grown up version).
+9. If time: glow motes by the pond, the ringed planet in the night sky, dust devils by day, a skittering critter, a dawn and dusk look pass.
 Add a `creature-pipeline` skill (`.claude/skills/`) when the stinger v3 build is done, since the Blender to pose code to game procedure is longer than a few lines.
 
 ## Working on this repo
