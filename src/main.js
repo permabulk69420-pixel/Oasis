@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import './style.css';
+import { installAssetVersioning } from './asset-version.js';
 import { createHeightField, clamp, stickAxis, stickVector, pivotRig, isInPond, SPAWN, WATER, HERO_TREE } from './world.js';
 import { createTerrain } from './terrain.js';
 import { createMaterials, createWater } from './materials.js';
@@ -20,6 +21,9 @@ import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater 
 import { pulseHaptics } from './haptics.js';
 import { createSurvivorMenu } from './survivor-menu.js';
 import { getInventoryWeight, getCarryCapacity, getCarrySpeedMultiplier, removeInventoryItem } from './inventory.js';
+
+// Every model and texture asks for ?v=<build id>, so a new deploy is never answered from the browser's 10 minute cache.
+installAssetVersioning();
 
 installNightFill(); // moonlit fill for the lit (PBR) objects: before anything compiles
 const canvas = document.querySelector('#world');
