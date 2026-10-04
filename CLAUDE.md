@@ -116,6 +116,10 @@ work. What he has told me, or shown he wants, across sessions:
   models for up to 10 minutes. Check the live files first (`curl -sI` the `.glb` or texture on the Pages URL and compare `content-length` with
   `public/`). Since #49 every model and texture request carries `?v=<build id>` (`src/asset-version.js`), so a new deploy is fetched fresh once
   the new page loads; to get past a cached page, open the URL with any extra query (`?x=1`). Sounds are not versioned.
+- **A model looks black once a texture goes on it?** Check its `COLOR_0` (vertex colours). Models painted with vertex colour only (the alien desert
+  plants, the first trees) multiply the texture by about 0.1. Either turn `vertexColors` off (the palms) or keep only the variation:
+  `normaliseVertexColours` in `src/plant-colours.js` divides each channel by its average (the desert plants, #53). Read the accessor
+  in the .glb with a few lines of Python before guessing at lights or emissive.
 - Tests live in `tests/`. Add tests for game logic. Keep constants in one table at the top of a module.
 
 ## Roadmap
