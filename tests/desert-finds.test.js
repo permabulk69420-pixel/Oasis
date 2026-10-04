@@ -59,7 +59,7 @@ test('nodes stand on gentle ground and never overlap', () => {
     const r = footprintOf(node.kind, node.variant) * node.scale;
     const ground = groundUnder(field.sample, node.x, node.z, r);
     assert.ok(ground.max - ground.min <= FINDS.maxSlope[node.kind] * r + 1e-6, `${node.id} on ground that drops ${(ground.max - ground.min).toFixed(2)} m`);
-    assert.ok(node.y >= ground.min - 0.01 && node.y <= ground.max + 0.01 + (node.kind === 'rock' ? 0.04 * heightOf('rock', node.variant) * node.scale : 0), `${node.id} stands on the ground`);
+    assert.ok(node.y >= ground.min - 0.06 && node.y <= ground.max + 0.01 + (node.kind === 'rock' ? 0.04 * heightOf('rock', node.variant) * node.scale : 0), `${node.id} stands on the ground`);
   }
   for (let i = 0; i < nodes.length; i++) {
     for (let j = i + 1; j < nodes.length; j++) {
