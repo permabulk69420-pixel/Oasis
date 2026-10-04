@@ -20,6 +20,8 @@ the moment", so keep it loose: he said not to get into too much of the specifics
   more, because the game is "still a little bit too bright", it "has a better vibe at night", the darkness hides a lot of flaws, and the game leans on bioluminescence. So lean
   darker and moodier, with the glow carrying the scene. Day length and the exact balance are not decided ("I don't know yet"), so do not change the day/night timing without
   asking. Lighting and exposure are art, so those are mine to try and show (current: 3 minutes day, 3 minutes night, `src/day-night.js`; day exposure about 0.82, night about 0.035).
+- **Climbing is in, and gliding too (Kane, 5 Oct).** Both tie into stamina, which already exists (`src/survival.js`). It is the colossus climb above and probably a general
+  ability as well. What each costs in stamina and how they feel are his calls, not mine to invent.
 - The full write-up is `claude/direction.md` in the Project (the `Projects` tool). Keep it and this section in step.
 
 ## How we work (Kane and me)
