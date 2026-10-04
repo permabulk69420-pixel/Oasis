@@ -145,14 +145,14 @@ test('gripped by the leather wrap with the same flip the axe has, and the long p
   assert.ok(pick.root.quaternion.angleTo(tools.getInstances('axe')[0].kind.heldRotation) < 1e-6, 'held just like the axe, so a swing feels the same');
 });
 
-test('on a hip it leans back with the head behind the shoulder and the butt well clear of the ground', () => {
+test('on a hip it hangs upside down, head low and handle up behind the hip, the head clear of the ground', () => {
   for (const side of ['left', 'right']) {
     const pose = holsterPose(PICKAXE_HOLSTER, side);
     const dir = new THREE.Vector3(0, 1, 0).applyQuaternion(pose.quaternion);
-    assert.ok(dir.y > 0.7 && dir.z > 0.3, `${side}: the head is up and leaning back (${dir.toArray().map(n => n.toFixed(2))})`);
+    assert.ok(dir.y < -0.7 && dir.z < -0.3, `${side}: the head points down and the handle leans back (${dir.toArray().map(n => n.toFixed(2))})`);
     const at = modelY => new THREE.Vector3(0, modelY, 0).applyQuaternion(pose.quaternion).add(pose.position);
-    assert.ok(0.9 + at(-0.31).y > 0.35, `${side}: the butt end hangs ${(0.9 + at(-0.31).y).toFixed(2)} m off the ground at 1.7 m head height`);
-    assert.ok(at(0.5).y < 0.7, `${side}: and the head stays below head height`);
+    assert.ok(0.9 + at(0.5).y > 0.2, `${side}: the head hangs ${(0.9 + at(0.5).y).toFixed(2)} m off the ground with the hip at 0.9 m`);
+    assert.ok(at(-0.31).y > 0.1 && at(-0.31).y < 0.7, `${side}: the handle end is within reach above the hip`);
   }
 });
 
