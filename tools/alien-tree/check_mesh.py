@@ -28,6 +28,7 @@ BUDGET = {0: (3500, 6000), 1: (1000, 2000), 2: (250, 700)}   # (at least, at mos
 TREE_HEIGHT = (4.3, 4.7)
 CHOP_TOP = 1.9               # src/axe.js TREE_CHOP_TOP: the trunk must be straight and on the origin up to here
 TRUNK_RADIUS = (0.08, 0.16)  # around src/axe.js TREE_TRUNK_RADIUS 0.12, measured at 1 m
+CROWN_CENTRE = (0.364, 0.138)  # where the fronds leave the leaning trunk, in Blender axes
 LOWEST_FROND = 2.4           # leaves further than 0.45 m from the trunk stay above this (a head is 1.7 m up)
 
 problems = []
@@ -108,8 +109,8 @@ def check_level(level):
     print(f"LOD{level} runs from {bottom:.2f} to {top:.2f} m")
     if not TREE_HEIGHT[0] <= top <= TREE_HEIGHT[1]:
         problems.append(f"LOD{level}: {top:.2f} m tall, expected {TREE_HEIGHT[0]} to {TREE_HEIGHT[1]}")
-    if bottom < -0.2 or bottom > 0.0:
-        problems.append(f"LOD{level}: the lowest point is {bottom:.2f} m; the base should sink a little (0 to -0.2 m) into the ground")
+    if bottom < -0.35 or bottom > 0.0:   # the near level sinks its buttress feet 0.3 m (a tree on a slope shows no underside)
+        problems.append(f"LOD{level}: the lowest point is {bottom:.2f} m; the base should sink a little (0 to -0.35 m) into the ground")
     # the trunk is the bark ring of vertices near each height: its centre must stay on the origin up to the chop height
     bark_pts = []
     for poly in ob.data.polygons:
@@ -137,7 +138,9 @@ def check_level(level):
         if slots[poly.material_index] == LEAF:
             for i in poly.vertices:
                 leaf_pts.append(ob.matrix_world @ ob.data.vertices[i].co)
-    out = [p for p in leaf_pts if math.hypot(p.x, p.y) > 0.45]
+    # The trunk leans toward the top, so "beside the trunk" is measured from the crown (trunk_center(CROWN_Y) in the builder; Blender
+    # has glTF z as -y), not from the base.
+    out = [p for p in leaf_pts if math.hypot(p.x - CROWN_CENTRE[0], p.y - CROWN_CENTRE[1]) > 0.45]
     lowest = min(p.z for p in out)
     reach = max(math.hypot(p.x, p.y) for p in out)
     print(f"LOD{level} fronds: lowest {lowest:.2f} m, reach {reach:.2f} m")

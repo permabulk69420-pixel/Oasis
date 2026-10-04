@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WATER, SUN, HERO_TREE } from './world.js';
 import { createPodHalos, buildGroundLights, applyGroundLights } from './glow-halos.js';
 import { addWindSwayToModel, SWAY } from './wind.js';
+import { applySurfaceTextures } from './surface-textures.js';
 import { pickTreeSet, levelDistance, forcedTreeLevel } from './tree-sets.js';
 
 const TREE_DRAW_DISTANCE = 240;
@@ -42,8 +43,13 @@ const TREE_LAYOUT = [
   { angle: 5.57, radius: 1.60, scale: 1.10, yaw: 0.85 },
 ];
 
-// A second set of trees on the spots the old purple ferns used, all at 2x scale and unrotated.
-// They deliberately skip the hero clearing filter so the oasis keeps its current layout.
+// A second set of trees on the spots the old purple ferns used, about 2x scale. They used to be exactly 2x and unrotated, which
+// read as a row of copies; each now has its own size and turn (the positions are unchanged). They deliberately skip the
+// hero clearing filter so the oasis keeps its current layout.
+const SECOND_TREE_VARIETY = [
+  { scale: 1.85, yaw: 0.6 }, { scale: 2.25, yaw: 2.1 }, { scale: 1.70, yaw: 4.0 }, { scale: 2.10, yaw: 5.5 }, { scale: 2.40, yaw: 1.2 },
+  { scale: 1.95, yaw: 3.3 }, { scale: 1.75, yaw: 0.2 }, { scale: 2.30, yaw: 4.7 }, { scale: 2.00, yaw: 2.8 },
+];
 const SECOND_TREE_LAYOUT = [
   { angle: 0.18, radius: 1.24 },
   { angle: 0.52, radius: 1.42 },
@@ -54,7 +60,7 @@ const SECOND_TREE_LAYOUT = [
   { angle: 4.08, radius: 1.57 },
   { angle: 5.22, radius: 1.27 },
   { angle: 5.54, radius: 1.48 },
-].map(item => ({ ...item, scale: 2.0, yaw: 0 }));
+].map((item, i) => ({ ...item, ...SECOND_TREE_VARIETY[i] }));
 
 const SHADOW_SEGMENTS = 4;
 const SHADOW_WIDTH_PROFILE = [0.18, 0.70, 1.00, 0.72, 0.18];
@@ -308,6 +314,8 @@ export function createOasisVegetation({ field, sunDirection = null, groundGlowUn
       const source = gltf.scene;
       source.updateMatrixWorld(true);
       disableModelShadows(source);
+      // The shared bark and leaf detail (see surface-textures.js); materials with other names are left alone.
+      applySurfaceTextures(source);
       // The crown sways in the wind and the leaves tremble; the hero tree below is left alone.
       addWindSwayToModel(source, material => (material.name === 'Waxy blue leaf tissue' ? SWAY.foliage : SWAY.trunk));
       return { ...level, source };

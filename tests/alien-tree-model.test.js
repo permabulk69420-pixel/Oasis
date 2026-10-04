@@ -105,7 +105,8 @@ test('every level is the same tree: the same height, reach and crown, so nothing
   });
   for (const { top, bottom, reach } of bounds) {
     assert.ok(top > 4.3 && top < 4.7, `${top.toFixed(2)} m tall`);
-    assert.ok(bottom < 0 && bottom > -0.2, `the foot sinks ${(-bottom).toFixed(2)} m`);
+    // The near level's buttress feet are sunk 0.3 m so a tree on a slope shows no underside; the far levels just a little.
+    assert.ok(bottom < 0 && bottom > -0.35, `the foot sinks ${(-bottom).toFixed(2)} m`);
     assert.ok(reach > 1.9 && reach < 2.6, `the crown reaches ${reach.toFixed(2)} m out`);
   }
   for (const key of ['top', 'bottom', 'reach']) {
@@ -142,9 +143,12 @@ test('the trunk stands straight on the origin up to the axe chop height, thick e
   });
 });
 
+const CROWN_CENTRE = [0.364, -0.138]; // trunk_center(CROWN_Y) in build_alien_tree.py
+
 test('the fronds stay out of the way of someone walking under the tree', () => {
   levels.forEach((glb, level) => {
-    const leaves = positions(glb, primitiveFor(glb, LEAF)).filter(p => Math.hypot(p[0], p[2]) > 0.45);
+    // The trunk leans toward the top, so "beside the trunk" is measured from the crown (where the veils hang), not from the base.
+    const leaves = positions(glb, primitiveFor(glb, LEAF)).filter(p => Math.hypot(p[0] - CROWN_CENTRE[0], p[2] - CROWN_CENTRE[1]) > 0.45);
     const lowest = Math.min(...leaves.map(p => p[1]));
     assert.ok(lowest > 2.4, `LOD${level}: a frond hangs down to ${lowest.toFixed(2)} m`);
   });
