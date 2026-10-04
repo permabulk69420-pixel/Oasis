@@ -161,6 +161,26 @@ colour per vertex and a tiny second material for the glow: no textures, two draw
   `/tools/bird/lab.html?poses=rest,drink,glide,flapUp,flapDown,land&lod=0&yaw=135` (also `view=under|top`, `zoom=`, and
   `j=foldShoulder.sweep:1.4,foldHand.scaleZ:0.4` to try joint numbers).
 
+## The dune stinger in the game
+
+One dune stinger (the scorpion-like creature, model v2 from `tools/dune-stinger/v2/`) lives in the dunes to the right of where you
+start, about 46 m away. It is a living creature in the scene and nothing more: it stands about, glances round, and every few seconds
+turns and walks a short way (never further than about 22 m from its patch of dune, never into the pond or the hero tree's clearing,
+never up a steep face). If you come within about 15 m it stops, turns to face you, and curls its tail up over its back with its
+mandibles open; it carries on once you are 20 m away. **It never chases you and nothing it does hurts you:** what a stinger does to a
+player (damage, hunting, death, drops) is a gameplay decision that has not been made. It cannot be hit by tools yet either.
+
+- `src/dune-stinger.js` is the scene side: loads the three levels of detail (`public/models/creatures/dune_stinger_lod0..2.glb`,
+  11,612 / 4,072 / 626 triangles, 49 bones each, switched at 28 m and 80 m), scales it up 2.5 times (`DUNE_STINGER.scale`; the model
+  is 1.5 m long, so it is about 3.7 m long in the game), stands it on the ground tilted to the slope under its four corners, keeps the
+  glowing eyes and sting at the same look by day and night (`exposureGlow`, like the backpack's trim), and draws a soft shadow under it.
+- `src/stinger-brain.js` is the behaviour with no three.js in it (idle, turn, walk, watch); `src/stinger-pose.js` turns a handful of
+  numbers (gait, phase, turn, alert, head) into bone rotations: a ripple of steps along each side (the legs lift and swing, no baked
+  animation), the body swaying as it walks, breathing, the tail's slow sway and an occasional flick of the sting. The walking cycle
+  follows the ground covered (`JOINTS.stride`), so the feet do not skate.
+- Tuning is in the tables at the top of those files: `DUNE_STINGER` (scale, home, glow), `BRAIN` (speeds, distances) and `JOINTS`
+  (how far the legs swing and lift).
+
 ## The backpack
 
 A rucksack you pick up and put on, which raises how much you can carry before it slows you down. It lies in the sand a couple of
