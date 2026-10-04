@@ -178,6 +178,9 @@ desert where little else is drawn (measured on desktop: 25k to 80k triangles in 
 up to about 50,000. My view: fine as a ceiling for one creature at a time (it adds about 13% to the spawn scene); spend it where it shows at 1 to 5 m
 (head, plates, legs), do not pad. Keep three levels and keep the draw calls at two per creature.
 
+Dune stinger v2 (mine, `tools/dune-stinger/v2/`, script `build_stinger.py`): reworked the first build into a spikier, rust-banded creature with ball-jointed arched legs,
+glowing eyes and flank dashes and a lit stinger: 11,612 / 4,072 / 626 triangles, same skeleton. Passes the checks; sent to Kane for his OK, not in `public/`.
+Kane's rule of thumb: build the high-detail version first, scaling down is easy and scaling up is not.
 Dune stinger (first creature, `tools/dune-stinger/`): the other model's first build (3 LODs 4,482 / 1,560 / 582 tris, 49 bones) passes my checks
 (`python3 tools/creature/check_glb.py`: numpy + trimesh, no Blender) and loads and bends in three.js, but it is artistically generic and barely
 glows. It is kept in `tools/`, NOT in `public/`, and waits for Kane's OK; the plan I gave him is to use it as a base and improve it myself
