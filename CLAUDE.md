@@ -107,7 +107,7 @@ work. What he has told me, or shown he wants, across sessions:
 - Palm close-up for a screenshot (dev build): `?hour=14&at=311.6,-357.7&look=313.5,-351,2.5&treelod=0`; `&eye=1.0` for a low camera at
   the base. Other palms are at `WATER + (cos a * radiusX * r, sin a * radiusZ * r)` for the `angle`/`radius` pairs in
   `TREE_LAYOUT`, `src/oasis-vegetation.js`. `?camp=lit` ignores `?at` (the fire goes near spawn).
-- Free texture sources: `python3 tools/textures/make_bark.py` (arrives with #46) shows the pattern (download the 1k Poly Haven set, reduce it to a neutral
+- Free texture sources: `python3 tools/textures/make_bark.py` shows the pattern (download the 1k Poly Haven set, reduce it to a neutral
   grey detail map plus a normal map, record the credit in `public/textures/<name>/CREDITS.md`, add a test that the files exist and are small).
 - Tests live in `tests/`. Add tests for game logic. Keep constants in one table at the top of a module.
 
@@ -163,7 +163,7 @@ level of detail for the veil tree (Kane has said to leave that tree alone, so as
 
 Merged: #39 glow fruit grip fix (mirrored per-hand offset), #40, #41 and #44 notes in this file, #42 backpack haptic tick (stronger, so you can
 feel the back zone), #43 Milky Way edge (the band now fades to exactly zero where it is cut), #45 softer wind-blown sand (patchy veils, fewer
-hair-thin streaks). Open, waiting for Kane's headset check: #46 palm pass (shared bark and leaf textures in `src/surface-textures.js`, real
+hair-thin streaks). Merged after Kane looked: #46 palm pass (shared bark and leaf textures in `src/surface-textures.js`, real
 CC0 palm bark with a normal map, buttress base instead of root spikes, a fourth ring of older fronds, more arch, outer palms vary in size
 and turn). Waiting on Kane before touching: the backpack back zone (options if it still feels hard: a repeating buzz, a sound, a bigger zone,
 a visual cue). Only if Kane says go: a script and post for his explainer on tokens, API price and plan usage.
