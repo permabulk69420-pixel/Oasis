@@ -643,3 +643,48 @@ test('without a backpack the menu is as it was: no Back slot, but the limit is t
     globalThis.document = originalDocument;
   }
 });
+
+// ---------------------------------------------------------------------------------------------- the save
+
+test('the pack is saved as worn, or as lying where it was left, and put back the same way (src/save-game.js)', t => {
+  reset();
+  const { backpack, right, handTo, squeeze, handle } = world(t, { heightAt: () => 20 });
+  const pack = backpack.debug.getObject();
+  assert.deepEqual(backpack.snapshot(), { status: 'ground', x: PACK.spawn.x, z: PACK.spawn.z, yaw: PACK.spawn.yaw });
+
+  backpack.debug.ground(310.126, -295.5, 0.7);
+  assert.deepEqual(backpack.snapshot(), { status: 'ground', x: 310.13, z: -295.5, yaw: 0.7 });
+
+  // in your hand it is saved as put down where the hand is
+  handTo(right, handle());
+  squeeze(right, true);
+  assert.equal(backpack.getStatus(), 'held');
+  const held = backpack.snapshot();
+  assert.equal(held.status, 'ground');
+  const where = pack.getWorldPosition(new THREE.Vector3());
+  assert.ok(Math.abs(held.x - where.x) < 0.006 && Math.abs(held.z - where.z) < 0.006, 'under the pack, wherever the hand has taken it');
+  squeeze(right, false);
+
+  backpack.debug.wear();
+  assert.deepEqual(backpack.snapshot(), { status: 'worn' });
+
+  // put back: lying somewhere else, on the ground, facing the way it was
+  assert.equal(backpack.restore({ status: 'ground', x: 12, z: -34, yaw: 1.1 }), true);
+  assert.equal(backpack.getStatus(), 'ground');
+  assert.equal(isPackWorn(), false, 'taking it from worn to lying takes it off you');
+  assert.ok(Math.abs(pack.position.x - 12) < 1e-9 && Math.abs(pack.position.z + 34) < 1e-9);
+  assert.ok(Math.abs(pack.rotation.y - 1.1) < 1e-9);
+  assert.equal(pack.parent !== null, true);
+
+  assert.equal(backpack.restore({ status: 'worn' }), true);
+  assert.equal(backpack.isWorn(), true);
+  assert.equal(isPackWorn(), true);
+  assert.equal(getCarryCapacity(), 100);
+  assert.equal(pack.parent, null, 'on your back, not in the world');
+  assert.equal(backpack.restore({ status: 'worn' }), true, 'twice is the same as once');
+
+  assert.equal(backpack.restore({ status: 'floating' }), false);
+  assert.equal(backpack.restore(null), false);
+  assert.equal(backpack.isWorn(), true, 'junk changes nothing');
+  reset();
+});
