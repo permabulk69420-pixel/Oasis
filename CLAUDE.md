@@ -128,9 +128,11 @@ carried on a hip leaning back about 33 degrees, packed at the chest. One LOD on 
 The little cyan bead on the tassel keeps its brightness at night through `src/glow.js` (shared with the backpack). Held (Kane's call, #59, #60): the point goes out in front of the fist like a poke (`SPEAR_THRUST_TILT` 35 degrees about the
 palm normal in `src/spear.js`; the hold lab `item=spear&pitch=-30` shows it). The hand sits at the middle of the shaft near the balance point
 (`SPEAR_GRIP.point` [0,0,0], the leather wrap's centre). #59 tried the butt end for reach and Kane found one hand at the very end weird.
-Open idea, not built: a throw like a javelin needs a different hold from the poke (Kane: "we need to flip it", screenshots of the poke hold; I
-was not sure what flip he means, ask), maybe a second hand on the shaft for a two-handed poke, and the throw itself (projectile rules) waits for
-the creature. Oddities to tell Kane: the butt end reaches the sand in a deep crouch (the hip hangs from the head position); picking it up
+Throwing grip (#62, Kane's idea): hold the torch's button (B right, X left) with the spear in hand and it turns to `SPEAR_THROW_TILT` 75
+degrees, so with the arm cocked back the point faces forward and about 40 degrees up; release the button and it is a poke again (a buzz marks it;
+the angle and speed are one table, `SPEAR_SWITCH`, to tune by feel). It does not throw yet: the throw itself (flight, landing, retrieval, damage)
+is a gameplay call for Kane and waits for the creature. A second hand on the shaft for a two-handed poke is also only an idea. 75 is the most the
+fingers close on (90 does not solve). Oddities to tell Kane: the butt end reaches the sand in a deep crouch (the hip hangs from the head position); picking it up
 snaps it to the hand at the wrap wherever you reached; it does no damage yet (the creature will give it a job).
 
 Blue palms (done, `tools/alien-tree/`, `src/tree-sets.js`; my call on the look, Kane said to make my own visual choices): the sixteen
@@ -172,6 +174,6 @@ CC0 palm bark with a normal map, buttress base instead of root spikes, a fourth 
 and turn). Then #47 and #48 (this file: how we work, palms merged), #49 (every model and texture request carries `?v=<build id>`, so a deploy
 is not hidden by the 10 minute Pages cache), #50 (the stop-hook false alarm and its fix), #51 (palm fronds wear the alien desert plant's leaf
 texture because the blue read too blue; default look `plant`, mid-dark; Kane asked about "the much darker one", so `?leaf=dark` is the likely
-next default, but he has not said which: ask which look he settled on after the headset). #53: the four alien desert plants were near black (vertex colour times texture), now lit properly (night unchanged). #54: three skills split out of this file. #55 to #58: notes on text-to-speech, relaxed tone, no motion sickness. #59 and #60: spear held pointing forward (the hand at the butt in #59, back at the middle in #60). Waiting on Kane before touching: the backpack back zone (options if it still feels hard: a repeating buzz, a sound, a bigger zone,
+next default, but he has not said which: ask which look he settled on after the headset). #53: the four alien desert plants were near black (vertex colour times texture), now lit properly (night unchanged). #54: three skills split out of this file. #55 to #58: notes on text-to-speech, relaxed tone, no motion sickness. #59 and #60: spear held pointing forward (the hand at the butt in #59, back at the middle in #60). #61: Quest screenshot black boxes are a capture bug. #62: hold the torch button for the spear's throwing grip. Waiting on Kane before touching: the backpack back zone (options if it still feels hard: a repeating buzz, a sound, a bigger zone,
 a visual cue). Only if Kane says go: a script and post for his explainer on tokens, API price and plan usage.
 

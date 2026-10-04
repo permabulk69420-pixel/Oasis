@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createTools, holsterPose } from '../src/tools.js';
-import { createSpearKind, SPEAR, SPEAR_GRIP, SPEAR_HELD_ROTATION, SPEAR_HOLSTER, SPEAR_THRUST_TILT } from '../src/spear.js';
+import { createSpearKind, SPEAR, SPEAR_GRIP, SPEAR_HELD_ROTATION, SPEAR_HOLSTER, SPEAR_THRUST_TILT, SPEAR_THROW_TILT, SPEAR_SWITCH, spearHeldRotation } from '../src/spear.js';
 import { createTorchKind } from '../src/torch.js';
 import { createAxeKind } from '../src/axe.js';
 import { terrainHeight } from '../src/world.js';
@@ -69,7 +69,7 @@ function fixture(t, { exposure = { value: 1 } } = {}) {
   const handTo = world => { rig.updateMatrixWorld(true); grip.position.copy(rig.worldToLocal(world.clone())); grip.updateMatrixWorld(true); };
   const squeeze = value => { buttons[1].pressed = value; tools.update(0.016); };
   tools.update(0.016); // place the belt
-  return { scene, rig, tools, state, handTo, squeeze, xrCamera, exposure };
+  return { scene, rig, tools, state, handTo, squeeze, xrCamera, exposure, buttons };
 }
 
 function clearInventory(type) {
@@ -294,4 +294,48 @@ test('the menu lists the spear recipe, crafts it, draws its icon, and puts it on
     globalThis.document = originalDocument;
     clearInventory('spear');
   }
+});
+
+test('hold the torch button with the spear in your hand and it turns to the throwing grip; let go and it turns back', t => {
+  const { tools, state, handTo, squeeze, buttons } = fixture(t);
+  const [spear] = tools.getInstances('spear');
+  handTo(worldOf(spear.root).add(new THREE.Vector3(0.05, 0.1, 0.05)));
+  squeeze(true);
+  assert.equal(spear.heldBy, state);
+  const poke = spear.root.quaternion.clone();
+  assert.ok(poke.angleTo(spearHeldRotation(SPEAR_THRUST_TILT)) < 1e-6, 'it starts as a poke');
+
+  const button = SPEAR_SWITCH.rightButton;
+  assert.equal(button, 5, 'B on the right controller, the same button as the torch');
+  buttons[button].pressed = true;
+  tools.update(0.016);
+  assert.ok(spear.root.quaternion.angleTo(poke) > 0, 'it starts turning at once');
+  assert.ok(spear.root.quaternion.angleTo(poke) < THREE.MathUtils.degToRad(SPEAR_THROW_TILT - SPEAR_THRUST_TILT), 'but not in a single frame');
+  for (let i = 0; i < 20; i++) tools.update(0.016);
+  assert.ok(spear.root.quaternion.angleTo(spearHeldRotation(SPEAR_THROW_TILT)) < 1e-6, 'a third of a second later it is in the throwing grip');
+  const expected = new THREE.Vector3(...SPEAR_GRIP.point).applyQuaternion(spear.root.quaternion).negate();
+  assert.ok(spear.root.position.distanceTo(expected) < 1e-9, 'the grip point stays in the palm while it turns');
+  assert.ok(Math.abs(spear.root.quaternion.angleTo(poke) - THREE.MathUtils.degToRad(SPEAR_THROW_TILT - SPEAR_THRUST_TILT)) < 1e-6);
+
+  buttons[button].pressed = false;
+  for (let i = 0; i < 20; i++) tools.update(0.016);
+  assert.ok(spear.root.quaternion.angleTo(poke) < 1e-6, 'and back to the poke');
+});
+
+test('the throwing grip is the same on the left hand (X), a dropped spear starts as a poke again, and the tilt stays one the fingers can close on', t => {
+  const { tools, state, handTo, squeeze, buttons } = fixture(t);
+  state.handedness = 'left';
+  const [spear] = tools.getInstances('spear');
+  handTo(worldOf(spear.root).add(new THREE.Vector3(0.05, 0.1, 0.05)));
+  squeeze(true);
+  assert.equal(spear.heldBy, state);
+  buttons[SPEAR_SWITCH.leftButton].pressed = true;
+  for (let i = 0; i < 20; i++) tools.update(0.016);
+  assert.ok(spear.root.quaternion.angleTo(spearHeldRotation(SPEAR_THROW_TILT)) < 1e-6);
+  squeeze(false); // let go while the button is still down
+  assert.equal(spear.heldBy, null);
+  tools.update(0.016);
+  buttons[SPEAR_SWITCH.leftButton].pressed = false;
+  tools.update(0.016);
+  assert.ok(SPEAR_THROW_TILT > SPEAR_THRUST_TILT && SPEAR_THROW_TILT <= 80, 'past about 80 degrees the fingers cannot close round the shaft');
 });

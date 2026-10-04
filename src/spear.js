@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SPAWN } from './world.js';
 import { setGripSurface } from './grip-contact.js';
 import { exposureGlow } from './glow.js';
+import { pulseHaptics } from './haptics.js';
 
 // The spear: a hand tool like the axe and the torch, and no more than that (it does not hurt or hunt anything). It stands
 // planted in the sand by the other starting tools, can be crafted, gripped by the leather wrap, carried on a hip and packed
@@ -33,7 +34,26 @@ export const SPEAR_GRIP = Object.freeze({ meshes: ['Shaft'], axis: [0, 1, 0], po
 // hands (the hold lab, `item=spear&pitch=-30`, solves the grip on both with this tilt). More than about 80 degrees stops the
 // fingers fitting round the shaft.
 export const SPEAR_THRUST_TILT = 35;
-export const SPEAR_HELD_ROTATION = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI + THREE.MathUtils.degToRad(SPEAR_THRUST_TILT));
+
+// The throwing grip. Hold the same button that lights a torch (B on the right controller, X on the left) with the spear in your
+// hand and it turns in your fist to THROW_TILT, so with your arm cocked back (forearm up) the point still faces forward and
+// a little up, like a javelin over the shoulder; let go of the button and it turns back to the poke. About 75 degrees is as far as the
+// fingers still close round the shaft (90 does not), so this is the biggest turn there is. It is one number to tune by feel.
+// Nothing is thrown yet: letting go of grip still just drops it (or holsters it).
+export const SPEAR_THROW_TILT = 75;
+export const SPEAR_SWITCH = Object.freeze({
+  rightButton: 5, // the same buttons as the torch's toggle (src/torch.js)
+  leftButton: 4,
+  turnSpeed: 500, // degrees per second, so the 40 degree turn takes under a tenth of a second
+  haptics: Object.freeze({ on: [0.35, 45], off: [0.2, 28] }),
+});
+
+const AXIS_X = new THREE.Vector3(1, 0, 0);
+// The spear's rotation in the hand for a given tilt: the flip every held tool has, then the tilt about the palm normal.
+export function spearHeldRotation(tilt, out = new THREE.Quaternion()) {
+  return out.setFromAxisAngle(AXIS_X, Math.PI + THREE.MathUtils.degToRad(tilt));
+}
+export const SPEAR_HELD_ROTATION = spearHeldRotation(SPEAR_THRUST_TILT);
 
 // Hip pose (see holsterPose in src/tools.js): where the shaft points, as [outward, up, backward] from the belt, and which
 // model-Y point sits on the hip anchor. The spear is longer than you can hang straight down, so it leans back about 33
@@ -54,6 +74,7 @@ export function createSpearKind({ getExposure = () => 1 } = {}) {
     heldRotation: SPEAR_HELD_ROTATION,
     holster: SPEAR_HOLSTER,
     spawns: [{ x: SPEAR.spawn.x, z: SPEAR.spawn.z }],
+    createState: () => ({ tilt: SPEAR_THRUST_TILT, switchDown: false }),
 
     // The copies share their materials, so the glow is set once on the template's.
     prepareTemplate(root) {
@@ -66,6 +87,28 @@ export function createSpearKind({ getExposure = () => 1 } = {}) {
         object.castShadow = false;
         object.receiveShadow = false;
       });
+    },
+    // Hold the torch button to turn the spear to the throwing grip; let go to turn it back. Nothing is allocated here.
+    update(instance, dt) {
+      const { heldBy, state, root } = instance;
+      if (!heldBy) {
+        state.tilt = SPEAR_THRUST_TILT; // dropped or holstered: the tools code sets its pose, and the next pickup starts as a poke
+        state.switchDown = false;
+        return;
+      }
+      const button = heldBy.handedness === 'left' ? SPEAR_SWITCH.leftButton : SPEAR_SWITCH.rightButton;
+      const pressed = Boolean(heldBy.inputSource?.gamepad?.buttons?.[button]?.pressed);
+      if (pressed !== state.switchDown) {
+        const [strength, ms] = pressed ? SPEAR_SWITCH.haptics.on : SPEAR_SWITCH.haptics.off;
+        pulseHaptics(heldBy, strength, ms);
+        state.switchDown = pressed;
+      }
+      const target = pressed ? SPEAR_THROW_TILT : SPEAR_THRUST_TILT;
+      if (state.tilt === target) return;
+      const step = SPEAR_SWITCH.turnSpeed * dt;
+      state.tilt = Math.abs(target - state.tilt) <= step ? target : state.tilt + Math.sign(target - state.tilt) * step;
+      spearHeldRotation(state.tilt, root.quaternion);
+      root.position.fromArray(SPEAR_GRIP.point).multiply(root.scale).applyQuaternion(root.quaternion).negate();
     },
     updateShared() {
       if (!glowMaterial) return;
