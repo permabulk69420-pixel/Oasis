@@ -113,7 +113,7 @@ intentional later"), so none of the fight, water or insect sounds. In this order
 4. Fight effects: sand puffs on the lunge and death, the dead stinger sinks into the sand instead of popping out of the world.
 5. Saving: a silent, versioned autosave of inventory, tools, fires, felled trees, position and time (`?fresh=1` starts clean; mismatched saves discarded).
 6. (Done.) Footprints in the sand (player and creature), filled in by the wind, one instanced draw call.
-7. Giant bones half buried in the dunes (Blender model with LODs) as landmarks; a crashed expedition wreck if time.
+7. (Done, #81.) Giant bones half buried in the dunes (Blender model with LODs) as landmarks; a crashed expedition wreck if time.
 8. A direction doc in the Project (`Projects` tool): the decisions only Kane can make, each with my one-line take, and the story seed we talked through
    (survivor of an expedition that came down on a desert moon with a ringed planet in the sky; the giant bones are what brought the ship down; the
    boss is its grown up version).
@@ -269,7 +269,7 @@ on you... just don't fire off subagent or do anything crazy"; "don't be afraid t
 about gameplay mechanic that's going to be something I really need to test and do myself"), no sound effects yet ("way more intentional later"). He
 wants "something more than just visual" and a reason to go out into the desert: a pickaxe, good stones or crystals, a "not a cactus" alien plant, PBR.
 Plan: pickaxe + desert finds, dune stinger v3 (Blender), fight effects, saving, footprints, giant bones, a direction doc in the Project. Keep the time
-(`TZ=Australia/Sydney date`). Done so far: #75 (smoke test in CI), #76 the pickaxe and desert finds, #77 the dune stinger v3, #78 fight effects (all below), #79 saving (below, last paragraph).
+(`TZ=Australia/Sydney date`). Done so far: #75 (smoke test in CI), #76 the pickaxe and desert finds, #77 the dune stinger v3, #78 fight effects (all below), #79 saving, #80 footprints, #81 giant bones (below, last paragraphs).
 
 Pickaxe and desert finds (my call, done; see README "The desert finds and the pickaxe"): `src/pickaxe.js` (a stone pickaxe like the axe, crafted from 3 sticks +
 3 stones, also stands by the starting tools, hurts the stinger for 26), `src/desert-finds.js` (fixed-seed layout of about 120 nodes in 25 sites),
@@ -312,3 +312,15 @@ Footprints (my call, done; README "Footprints", `src/footprints.js`, `tests/foot
 instanced draw call, nothing per frame, not saved, no sound. The quad is laid flat so it faces down: the material MUST stay `DoubleSide` (it was invisible until then). `flat` is a reserved word in GLSL ES 3.00, so
 a variable called `flat` kills the shader. Dev handle `window.__prints`. Oddities to tell Kane: look along a dune ridge in low sun (the dents show best from the sun's side and fade at noon), at night they hardly show
 (only the pressed floor), a trail is gone after about two and a half minutes, prints are not laid on grass or in the pond.
+
+Giant bones (my call on the look and the places, done, #81; README "The giant bones", `src/giant-bones.js`, `tools/giant-bones/build_bones.py`, `tests/giant-bones.test.js`): a colossal skull lying open-jawed in the dunes 230 m from the start, turned to face you,
+with the ribcage of the same animal 43 m behind it (a row of tall arches with a collapsed stretch of spine, one pair missing, snapped ends, fallen ribs), and a smaller ribcage 320 m out the other way. The carcass is searched for
+(`layoutBones`: level ground, clear of the pond, hero tree, stinger home and every find, ribs in sight of the start); the lone ribcage is at least 240 m from it. Models in `public/models/bones/giant_{ribs,skull}_lod{0,1,2}.glb`
+(23,592 / 5,716 / 2,256 and 17,088 / 4,476 / 1,496 triangles, one draw call each, vertex colours, one material `Bone`). The runtime fetches only the far level at the start, the others as you approach (prefetch at 1.5 times the distance), and keeps the
+nearest arrived level on screen meanwhile. Built with the shared `tools/props/propkit.py`, which had a bug I fixed on the way: the two end caps of a tube faced the same way, so one cap per tube was inside out (invisible from outside, and it made every skull
+tooth fail `check_mesh.py` with "inside_out"); other props built with it before are unaffected (their volumes are dominated by the sides) but a rebuild will now be correct. Another bug worth remembering: a random offset drawn inside a
+list comprehension is drawn once PER POINT; I drew the ribs' sideways nudge that way and every ring of every rib shifted, which made ledges all down the bone (the Blender close-up showed it, the game's distant shots did not): draw once, then apply it.
+When a mesh looks faceted in the game, render a close-up of the GLB in Blender first (`tools/props/render_preview.py ... --views close --focus x,y,z --dist 9`) to see whether the geometry or the shading is at fault.
+Oddities to tell Kane: you can walk through the bones (no collision), they cast no shadow, there is no sound; they are big (the skull about 18 m long, the ribs about 14 m tall with spines above); the close level is a 1.1 MB download that only
+starts when you are about 190 m from the ribs; at night they are a thin moonlit silhouette against the stars like the trees. The skull's mouth is dark inside and the bone is plain ivory with a faint mottle, so a texture pass (cracks, a real bone photo) is the obvious next step if he wants it closer.
+
