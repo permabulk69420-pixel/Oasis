@@ -25,11 +25,12 @@ export const PICKAXE = Object.freeze({
 });
 
 // What the fingers close on: the leather wrap in the middle of the haft, never the head or the tassel.
-export const PICKAXE_GRIP = Object.freeze({ meshes: ['Shaft'], axis: [0, 1, 0], point: [0, 0, 0] });
+// The hand takes it low on the haft, nearer the butt, the way a pickaxe is held (the wrap is in the middle, so the fist sits 14 cm below it).
+export const PICKAXE_GRIP = Object.freeze({ meshes: ['Shaft'], axis: [0, 1, 0], point: [0, -0.14, 0] });
 
-// Hip pose (see holsterPose in src/tools.js): the haft leans back about 30 degrees with the head behind the shoulder, like the
-// spear, so the butt end hangs well clear of the sand.
-export const PICKAXE_HOLSTER = Object.freeze({ dir: [0.10, 1, 0.55], along: 0.05 });
+// Hip pose (see holsterPose in src/tools.js): upside down, the head hanging at the hip and the haft leaning back about 30 degrees with the
+// handle end up behind the hip, so the hand that reaches for it closes on the handle, not on the head.
+export const PICKAXE_HOLSTER = Object.freeze({ dir: [-0.10, -1, -0.55], along: -0.10 });
 
 // The same flip the axe has (model +Y points opposite the hand socket's held-up direction), then a quarter turn about the haft so the
 // head's long side (the pick) points forward.
