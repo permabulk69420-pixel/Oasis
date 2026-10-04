@@ -20,13 +20,13 @@ export const WIND_SAND = Object.freeze({
     // Close in, where grains cross your feet and are big enough to see: a small box with plenty of them.
     near: Object.freeze({
       radius: 8, // metres: the box around the player; grains fade out toward its edge
-      count: 560,
+      count: 380,
       speed: [1.9, 4.6],
-      length: [0.07, 0.30],
+      length: [0.05, 0.20],
       width: [0.004, 0.010],
       height: 0.50, // the highest grains rise this far above the ground
       hop: 0.07, // how far a grain bounces
-      alpha: 0.50,
+      alpha: 0.32,
       near: [0.35, 1.1], // fades out this close to the eye
       round: 0.0, // 0 = a thin line, 1 = a round puff when seen end-on
       crest: 0.6, // extra lift and density on dune crests
@@ -36,13 +36,13 @@ export const WIND_SAND = Object.freeze({
     }),
     streaks: Object.freeze({
       radius: 26,
-      count: 520,
+      count: 320,
       speed: [1.7, 4.8],
-      length: [0.16, 0.65],
+      length: [0.10, 0.40],
       width: [0.006, 0.015],
       height: 0.70,
       hop: 0.10,
-      alpha: 0.50,
+      alpha: 0.30,
       near: [0.5, 1.6],
       round: 0.0,
       crest: 0.9,
@@ -50,21 +50,23 @@ export const WIND_SAND = Object.freeze({
       soft: 1.15,
       seed: 20261003,
     }),
-    // Soft veils hugging the ground and spilling over the crests: the part you see at a glance.
+    // Soft veils hugging the ground and spilling over the crests: the part you see at a glance. Thick and patchy,
+    // so they read as drifting plumes of sand and not as thin bright bars (see breakup).
     veils: Object.freeze({
       radius: 24,
-      count: 220,
+      count: 300,
       speed: [2.2, 4.4],
-      length: [1.6, 4.5],
-      width: [0.16, 0.42],
-      height: 0.55,
+      length: [1.4, 3.6],
+      width: [0.30, 0.80],
+      height: 0.42,
       hop: 0.0,
-      alpha: 0.60,
+      alpha: 0.30,
       near: [1.5, 4.0],
-      round: 0.35,
+      round: 0.7,
       crest: 1.4,
-      haze: 0.35,
-      soft: 1.3,
+      haze: 0.25,
+      breakup: 0.7, // 0 = a smooth sheet, 1 = broken up into patches that drift along it
+      soft: 1.4,
       seed: 20261005,
     }),
     // Big, very soft clouds of dust rolling past.
@@ -76,11 +78,12 @@ export const WIND_SAND = Object.freeze({
       width: [1.2, 2.4],
       height: 1.2,
       hop: 0.0,
-      alpha: 0.20,
+      alpha: 0.16,
       near: [2.5, 7.0],
       round: 0.9,
       crest: 1.6,
       haze: 0.55,
+      breakup: 0.5,
       soft: 1.8,
       seed: 20261004,
     }),
@@ -134,6 +137,7 @@ const VERTEX = /* glsl */`
   varying vec2 vUv;
   varying float vAlpha;
   varying float vTone;
+  varying float vSeed;
   varying vec3 vWorld;
   ${WIND_GLSL}
 
@@ -199,6 +203,7 @@ const VERTEX = /* glsl */`
     vAlpha = uGain * uAlpha * (0.45 + 0.55 * aSeedB.w) * (0.3 + 0.7 * gust) * (1.0 + 0.8 * crest)
       * edge * nearFade * calm * dry * thin;
     vTone = aSeedB.w;
+    vSeed = fract(aSeedB.z * 7.31 + aSeedA.x * 3.17);
   }
 `;
 
@@ -206,16 +211,35 @@ const FRAGMENT = /* glsl */`
   uniform vec3 uSun;
   uniform float uSoft;
   uniform float uHaze;
+  uniform float uBreakup;
   uniform float uTime;
   varying vec2 vUv;
   varying float vAlpha;
   varying float vTone;
+  varying float vSeed;
   varying vec3 vWorld;
+
+  // Value noise from a hash without sin(), so it is the same on every GPU.
+  float hash21(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+  float valueNoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x), mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x), f.y);
+  }
+
   void main() {
     float shape = (1.0 - vUv.x * vUv.x) * (1.0 - vUv.y * vUv.y);
     shape = pow(max(shape, 0.0), uSoft);
     shape *= 0.55 + 0.45 * (0.5 + 0.5 * vUv.x); // a little brighter at the leading end
     float a = shape * vAlpha;
+    if (uBreakup > 0.0) {
+      // Patches of denser and thinner sand, stretched along the wind and sliding down it, so a veil or a cloud is a
+      // wisp with ragged edges and not a smooth bar.
+      vec2 q = vec2(vUv.x * 1.3 - uTime * 0.25, vUv.y * 0.8) + vSeed * 41.0;
+      float n = 0.65 * valueNoise(q * vec2(2.2, 1.4)) + 0.35 * valueNoise(q * vec2(5.5, 3.2) + 7.1);
+      a *= mix(1.0, mix(0.30, 1.0, smoothstep(0.15, 0.90, n)), uBreakup); // thinner, never a hole
+    }
     if (a < 0.004) discard;
 
     float day = smoothstep(-0.07, 0.16, uSun.y);
@@ -227,7 +251,9 @@ const FRAGMENT = /* glsl */`
     vec3 sun = vec3(1.23, 1.09, 0.86) * (0.55 + 0.9 * backlit) * day;
     // a few grains catch the light and flash
     float glint = smoothstep(0.86, 1.0, vTone) * (0.5 + 0.5 * sin(uTime * 13.0 + vWorld.x * 7.0 + vWorld.z * 3.0));
-    gl_FragColor = vec4(sand * (ambient + sun) * (1.15 + 1.3 * glint * (1.0 - uHaze) * day), min(1.0, a * (1.0 + 0.8 * glint)));
+    // hazy layers are a touch darker, so a veil is the colour of the sand it drifts over and not a cream stripe
+    float lift = mix(1.15, 0.92, smoothstep(0.0, 0.4, uHaze));
+    gl_FragColor = vec4(sand * (ambient + sun) * (lift + 1.3 * glint * (1.0 - uHaze) * day), min(1.0, a * (1.0 + 0.8 * glint)));
     #include <tonemapping_fragment>
     // Faint moonlit dust at night, added after tone mapping like the terrain's own fill.
     gl_FragColor.rgb += sand * vec3(0.0060, 0.0090, 0.0165) * (1.0 - day);
@@ -260,6 +286,7 @@ function buildLayer(name, layer, shared, center) {
       uCrest: { value: layer.crest },
       uSoft: { value: layer.soft },
       uHaze: { value: layer.haze },
+      uBreakup: { value: layer.breakup ?? 0 },
     },
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
