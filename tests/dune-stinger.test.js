@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { DUNE_STINGER, isBlocked, lineOfSight } from '../src/dune-stinger.js';
+import { DUNE_STINGER, isBlocked, lineOfSight, sunkDepth, buriedWhileRising } from '../src/dune-stinger.js';
 import { createStinger, BRAIN } from '../src/stinger-brain.js';
 import { createHeightField, WATER, HERO_TREE, SPAWN, isInPond } from '../src/world.js';
 
@@ -80,4 +80,31 @@ test('the real dunes hide something: some of the places 20 m round its home cann
   }
   assert.ok(seen > 0, 'it can see some of the ring');
   assert.ok(seen + hidden === 24);
+});
+
+test('a dead stinger lies there a while, sinks smoothly into the dune, and is gone under it before it lingers out', () => {
+  const { sink } = DUNE_STINGER;
+  assert.equal(sunkDepth(0), 0);
+  assert.equal(sunkDepth(sink.start), 0);
+  let previous = 0;
+  for (let t = sink.start; t <= sink.finish; t += 0.5) {
+    const depth = sunkDepth(t);
+    assert.ok(depth >= previous - 1e-12, 'only ever down');
+    previous = depth;
+  }
+  assert.ok(Math.abs(sunkDepth(sink.finish) - sink.depth) < 1e-9, 'all the way down');
+  assert.equal(sunkDepth(sink.finish + 20), sink.depth, 'and no further');
+  assert.ok(sink.finish < BRAIN.deadLinger, 'it is buried before it disappears, so nothing pops out of the world');
+  assert.ok(sink.depth > 0.5, 'deep enough to hide a body that is about half a metre tall at scale 1');
+});
+
+test('a new stinger climbs out of the sand over a few seconds, ending at the surface', () => {
+  assert.ok(Math.abs(buriedWhileRising(DUNE_STINGER.rise) - DUNE_STINGER.sink.depth) < 1e-9, 'starts buried like the dead one');
+  assert.equal(buriedWhileRising(0), 0, 'ends at the surface');
+  let previous = Infinity;
+  for (let left = DUNE_STINGER.rise; left >= 0; left -= 0.1) {
+    const depth = buriedWhileRising(left);
+    assert.ok(depth <= previous + 1e-12, 'only ever up');
+    previous = depth;
+  }
 });

@@ -196,6 +196,11 @@ no death yet, and nothing drops from it yet.
   on guard, flung wide in the windup, snapping shut in the strike), the jaws, the tail's slow sway, the windup (tail cocked up and back), the strike (the
   tail arches over the body and the sting lands on the ground about 2.3 m ahead of its middle), the flinch and the death (the tail lies on the sand behind it, curled to one side).
   The walking cycle follows the ground covered (`JOINTS.stride`), so the feet do not skate.
+- The fight has some weight to it (`src/sand-puffs.js`, one instanced mesh of soft dust clouds for the whole world, 96 puffs at most, simulated on the CPU, lit like the
+  wind-blown sand and faded out where they meet the dune): sand is kicked up behind the stinger as it lunges, a ring of dust and a plume jump up where the sting lands,
+  a blow that connects knocks off a few dark chitin chips (the same `src/bursts.js` pool the mining uses) and a puff of sand, and when it dies it falls in a cloud with a
+  burst of chips. The dead body then **sinks into the dune** over the 40 s it lingers (the terrain hides it) and a new one **climbs out of the sand** at its home
+  when it respawns. Numbers are `DUNE_STINGER.sink`, `.rise` and `.fx`; the dev build has `window.__stinger` and `window.__sandPuffs` for screenshots.
 - `src/weapon-hits.js` is the other half of a fight: any tool kind with a `hit` entry (`src/spear.js`, `src/axe.js`: the point that does
   the damage, its radius, the speed it must reach and the damage at full speed) is checked every frame against anything with
   `hitTest` and `hurt`. `src/survival.js` has `damagePlayer`.

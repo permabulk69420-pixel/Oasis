@@ -3,7 +3,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { HERO_TREE, SPAWN, basinRadius, isInPond } from './world.js';
 import { createStingerPoser } from './stinger-pose.js';
-import { createStinger } from './stinger-brain.js';
+import { createStinger, BRAIN } from './stinger-brain.js';
+import { createBurstPool } from './bursts.js';
 import { createShadowTexture, pickLod } from './alien-bird.js';
 import { exposureGlow } from './glow.js';
 
@@ -12,7 +13,9 @@ import { exposureGlow } from './glow.js';
 // can be hurt by a spear or an axe moving fast enough (src/weapon-hits.js), backs away when hit and dies after a few good
 // blows. The behaviour is in src/stinger-brain.js, the poses in src/stinger-pose.js, the model in tools/dune-stinger/v3/.
 // This file makes the scene objects, puts the model on the ground (tilted to the slope), picks the level of detail, keeps the
-// glowing eyes and sting bright at night, draws a soft shadow, and answers the question "is this point inside it?" for hits.
+// glowing eyes and sting bright at night, draws a soft shadow, and answers the question "is this point inside it?" for hits. It also
+// does the fight's dust and chips: sand kicked up by the lunge, a ring of dust where the sting lands, chitin chips when a blow connects,
+// a cloud when it falls, and then the dead body slowly sinks into the dune (the terrain hides it) until it is gone.
 
 const BASE = import.meta.env?.BASE_URL ?? '/';
 
@@ -38,8 +41,27 @@ export const DUNE_STINGER = Object.freeze({
     ['Claw_L_Fore', 'Claw_L_Finger', 0.16], ['Claw_L_Finger', ['Claw_L_Finger', -0.06, 0, 0.2], 0.13],
     ['Claw_R_Fore', 'Claw_R_Finger', 0.14], ['Claw_R_Finger', ['Claw_R_Finger', 0.05, 0, 0.17], 0.11],
   ]),
+  // After it dies the body sinks into the sand: it starts `start` seconds after the death and is under (`depth` metres at scale 1) a little before it lingers out
+  sink: Object.freeze({ start: 6, depth: 0.7, finish: BRAIN.deadLinger - 1.5 }),
+  rise: 2.6, // seconds a new one takes to climb out of the sand at its home
+  // The fight's effects. Sizes are multiples of the puffs' own sizes (the stinger is big, so about half its scale).
+  fx: Object.freeze({
+    size: 0.5,
+    chitin: Object.freeze([0x1a0c06, 0x33180a, 0x52280f, 0x7d4a22, 0xa57a46]), // chips knocked off by a blow
+    trickleEvery: 1.1, // seconds between the small clouds while it sinks
+  }),
   broadRange: 7, // metres: a blow further than this from the middle of its body cannot touch it, so the balls are not worked out
 });
+
+// How far below the dune a body has sunk, in metres at scale 1: nothing until `start` seconds after it died, then a smooth slide down to
+// `depth` by `finish`. And how far a new one still has to climb, `left` seconds before it is out of the sand.
+const smooth01 = t => t * t * (3 - 2 * t);
+export function sunkDepth(deadFor, sink = DUNE_STINGER.sink) {
+  return smooth01(Math.min(1, Math.max(0, (deadFor - sink.start) / (sink.finish - sink.start)))) * sink.depth;
+}
+export function buriedWhileRising(left, rise = DUNE_STINGER.rise, sink = DUNE_STINGER.sink) {
+  return smooth01(Math.min(1, Math.max(0, left / rise))) * sink.depth;
+}
 
 // Keeps it out of the pond, off the shore and clear of the hero tree
 export function isBlocked(x, z) {
@@ -61,7 +83,7 @@ export function lineOfSight(groundAt, ax, ay, az, bx, by, bz, margin = 0.25, ski
 }
 
 export function createDuneStinger({
-  scene, renderer = null, camera = null, field, getExposure = () => 1, rng = Math.random, onError = () => {}, onPlayerHit = () => {},
+  scene, renderer = null, camera = null, field, getExposure = () => 1, rng = Math.random, onError = () => {}, onPlayerHit = () => {}, puffs = null,
 }) {
   const cfg = DUNE_STINGER;
   const scale = cfg.scale;
@@ -70,9 +92,32 @@ export function createDuneStinger({
     blocked: (x, z) => isBlocked(x, z) || isInPond(x, z, field.sample(x, z)),
     canSee: (ax, ay, az, bx, by, bz) => lineOfSight(field.sample, ax, ay, az, bx, by, bz),
   };
+  const lastHit = { x: 0, y: 0, z: 0, at: -10 }; // where the latest blow landed (hitTest notes it, hurt uses it), for the chips
+  const chips = createBurstPool({
+    capacity: 40, heightAt: field.sample,
+    material: new THREE.MeshStandardMaterial({ name: 'Chitin chips', roughness: 0.5, metalness: 0.15 }),
+  });
+  scene.add(chips.mesh);
+  const fxSize = cfg.fx.size * scale / 1.25; // the puffs are made for a 1.25 m body; this one is bigger
   const brain = createStinger({
     world, rng, home: cfg.home, scale,
-    onStrike: strike => { if (strike.hit) onPlayerHit(strike); },
+    onStrike: strike => {
+      puffs?.impact(strike.x, strike.z, { size: fxSize, strength: strike.hit ? 1.3 : 1 });
+      if (strike.hit) onPlayerHit(strike);
+    },
+    onHurt: () => {
+      const fresh = brain.state.time - lastHit.at < 0.25;
+      const x = fresh ? lastHit.x : brain.state.x;
+      const y = fresh ? lastHit.y : height + 0.5 * scale;
+      const z = fresh ? lastHit.z : brain.state.z;
+      chips.emit(x, y, z, 9, { speed: 3.2, colours: cfg.fx.chitin, sizes: [0.025, 0.06], lifetime: [0.8, 1.4], upward: 1.4 });
+      puffs?.trickle(x, z, { size: fxSize * 0.8, count: 3, radius: 0.5 });
+    },
+    onDeath: () => {
+      const { x, z } = brain.state;
+      chips.emit(x, height + 0.5 * scale, z, 22, { speed: 4.2, colours: cfg.fx.chitin, sizes: [0.03, 0.08], lifetime: [1, 1.8], upward: 2 });
+      puffs?.collapse(x, z, { size: fxSize });
+    },
   });
   const state = brain.state;
   const glowMaterials = [];
@@ -90,6 +135,11 @@ export function createDuneStinger({
   let pitch = 0;
   let roll = 0;
   let appliedGlow = -1;
+  let lastMode = 'idle';
+  let trickleClock = 0;
+  let emerge = 0; // seconds left of climbing out of the sand after a respawn
+  let buried = 0; // metres the body is below the dune (a dead one sinks, a new one climbs out)
+  let sunkPuffed = false;
   const up = new THREE.Vector3(0, 1, 0);
   const normal = new THREE.Vector3();
   const qTilt = new THREE.Quaternion();
@@ -155,7 +205,10 @@ export function createDuneStinger({
       t = t < 0 ? 0 : t > 1 ? 1 : t;
       const dx = ends[k] + abx * t - point.x, dy = ends[k + 1] + aby * t - point.y, dz = ends[k + 2] + abz * t - point.z;
       const reach = parts[i][2] * scale + radius;
-      if (dx * dx + dy * dy + dz * dz <= reach * reach) return true;
+      if (dx * dx + dy * dy + dz * dz <= reach * reach) {
+        lastHit.x = point.x; lastHit.y = point.y; lastHit.z = point.z; lastHit.at = state.time;
+        return true;
+      }
     }
     return false;
   }
@@ -164,6 +217,7 @@ export function createDuneStinger({
   const hurt = amount => brain.hurt(amount);
 
   function update(dt, head) {
+    chips.update(dt);
     if (!ready) return;
     brain.update(dt, head);
     const distance = Math.hypot(head.x - state.x, head.z - state.z);
@@ -182,7 +236,30 @@ export function createDuneStinger({
       pitch += (g.pitch - pitch) * k;
       roll += (g.roll - roll) * k;
     }
-    holder.position.set(state.x, height, state.z);
+    // dust where it kicks off into a lunge; a dead body sinks, and a new one climbs out of the sand
+    if (state.mode !== lastMode) {
+      if (state.mode === 'strike') puffs?.kick(state.x, state.z, Math.sin(state.yaw), Math.cos(state.yaw), { size: fxSize, count: 7 });
+      if (lastMode === 'dead') emerge = cfg.rise;
+      lastMode = state.mode;
+    }
+    if (state.mode === 'dead') {
+      const sinking = state.deadFor > cfg.sink.start && state.deadFor < cfg.sink.finish;
+      buried = sunkDepth(state.deadFor) * scale;
+      if (sinking) {
+        trickleClock += dt;
+        if (trickleClock > cfg.fx.trickleEvery) { trickleClock = 0; puffs?.trickle(state.x, state.z, { size: fxSize, count: 2, radius: 1.6 }); }
+      }
+      if (state.deadFor >= cfg.sink.finish && !sunkPuffed) { sunkPuffed = true; puffs?.collapse(state.x, state.z, { size: fxSize * 0.6 }); }
+    } else {
+      sunkPuffed = false;
+      if (emerge > 0) {
+        emerge = Math.max(0, emerge - dt);
+        buried = buriedWhileRising(emerge) * scale;
+        trickleClock += dt;
+        if (trickleClock > cfg.fx.trickleEvery * 0.5) { trickleClock = 0; puffs?.trickle(state.x, state.z, { size: fxSize, count: 2, radius: 1.6 }); }
+      } else buried = 0;
+    }
+    holder.position.set(state.x, height - buried, state.z);
     holder.rotation.set(pitch, state.yaw, roll);
 
     const head3 = Math.hypot(distance, head.y - height);
@@ -204,6 +281,7 @@ export function createDuneStinger({
     shadow.quaternion.copy(qTilt).multiply(qTurn);
     shadow.position.set(state.x, field.sample(state.x, state.z) + cfg.shadow.lift, state.z);
     shadow.scale.set(cfg.shadow.width * scale * 2, 1, cfg.shadow.length * scale * 2);
+    shadow.material.opacity = cfg.shadow.opacity * (1 - Math.min(1, buried / (cfg.sink.depth * scale)));
   }
 
   const loader = new GLTFLoader();
