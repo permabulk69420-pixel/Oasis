@@ -173,6 +173,12 @@ for the least change is the grass (cull patches behind the view when it rebuilds
 level of detail for the veil tree (Kane has said to leave that tree alone, so ask first).
 ## Day session log (4 Oct 2026, Kane and me)
 
+Dune stinger (first creature, `tools/dune-stinger/`): the other model's first build (3 LODs 4,482 / 1,560 / 582 tris, 49 bones) passes my checks
+(`python3 tools/creature/check_glb.py`: numpy + trimesh, no Blender) and loads and bends in three.js, but it is artistically generic and barely
+glows. It is kept in `tools/`, NOT in `public/`, and waits for Kane's OK; the plan I gave him is to use it as a base and improve it myself
+(bigger head with a lit eye band, thicker legs that differ along the body, banded rust colour, a brighter stinger seam), then wire it to code-driven
+animation like the bird. Gameplay (damage, death, behaviour) is still Kane's call.
+
 Dropping and throwing (`src/falling.js`, `src/hand-motion.js`; Kane said "100% go for it"): a tool you let go of falls with your hand's
 speed and turn (letting go while swinging throws it), bounces a little, topples and lies along the ground (axe rolls its head flat), and a spear
 point-first at 3+ m/s sticks in the sand. A lying tool can be grabbed anywhere along its length. Tools have `fall: { radius, landing, com }` in
