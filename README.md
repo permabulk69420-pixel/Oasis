@@ -270,7 +270,12 @@ emissive floor, so the shaded side keeps its detail. Two versions of the bark:
 - A real photographed palm bark (**Palm Bark** by Charlotte Baglioni, Poly Haven, CC0; see `public/textures/bark/CREDITS.md`): a neutral grey
   detail map plus a normal map, 1024 x 1024 each, about 0.8 MB, loaded in the background and swapped in when it arrives. The colour comes
   from the vertices, so the same bark can be teal, brown or grey. `python3 tools/textures/make_bark.py <dir>` makes the two files from the
-  Poly Haven download. The leaf detail stays drawn: the fronds are thin and read by shape, and a photo would not show.
+  Poly Haven download.
+
+The fronds wear the alien desert plant's own leaf texture (`public/textures/alien_desert_plant/alien_desert_plant_leaf_albedo.png`, the same file
+those plants load, so no extra download), loaded in the background over a drawn grey leaf detail. It replaces the model's vertex colours,
+because the blue read too blue. `?leaf=dark|plant|bright|plain` switches the look in production (`plant` is the default; `plain` is the old
+blue; the table is `LEAF_LOOKS` in `src/surface-textures.js`).
 
 To use the same bark on a new model, give it UVs with u once round and v = height in metres * 1.25 (`BARK.tilesPerMetre`; a test keeps the
 palm builder's constant in step), and name the material `Banded teal bark` (or add a name to `SURFACE_BY_MATERIAL`). The nine outer palms now
@@ -278,7 +283,11 @@ each have their own size and turn.
 
 All three grow their fronds from the same seeds, so a frond has the same length, angle and droop at every level and the tree does not change
 shape when one takes over from another. Each level is one object with two materials, so a tree costs 2 draw calls at any distance, and the
-whole file set is 348 KB (the first trees were 2.2 MB). At the pond that took the view from 688,000 to 563,000 triangles.
+whole file set is 348 KB (the first trees were 2.2 MB).
+
+**Browser cache.** GitHub Pages lets a browser keep a file for 10 minutes. Every model and texture request therefore carries `?v=<build id>`
+(`src/asset-version.js`, the id is set in `vite.config.js` from the commit), so a new deploy is fetched fresh as soon as the new page loads.
+To get past a cached page, open the URL with any extra query, such as `?x=1`. Sounds are not versioned. At the pond that took the view from 688,000 to 563,000 triangles.
 
 - `?trees=old` puts the first blue trees back to compare (their files are still in `public/models/vegetation/alien-tree/`). Dev build only:
   `?treelod=0|1|2` draws every tree at one level, to judge it on its own.
