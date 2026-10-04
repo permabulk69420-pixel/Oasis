@@ -24,6 +24,9 @@ work. What he has told me, or shown he wants, across sessions:
 - **Performance in the headset is fine right now** (he says the grass and the hero tree with no level of detail are not a problem), so do
   not optimise them ahead of a real problem. Real 1k CC0 PBR textures are fine where they matter up close (bark, ground), at 1k not 2k, and
   not on thin leaves. Poly Haven (`api.polyhaven.com`) and ambientCG are reachable and free.
+- **He often talks to me by text-to-speech, with an Australian accent**, so messages come through long, without punctuation, and sometimes with
+  words the transcriber got wrong. Read for the meaning. If a word or a whole request could be a mishearing and the guess would matter (which
+  tree, which file, which look), ask him one short question rather than building on it. He asked for exactly that.
 - **Do not make him repeat himself.** When he tells me a fact, rule or preference, it goes in this file before the session ends. If I hit
   the same pain twice, add a note here and tell him (he asked for that).
 - Everything above sits on top of the standing rules below (no sub-agents, nothing that costs money, no keys, merge what is verified).
