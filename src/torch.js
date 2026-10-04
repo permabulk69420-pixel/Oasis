@@ -217,6 +217,9 @@ export function createTorchKind({ scene, onError = console.warn }) {
     },
     createState: () => ({ lit: false, toggleDown: false, flame: null, flameAnchor: null, audio: null }),
     onDispose(instance) { setLit(instance, false); },
+    // The save: a torch that is burning is still burning when the game comes back.
+    saveState: instance => (instance.state.lit ? { lit: true } : null),
+    loadState(instance, data) { if (data?.lit === true) setLit(instance, true); },
 
     update(instance, dt) {
       const { heldBy, state } = instance;

@@ -128,6 +128,7 @@ Add a `creature-pipeline` skill (`.claude/skills/`) when the stinger v3 build is
 - Long procedures live in project skills (`.claude/skills/`): `ship-a-change`, `grip-debug`, `perf-triangles`. Load one when the job matches; add a new
   skill when a procedure needs more than a few lines here (Kane gave me full authority over this file and the skills).
 - `gh pr create` fails here (GraphQL is blocked): use the REST API. Commands, merge routine and stop-hook notes are in the `ship-a-change` skill.
+- `?fresh=1` starts a new game (works in production; the old save is kept aside, see "Saving" below). A dev build saves nothing unless the address has `?save=1`, so none of the fixtures below meet a save.
 - Dev-only URL fixtures (stripped from production): `?view=...`, `?hour=N` (0 night, 14 day),
   `?camp=lit|unlit`, `?campd=<metres>`, `?bird=perch|fly|flare`, `?view=pack`, `?pack=worn`, `?view=spear`, `?treelod=0|1|2` (every tree at
   one level of detail). `?trees=old` also works in production (the first blue trees, for comparison). Add one when a new
@@ -268,7 +269,7 @@ on you... just don't fire off subagent or do anything crazy"; "don't be afraid t
 about gameplay mechanic that's going to be something I really need to test and do myself"), no sound effects yet ("way more intentional later"). He
 wants "something more than just visual" and a reason to go out into the desert: a pickaxe, good stones or crystals, a "not a cactus" alien plant, PBR.
 Plan: pickaxe + desert finds, dune stinger v3 (Blender), fight effects, saving, footprints, giant bones, a direction doc in the Project. Keep the time
-(`TZ=Australia/Sydney date`). Done so far: #75 (smoke test in CI), #76 the pickaxe and desert finds, #77 the dune stinger v3 (both below).
+(`TZ=Australia/Sydney date`). Done so far: #75 (smoke test in CI), #76 the pickaxe and desert finds, #77 the dune stinger v3, #78 fight effects (all below), #79 saving (below, last paragraph).
 
 Pickaxe and desert finds (my call, done; see README "The desert finds and the pickaxe"): `src/pickaxe.js` (a stone pickaxe like the axe, crafted from 3 sticks +
 3 stones, also stands by the starting tools, hurts the stinger for 26), `src/desert-finds.js` (fixed-seed layout of about 120 nodes in 25 sites),
@@ -296,3 +297,13 @@ CPU simulated, `impact`/`kick`/`collapse`/`trickle` presets, a fade near the gro
 lands, chitin chips (the mining's `bursts.js` pool) and a puff when a blow connects, a cloud and chips when it dies, the dead body sinking into the dune from 6 s to 38.5 s (`DUNE_STINGER.sink`) and a new one climbing out of the sand
 over 2.6 s at its home. No sound and no screen effect when you are hit (haptics only, still). Oddities to tell Kane: the dust is pale and soft on purpose, so look for it at the sting's landing and when it falls; at night it is a faint
 moonlit smudge; the dead body is under the sand by about 38 s, which is just before the 40 s it lingers.
+
+Saving (my call, done; README "Saving", `src/save-game.js`): a silent autosave in local storage every 10 s and when the page is hidden, the headset comes off, a VR session ends or the menu closes. Saved: inventory,
+health/food/water/stamina, time of day, where you stand and face (a VR session starts there too, not at the world's start), every tool (hip, lying, planted, a burning torch), campfires and whether lit, the backpack, the rocks you have
+broken (mining already had `serialize()/restore()`). Not saved on purpose: trees (they regrow in 3 minutes), loose sticks, stones and fruit (scattered again), the creatures. Rules that keep it safe: nothing is written until every saved
+part has been put back and the models (tools, fire, pack) have loaded; every number in a save is checked on the way in (`cleanSave`), a damaged part is dropped and the rest kept; a save the game cannot read, or that has been through two
+starts that never drew for 3 s, is set aside under `oasis-save-kept` and the game starts clean; local storage that refuses is fine. A tool kind the save never heard of keeps its starting tool (that is how a new tool reaches an old save).
+When something new needs to survive a reload: add a slot in `src/main.js` (`createAutosave` list) and a cleaner in `CLEANERS` (`src/save-game.js`), and a test; bump `SAVE.version` only if an old save can no longer be read.
+Oddities to tell Kane: he comes back where he left off, so to see the start of the world (the starting tools, the stinger's ground) open the page with `?fresh=1`; the sticks, stones and fruit you picked up are back on the ground next time
+while the ones in your inventory stay (a small duplication, left alone for now); a stick or stone in your hand when the page closes is lost.
+

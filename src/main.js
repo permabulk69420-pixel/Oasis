@@ -23,10 +23,11 @@ import { SPEAR } from './spear.js';
 import { stepBody } from './falling.js';
 import { windTime, windStrength } from './wind.js';
 import { installNightFill } from './night-fill.js';
-import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater, damagePlayer } from './survival.js';
+import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater, damagePlayer, exportSurvival, importSurvival } from './survival.js';
 import { pulseHaptics } from './haptics.js';
 import { createSurvivorMenu } from './survivor-menu.js';
-import { getInventoryWeight, getCarryCapacity, getCarrySpeedMultiplier, removeInventoryItem } from './inventory.js';
+import { getInventoryWeight, getCarryCapacity, getCarrySpeedMultiplier, removeInventoryItem, getInventoryItems, importInventoryItems } from './inventory.js';
+import { createSaveStore, createAutosave, wantsFresh } from './save-game.js';
 
 // Every model and texture asks for ?v=<build id>, so a new deploy is never answered from the browser's 10 minute cache.
 installAssetVersioning();
@@ -346,11 +347,50 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).get('pack') === 
 // Development-only: ?camp=lit or ?camp=unlit puts a campfire in view near the spawn point.
 let devCamp = import.meta.env.DEV ? new URLSearchParams(location.search).get('camp') : null;
 
+// Saving (src/save-game.js): the game keeps itself in local storage and picks up where you left off. No button, no menu.
+// ?fresh=1 starts a new game. A dev build saves nothing unless the address has ?save=1, so the screenshot fixtures stay repeatable.
+const pageParams = new URLSearchParams(location.search);
+const saveStore = createSaveStore();
+const savingEnabled = (!import.meta.env.DEV || pageParams.get('save') === '1') && saveStore.available();
+const askedFresh = wantsFresh(location.search);
+const saveStart = savingEnabled ? saveStore.begin({ fresh: askedFresh }) : { save: null, note: 'off' };
+if (askedFresh) { // so reloading the page does not start another new game
+  try { const clean = new URL(location.href); clean.searchParams.delete('fresh'); history.replaceState(null, '', clean.href); } catch { /* the address stays as it is */ }
+}
+// Where a VR session starts: the start of the world, or where the saved game left you (and from then on, where you left VR).
+let startPoint = { x: SPAWN.x, z: SPAWN.z, yaw: 0 };
+function placePlayer({ x, z, yaw }) {
+  startPoint = { x, z, yaw };
+  groundY = field.sample(x, z);
+  rig.position.set(x, groundY, z);
+  rig.rotation.y = yaw;
+}
+const autosave = createAutosave({
+  store: saveStore, save: saveStart.save, enabled: savingEnabled,
+  onWarn: message => console.warn(message),
+  slots: [
+    { key: 'inventory', read: getInventoryItems, write: importInventoryItems },
+    { key: 'survival', read: exportSurvival, write: importSurvival },
+    { key: 'time', read: () => dayNight.getState().hours, write: hours => dayNight.setTimeOfDay(hours) },
+    { key: 'player', read: () => ({ x: head.x, z: head.z, yaw: rig.rotation.y }), write: placePlayer },
+    // the models arrive a moment after the page: these wait for them
+    { key: 'tools', ready: () => hands.tools.ready, read: () => hands.tools.snapshot(), write: data => hands.tools.restoreSnapshot(data) },
+    { key: 'fires', ready: () => campfires.ready, read: () => campfires.list().map(fire => ({ x: fire.x, z: fire.z, lit: fire.lit })), write: fires => { for (const fire of fires) campfires.place(fire.x, fire.z, { lit: fire.lit }); } },
+    { key: 'pack', ready: () => backpack.ready, read: () => backpack.snapshot(), write: data => backpack.restore(data) },
+    { key: 'mining', read: () => mining.serialize(), write: data => mining.restore(data) },
+  ],
+});
+autosave.update(); // what is already loaded goes back now, before the first frame
+if (import.meta.env.DEV) window.__save = { autosave, store: saveStore, start: saveStart.note, world: { THREE, rig, campfires, tools: hands.tools, backpack, mining, dayNight } }; // dev only: for the save's browser test
+document.addEventListener('visibilitychange', () => { if (document.hidden) autosave.flush(); });
+window.addEventListener('pagehide', () => autosave.flush());
+
 const survivorMenu = createSurvivorMenu({
   scene, renderer, states: hands.states, tools: hands.tools, backpack, onPlace: placeFromMenu,
   onToggle(open) {
     keys.clear(); touchMove = { x: 0, z: 0 }; touchMoveId = null; touchLookId = null; mouseDragging = false;
     velocity.set(0, 0, 0); footsteps.reset(); movePad.firstElementChild.style.transform = '';
+    if (!open) autosave.flush(); // you have just crafted or packed something
     touchControls.hidden = open || !playing || !touchDevice || renderer.xr.isPresenting;
     if (open) document.exitPointerLock?.();
     else if (playing && !touchDevice && !renderer.xr.isPresenting) {
@@ -467,9 +507,9 @@ renderer.xr.addEventListener('sessionstart', () => {
   document.exitPointerLock?.(); clearInput();
 
   // Match dumbgame's XR start state: no hidden world yaw or desktop camera transform.
-  groundY = field.sample(SPAWN.x, SPAWN.z);
-  rig.position.set(SPAWN.x, groundY, SPAWN.z);
-  rig.rotation.set(0, 0, 0);
+  groundY = field.sample(startPoint.x, startPoint.z);
+  rig.position.set(startPoint.x, groundY, startPoint.z);
+  rig.rotation.set(0, startPoint.yaw, 0);
   rig.scale.set(1, 1, 1);
   camera.position.set(0, 0, 0);
   camera.quaternion.identity();
@@ -482,9 +522,14 @@ renderer.xr.addEventListener('sessionstart', () => {
 
   setPlaying(true); menu.hidden = true; touchControls.hidden = true;
   const session = renderer.xr.getSession();
-  session.addEventListener('visibilitychange', clearInput);
+  session.addEventListener('visibilitychange', () => {
+    clearInput();
+    if (session.visibilityState !== 'visible') autosave.flush(); // the headset came off
+  });
 });
 renderer.xr.addEventListener('sessionend', () => {
+  autosave.flush();
+  if (savingEnabled) startPoint = { x: head.x, z: head.z, yaw: rig.rotation.y }; // the next session picks up from here, not from the start
   groundY = field.sample(head.x, head.z);
   rig.position.set(head.x, groundY, head.z);
   rig.rotation.y = -Math.atan2(WATER.x, -WATER.z);
@@ -541,6 +586,7 @@ function readInput() {
 function frame(time) {
   const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0;
   lastTime = time;
+  autosave.update(); // first, so what a save puts back (where you stand, the tools) is in place before anything reads it
   dayNight.update(dt);
   glowFruit.update(dt);
   campfires.update(dt, renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
@@ -722,6 +768,7 @@ function frame(time) {
     canvas.dataset.render = JSON.stringify({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures });
     canvas.dataset.birds = JSON.stringify(alienBirds.list());
     canvas.dataset.stinger = JSON.stringify(duneStinger.list());
+    canvas.dataset.save = JSON.stringify(autosave.status());
     canvas.dataset.finds = JSON.stringify({ stats: mining.stats(), near: mining.list(head, 60) });
     canvas.dataset.pack = JSON.stringify(backpack.list());
     canvas.dataset.campfires = JSON.stringify(campfires.list().map(fire => ({ x: +fire.x.toFixed(1), z: +fire.z.toFixed(1), lit: fire.lit })));
