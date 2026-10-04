@@ -11,7 +11,7 @@ test('its three models are in the game, small enough for a Quest, and cheaper at
   const sizes = DUNE_STINGER.files.map(url => fs.statSync(new URL(`../public/models/creatures/${url.split('/').pop()}`, import.meta.url)).size);
   assert.equal(sizes.length, 3);
   assert.ok(sizes[0] > sizes[1] && sizes[1] > sizes[2], `file sizes ${sizes}`);
-  assert.ok(sizes[0] < 1_000_000, 'the close-up model stays under a megabyte');
+  assert.ok(sizes[0] < 2_000_000, 'the close-up model stays under two megabytes');
   assert.deepEqual(DUNE_STINGER.lodDistances.length, 3);
   assert.ok(DUNE_STINGER.lodDistances.every((d, i, all) => i === 0 || d > all[i - 1]));
 });

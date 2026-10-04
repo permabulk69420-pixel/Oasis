@@ -10,7 +10,7 @@ import { exposureGlow } from './glow.js';
 // The dune stinger in the game: one of them lives in the dunes to the right of where you start. It wanders slowly; when it
 // sees you it stalks you, rears its tail back (the warning, with its eyes flaring) and strikes where you were standing. It
 // can be hurt by a spear or an axe moving fast enough (src/weapon-hits.js), backs away when hit and dies after a few good
-// blows. The behaviour is in src/stinger-brain.js, the poses in src/stinger-pose.js, the model in tools/dune-stinger/ (v2).
+// blows. The behaviour is in src/stinger-brain.js, the poses in src/stinger-pose.js, the model in tools/dune-stinger/v3/.
 // This file makes the scene objects, puts the model on the ground (tilted to the slope), picks the level of detail, keeps the
 // glowing eyes and sting bright at night, draws a soft shadow, and answers the question "is this point inside it?" for hits.
 
@@ -18,21 +18,25 @@ const BASE = import.meta.env?.BASE_URL ?? '/';
 
 export const DUNE_STINGER = Object.freeze({
   files: [0, 1, 2].map(level => `${BASE}models/creatures/dune_stinger_lod${level}.glb`),
-  scale: 2.5, // the model is a dog-sized 1.5 m long; at 2.5 it is a 3.7 m predator whose tail arches about 2.8 m high
+  scale: 2.5, // the body and claws are 1.5 m long in the model; at 2.5 it is a 3.8 m predator whose tail arches about 3.5 m high
   lodDistances: [0, 28, 80], // metres at which each model takes over from the one before
   lodHysteresis: 0.08,
   home: Object.freeze({ x: SPAWN.x + 46, z: SPAWN.z - 6 }), // in the dunes to the right of the start (facing the pond)
   hideBeyond: 280, // metres: past this nothing is drawn
   // How bright the glowing eyes and sting look (displayed brightness: the tone-mapping exposure is divided out)
-  glow: Object.freeze({ day: 0.9, night: 1.1 }),
-  feet: Object.freeze({ half: 0.55, side: 0.33 }), // metres at scale 1 from the middle to where the ground is read: ahead/behind and to the sides
+  glow: Object.freeze({ day: 0.5, night: 0.4 }), // the model's cyan clips to white above about 0.5 displayed brightness; the flare in the windup is what takes it to white
+  feet: Object.freeze({ half: 0.42, side: 0.55 }), // metres at scale 1 from the middle to where the ground is read: ahead/behind and to the sides (the toes stand at 0.48 to 0.61 out and 0.46 ahead to 0.36 behind)
   settle: 9, // per second: how quickly its height and tilt follow the ground
-  shadow: Object.freeze({ opacity: 0.4, lift: 0.04, length: 1.25, width: 0.95 }), // metres at scale 1 (half of the shadow's size)
+  shadow: Object.freeze({ opacity: 0.4, lift: 0.04, length: 1.05, width: 0.78 }), // metres at scale 1 (half of the shadow's size)
   flare: 1.8, // how much brighter the eyes and sting get in the windup and the strike (a multiple of the usual glow)
-  // Where a blow can land: a ball round each of these bones, radius in metres at scale 1.
-  hitBalls: Object.freeze([
-    ['Head', 0.24], ['Seg02', 0.26], ['Seg04', 0.27], ['Seg06', 0.25], ['Seg08', 0.21],
-    ['Tail1', 0.14], ['Tail2', 0.12], ['Tail3', 0.11], ['Tail4', 0.10], ['Stinger', 0.10],
+  // Where a blow can land: a capsule from one bone to another, radius in metres at scale 1. The end can also be a point [bone, x, y, z] in a
+  // bone's own space (the sting's point, a claw's tip: every bone rests with no turn, so those are plain offsets from the bone).
+  hitParts: Object.freeze([
+    ['Head', 'Body', 0.25], ['Body', 'Seg03', 0.28], ['Seg03', 'Tail1', 0.24],
+    ['Tail1', 'Tail2', 0.13], ['Tail2', 'Tail3', 0.125], ['Tail3', 'Tail4', 0.115], ['Tail4', 'Tail5', 0.105], ['Tail5', 'Stinger', 0.10],
+    ['Stinger', ['Stinger', 0, -0.25, 0.26], 0.10],
+    ['Claw_L_Fore', 'Claw_L_Finger', 0.16], ['Claw_L_Finger', ['Claw_L_Finger', -0.06, 0, 0.2], 0.13],
+    ['Claw_R_Fore', 'Claw_R_Finger', 0.14], ['Claw_R_Finger', ['Claw_R_Finger', 0.05, 0, 0.17], 0.11],
   ]),
   broadRange: 7, // metres: a blow further than this from the middle of its body cannot touch it, so the balls are not worked out
 });
@@ -119,16 +123,39 @@ export function createDuneStinger({
   }
 
   // Is this point (a weapon's tip, say, with a radius for the weapon's own thickness) inside the stinger? Only worked out when it is close.
-  const ballCentre = new THREE.Vector3();
+  // The ends of the capsules are read from the bones once per frame, the first time a blow asks.
+  const parts = cfg.hitParts;
+  const ends = new Float32Array(parts.length * 6);
+  let endsStale = true;
+  const endPoint = new THREE.Vector3();
+  function readEnd(bones, spec, at) {
+    if (typeof spec === 'string') endPoint.setFromMatrixPosition(bones[spec].matrixWorld);
+    else endPoint.set(spec[1], spec[2], spec[3]).applyMatrix4(bones[spec[0]].matrixWorld);
+    ends[at] = endPoint.x; ends[at + 1] = endPoint.y; ends[at + 2] = endPoint.z;
+  }
+  function refreshEnds() {
+    holder.updateMatrixWorld(true);
+    const { bones } = levels[lod].poser;
+    for (let i = 0; i < parts.length; i++) {
+      readEnd(bones, parts[i][0], i * 6);
+      readEnd(bones, parts[i][1], i * 6 + 3);
+    }
+    endsStale = false;
+  }
   function hitTest(point, radius = 0) {
     if (!ready || !attached || state.mode === 'dead') return false;
     const broad = cfg.broadRange * scale / 2.5 + radius;
     if ((point.x - state.x) ** 2 + (point.z - state.z) ** 2 > broad * broad || point.y < height - 0.5 || point.y > height + 4 * scale) return false;
-    const { bones } = levels[lod].poser;
-    for (const [name, size] of cfg.hitBalls) {
-      bones[name].getWorldPosition(ballCentre);
-      const reach = size * scale + radius;
-      if (ballCentre.distanceToSquared(point) <= reach * reach) return true;
+    if (endsStale) refreshEnds();
+    for (let i = 0; i < parts.length; i++) {
+      const k = i * 6;
+      const abx = ends[k + 3] - ends[k], aby = ends[k + 4] - ends[k + 1], abz = ends[k + 5] - ends[k + 2];
+      const length2 = abx * abx + aby * aby + abz * abz;
+      let t = length2 > 1e-9 ? ((point.x - ends[k]) * abx + (point.y - ends[k + 1]) * aby + (point.z - ends[k + 2]) * abz) / length2 : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const dx = ends[k] + abx * t - point.x, dy = ends[k + 1] + aby * t - point.y, dz = ends[k + 2] + abz * t - point.z;
+      const reach = parts[i][2] * scale + radius;
+      if (dx * dx + dy * dy + dz * dz <= reach * reach) return true;
     }
     return false;
   }
@@ -162,6 +189,7 @@ export function createDuneStinger({
     const next = pickLod(head3, lod, cfg.lodDistances, cfg.lodHysteresis);
     if (next !== lod) { levels[lod].root.visible = false; levels[next].root.visible = true; lod = next; }
     levels[lod].poser.apply(state.pose, state.time);
+    endsStale = true;
     updateGlow();
 
     // a soft shadow under the body, lying on the slope
@@ -220,7 +248,7 @@ export function createDuneStinger({
     get alive() { return state.mode !== 'dead'; },
     brain,
     list() {
-      return ready ? [{ mode: state.mode, health: Math.round(state.health), x: +state.x.toFixed(1), z: +state.z.toFixed(1), yaw: +state.yaw.toFixed(2), speed: +state.speed.toFixed(2), lod }] : [];
+      return ready ? [{ mode: state.mode, health: Math.round(state.health), x: +state.x.toFixed(1), y: +height.toFixed(2), z: +state.z.toFixed(1), yaw: +state.yaw.toFixed(2), speed: +state.speed.toFixed(2), lod }] : [];
     },
   };
 }
