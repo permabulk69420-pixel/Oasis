@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { DUNE_STINGER, isBlocked } from '../src/dune-stinger.js';
+import { DUNE_STINGER, isBlocked, lineOfSight } from '../src/dune-stinger.js';
 import { createStinger, BRAIN } from '../src/stinger-brain.js';
 import { createHeightField, WATER, HERO_TREE, SPAWN, isInPond } from '../src/world.js';
 
@@ -52,4 +52,32 @@ test('wandering on the real dunes, it stays inside its patch and out of the pond
     assert.ok(farthest <= BRAIN.wanderRadius + 2, `strayed ${farthest.toFixed(1)}`);
     assert.ok(steepest < BRAIN.maxSlope + 0.25, `steepest ${steepest.toFixed(2)}`);
   }
+});
+
+test('line of sight: a flat plain is open, a dune between hides you, and the ground under either end does not', () => {
+  const flat = () => 0;
+  assert.ok(lineOfSight(flat, 0, 0.55, 0, 20, 1.7, 0), 'open ground');
+  const ridge = x => (x > 9 && x < 11 ? 4 : 0);
+  assert.ok(!lineOfSight((x) => ridge(x), 0, 0.55, 0, 20, 1.7, 0), 'a ridge between');
+  // a rise right at the stinger's feet (within the skipped first metres) does not blind it
+  const bump = x => (x < 2 ? 3 : 0);
+  assert.ok(lineOfSight(bump, 0, 0.55, 0, 20, 1.7, 0), 'its own ground does not hide you');
+  assert.ok(lineOfSight(ridge, 0, 0.55, 0, 3, 1.7, 0), 'close up is always seen');
+  // a ridge lower than the line of sight at that point is no cover
+  const low = x => (x > 9 && x < 11 ? 0.5 : 0);
+  assert.ok(lineOfSight(low, 0, 0.55, 0, 20, 1.7, 0), 'a ridge under the line of sight');
+});
+
+test('the real dunes hide something: some of the places 20 m round its home cannot be seen from it', () => {
+  const { home } = DUNE_STINGER;
+  const eye = field.sample(home.x, home.z) + 0.55 * DUNE_STINGER.scale;
+  let seen = 0;
+  let hidden = 0;
+  for (let a = 0; a < 360; a += 15) {
+    const x = home.x + Math.cos(a * Math.PI / 180) * 20;
+    const z = home.z + Math.sin(a * Math.PI / 180) * 20;
+    if (lineOfSight(field.sample, home.x, eye, home.z, x, field.sample(x, z) + 1.7, z)) seen++; else hidden++;
+  }
+  assert.ok(seen > 0, 'it can see some of the ring');
+  assert.ok(seen + hidden === 24);
 });

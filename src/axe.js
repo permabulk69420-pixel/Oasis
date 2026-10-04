@@ -228,6 +228,14 @@ export function createAxeKind({ scene, onError = console.warn }) {
     holster: { dir: [0.04, -1, 0], edge: [1, 0, 0], along: 0 },
     // When let go or thrown (src/falling.js): heavy at the head, which lies flat on the ground (model x is the head's long side).
     fall: { radius: 0.04, landing: 'lie', com: 0.28, edge: [1, 0, 0] },
+    // A blow (src/weapon-hits.js): the stone head, swung or thrown fast enough.
+    hit: {
+      damage: 28, // health taken off a creature by a blow at full speed
+      minSpeed: 2.6, // m/s of the head (relative to your body when held)
+      fullSpeed: 6.5,
+      radius: 0.1,
+      point: out => out.copy(axeHeadLocal),
+    },
     spawns: [{ x: SPAWN.x - 0.85, z: SPAWN.z - 1.05 }],
 
     prepareTemplate(root) {

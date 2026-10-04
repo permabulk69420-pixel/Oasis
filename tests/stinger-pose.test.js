@@ -158,3 +158,57 @@ test('the whole body ripples while it walks, bends into a turn, and curls the ta
   assert.ok(left.x < straight.x - 0.02, 'bending to the left swings the tail out to the right');
   assert.ok(Math.abs(stingAt({ gait: 1, phase: 1 }).x - straight.x) > 0.003, 'the body sways side to side as it walks');
 });
+
+test('the fight poses give unit rotations for every bone', () => {
+  const out = quaternions();
+  for (const pose of [{ windup: 1 }, { strike: 1 }, { windup: 0.5, strike: 0.5 }, { hurt: 1 }, { dead: 1 }, { hurt: 1, gait: 1, phase: 3, turn: -1 }, { windup: 3, strike: -2, hurt: 9, dead: -1 }]) {
+    for (const time of [0, 12.5]) {
+      computePose({ ...POSE_REST, ...pose }, time, out);
+      for (const name of STINGER_BONES) assert.ok(Math.abs(out[name].length() - 1) < 1e-6, `${name}`);
+    }
+  }
+});
+
+// where the sting and the nose are, in metres (model scale 1, the nose at +Z), for a pose
+function pointsFor(pose, level = 0) {
+  const { group } = loadModel(level);
+  const poser = createStingerPoser(group);
+  poser.apply({ ...POSE_REST, ...pose }, 0);
+  group.updateMatrixWorld(true);
+  const at = name => poser.bones[name].getWorldPosition(new THREE.Vector3());
+  const tail = poser.bones.Stinger;
+  // the sting's point: the end of the Stinger bone's tip, as far along the bone as the model's lancet reaches
+  return { sting: at('Stinger'), head: at('Head'), root: at('Root'), tail1: at('Tail1'), tail4: at('Tail4'), tail };
+}
+
+test('the windup draws the tail back and up, high over the body, and the strike swings the sting out past the nose', () => {
+  const rest = pointsFor({ alert: 0 });
+  const windup = pointsFor({ windup: 1 });
+  const strike = pointsFor({ strike: 1 });
+  assert.ok(windup.sting.y > rest.sting.y - 0.05, `the sting is held up in the windup (${windup.sting.y.toFixed(2)} vs ${rest.sting.y.toFixed(2)})`);
+  assert.ok(windup.sting.z < strike.sting.z - 0.5, 'drawn back, then thrown forward');
+  assert.ok(strike.sting.z > strike.head.z, `the strike reaches past the head (${strike.sting.z.toFixed(2)} vs ${strike.head.z.toFixed(2)})`);
+  assert.ok(Math.abs(strike.sting.x) < 0.1, 'and straight ahead, not sideways');
+  assert.ok(strike.sting.y < windup.sting.y, 'it comes down onto the target');
+});
+
+test('hurt throws the tail up and dead leaves it low, with the legs curled in and the body down', () => {
+  const rest = pointsFor({});
+  const hurt = pointsFor({ hurt: 1 });
+  const dead = pointsFor({ dead: 1 });
+  assert.ok(hurt.sting.y !== rest.sting.y, 'a flinch moves the tail');
+  assert.ok(dead.sting.y < rest.sting.y - 0.1, `the tail droops when dead (${dead.sting.y.toFixed(2)} vs ${rest.sting.y.toFixed(2)})`);
+  const out = quaternions();
+  const living = quaternions();
+  computePose({ ...POSE_REST }, 0, living);
+  const sink = computePose({ ...POSE_REST, dead: 1 }, 0, out);
+  assert.ok(sink < -0.05, 'the body sinks');
+  assert.ok(out.Leg01_L_Upper.angleTo(living.Leg01_L_Upper) > 0.3, 'the legs curl up');
+});
+
+test('the lengthened tail lets the strike reach: the sting is ahead of the head, and the tail at rest is tall but not absurd', () => {
+  const rest = pointsFor({});
+  const strike = pointsFor({ strike: 1 });
+  assert.ok(strike.sting.z - strike.head.z > 0.2, 'the sting base is ahead of the head bone, the tip further (the old short tail only got to z = 0.4)');
+  assert.ok(rest.sting.y > 0.9 && rest.sting.y < 1.4, `the resting sting is about 1.1 m up before scaling (${rest.sting.y.toFixed(2)} m; 2.8 m at scale 2.5)`);
+});
