@@ -32,6 +32,33 @@ export const BARK_PHOTO = Object.freeze({
   anisotropy: 4,
 });
 
+// The palm fronds can also wear the leaf texture of the alien desert plants (fleshy green cells with red webbing; the same file those
+// plants already load, so it costs no extra download). It loads in the background over the drawn leaf and replaces it when it arrives.
+// The look is chosen by LEAF_LOOKS below; ?leaf=<name> in the address picks another (plain = the drawn leaf only, the way the palms were
+// before).
+export const LEAF_PHOTO = Object.freeze({
+  file: 'textures/alien_desert_plant/alien_desert_plant_leaf_albedo.png',
+  anisotropy: 4,
+});
+
+// Each look: how often the tile repeats across and along a leaflet (u across, v along), whether the model's own vertex colours still
+// multiply it, a brightness multiplier, and `glow`: the flat light the leaf gives off by itself (the models carry a small teal one, which
+// would turn the pattern dark and blue; this one is neutral, so the pattern keeps its own colours in the shade). The tile is 1254 px with cells about 100 px across; 0.15 x 0.6 of it spans a leaflet
+// (about 0.08 x 0.4 m) with the cells close to round.
+export const LEAF_LOOKS = Object.freeze({
+  plain: null, // the drawn leaf and the model's own blue
+  dark: Object.freeze({ repeat: [0.15, 0.6], vertexColors: false, boost: 1.0, glow: 0.08 }),
+  plant: Object.freeze({ repeat: [0.15, 0.6], vertexColors: false, boost: 1.0, glow: 0.30 }),
+  bright: Object.freeze({ repeat: [0.15, 0.6], vertexColors: false, boost: 1.0, glow: 0.55 }),
+});
+export const DEFAULT_LEAF_LOOK = 'plant';
+
+// The look named by a query string such as '?leaf=plain'; the default for anything else.
+export function pickLeafLook(search = '') {
+  const wanted = new URLSearchParams(search).get('leaf');
+  return wanted && Object.hasOwn(LEAF_LOOKS, wanted) ? wanted : DEFAULT_LEAF_LOOK;
+}
+
 export const LEAF = Object.freeze({
   width: 64,
   height: 128,
@@ -173,6 +200,48 @@ export function loadBarkPhoto(loader = new THREE.TextureLoader(), base = import.
   return barkPhotoRequest;
 }
 
+// Every material that has had the leaf put on it, so the photo can be swapped in when it arrives.
+const leafMaterials = new Set();
+let leafPhoto = null; // the texture once loaded
+let leafPhotoRequest = null;
+let leafLook = pickLeafLook(globalThis.location?.search || '');
+
+function setLeafPhoto(material) {
+  const look = LEAF_LOOKS[leafLook];
+  if (!look || !leafPhoto) return;
+  material.map = leafPhoto;
+  material.emissiveMap = leafPhoto; // the shaded side keeps the pattern too
+  material.vertexColors = look.vertexColors;
+  material.color.setScalar(look.boost);
+  material.emissive.setScalar(look.glow);
+  leafPhoto.repeat.set(look.repeat[0], look.repeat[1]);
+  material.needsUpdate = true;
+}
+
+// Loads the leaf tile once. Resolves to the texture, or null if it cannot be loaded (never rejects).
+export function loadLeafPhoto(loader = new THREE.TextureLoader(), base = import.meta.env?.BASE_URL ?? '/') {
+  if (leafPhotoRequest) return leafPhotoRequest;
+  leafPhotoRequest = loader.loadAsync(`${base}${LEAF_PHOTO.file}`).then(texture => {
+    texture.wrapS = texture.wrapT = THREE.MirroredRepeatWrapping; // mirrored, so the repeat can never show a seam
+    texture.colorSpace = THREE.SRGBColorSpace; // this one is a colour
+    texture.flipY = false; // glTF puts the UV origin at the top left, like the models' UVs
+    texture.anisotropy = LEAF_PHOTO.anisotropy;
+    leafPhoto = texture;
+    for (const material of leafMaterials) setLeafPhoto(material);
+    return texture;
+  }).catch(error => {
+    console.warn('[Oasis] Leaf photo unavailable, keeping the drawn leaf.', error);
+    return null;
+  });
+  return leafPhotoRequest;
+}
+
+// For tests: choose the look without a browser address.
+export function setLeafLook(name) {
+  if (!Object.hasOwn(LEAF_LOOKS, name)) throw new Error(`No leaf look called ${name}`);
+  leafLook = name;
+}
+
 // Put the shared textures on the materials of a loaded model that have a known name (SURFACE_BY_MATERIAL). Call it before the
 // model is first drawn. Materials with other names are left alone. In a browser the photographed bark is loaded too and replaces
 // the drawn one when it arrives; pass { photo: false } to keep the drawn bark only.
@@ -190,9 +259,13 @@ export function applySurfaceTextures(root, { photo = typeof document !== 'undefi
       if (kind === 'bark') {
         barkMaterials.add(material);
         if (barkPhoto) setBarkPhoto(material);
+      } else if (kind === 'leaf') {
+        leafMaterials.add(material);
+        if (leafPhoto) setLeafPhoto(material);
       }
       material.needsUpdate = true;
     }
   });
   if (photo && barkMaterials.size > 0) loadBarkPhoto();
+  if (photo && leafMaterials.size > 0 && LEAF_LOOKS[leafLook]) loadLeafPhoto();
 }
