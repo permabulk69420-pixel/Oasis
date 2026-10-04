@@ -190,6 +190,11 @@ Dune stinger in the game (Kane, 4 Oct: "just get the scorpion into the game, we 
 passive: idles, wanders within 22 m of home (not into the pond, the hero tree clearing or steep faces), and when you come within 15 m it stops, faces you and curls its tail up (out at 20 m). It never chases or hurts you and
 nothing hits it: damage, hunting, death and drops are Kane's call. No dev fixture on purpose. Code-driven animation like the bird (ripple of leg steps, body sway, breathing, tail sway, sting flick). Oddities to tell Kane: legs are not IK, so
 feet can skate a little on steep dune faces; the model's 11.6k-triangle close level is the v2 build (the 50k ceiling is not spent); at night only the eyes, flank dashes and sting glow and the rest is a thin moonlit rim like the trees.
+Stinger verdict after Kane saw it in VR (4 Oct): "the centipede thing, we need to make it way more complex". It reads as a centipede because the v2 skeleton has 8 leg pairs (16 legs) and no pincers.
+Plan I gave him: a real redesign (4 leg pairs with three-part legs, two pincers that open and close, a heavy plated carapace, curved segmented tail, a close-up level well above 11.6k toward the 50k ceiling, 3 levels),
+built by me in Blender. He is thinking of waiting (his usage may reset soon and he may try Astra again; his call, my view is that my pose code is tied to my skeleton). Agreed for now: the creature's AI, animation
+and attack/hit work WAIT for the final model, because the poses are written against the skeleton. If a model arrives from elsewhere: run `tools/creature/check_glb.py`, then retarget `src/stinger-pose.js` to its bones.
+Nothing hits or hurts the stinger yet; Kane joked about hitting it and said not to add that yet.
 Dune stinger (first creature, `tools/dune-stinger/`): the other model's first build (3 LODs 4,482 / 1,560 / 582 tris, 49 bones) passes my checks
 (`python3 tools/creature/check_glb.py`: numpy + trimesh, no Blender) and loads and bends in three.js, but it is artistically generic and barely
 glows. It is kept in `tools/`, NOT in `public/`, and waits for Kane's OK; the plan I gave him is to use it as a base and improve it myself
