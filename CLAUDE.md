@@ -112,7 +112,7 @@ intentional later"), so none of the fight, water or insect sounds. In this order
    the hit test (now capsules, `hitParts`); the fight logic and numbers stay. Feet planted on the sand. Claws are animation only, no pincer attack.
 4. Fight effects: sand puffs on the lunge and death, the dead stinger sinks into the sand instead of popping out of the world.
 5. Saving: a silent, versioned autosave of inventory, tools, fires, felled trees, position and time (`?fresh=1` starts clean; mismatched saves discarded).
-6. Footprints in the sand (player and creature), filled in by the wind, one instanced draw call.
+6. (Done.) Footprints in the sand (player and creature), filled in by the wind, one instanced draw call.
 7. Giant bones half buried in the dunes (Blender model with LODs) as landmarks; a crashed expedition wreck if time.
 8. A direction doc in the Project (`Projects` tool): the decisions only Kane can make, each with my one-line take, and the story seed we talked through
    (survivor of an expedition that came down on a desert moon with a ringed planet in the sky; the giant bones are what brought the ship down; the
@@ -307,3 +307,8 @@ When something new needs to survive a reload: add a slot in `src/main.js` (`crea
 Oddities to tell Kane: he comes back where he left off, so to see the start of the world (the starting tools, the stinger's ground) open the page with `?fresh=1`; the sticks, stones and fruit you picked up are back on the ground next time
 while the ones in your inventory stay (a small duplication, left alone for now); a stick or stone in your hand when the page closes is lost.
 
+Footprints (my call, done; README "Footprints", `src/footprints.js`, `tests/footprints.test.js`): your feet alternate every 0.74 m (1.05 running), the stinger lays a four-claw mark wherever a foot really comes down
+(`plantedFeet` in `src/stinger-pose.js`); a decal that multiplies the sand, shaded as a dent lit from the sun's side, filled in by the wind (holds 18% of its life, 150 s yours, 220 s the stinger's). Two rings of 480 slots, one
+instanced draw call, nothing per frame, not saved, no sound. The quad is laid flat so it faces down: the material MUST stay `DoubleSide` (it was invisible until then). `flat` is a reserved word in GLSL ES 3.00, so
+a variable called `flat` kills the shader. Dev handle `window.__prints`. Oddities to tell Kane: look along a dune ridge in low sun (the dents show best from the sun's side and fade at noon), at night they hardly show
+(only the pressed floor), a trail is gone after about two and a half minutes, prints are not laid on grass or in the pond.
