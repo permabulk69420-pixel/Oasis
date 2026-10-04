@@ -274,6 +274,11 @@ world is the same every session): two **sandstone outcrops** and three **spire p
 - **Cost:** about 120 nodes in a few instanced meshes (one per variant and level of detail: 70 m, 190 m, then far; rocks 324 to 756
   triangles close, 96 to 160 far; crystals 81 to 153; spires about 1,000 close), plus one halo draw and two small particle pools. At the start
   that is 104 draw calls and 276,000 triangles in all.
+- **Crystal motes** (`src/crystal-motes.js`, `tests/crystal-motes.test.js`): at night tiny violet specks (one in five cyan, like the odd cyan shard) lift off every
+  standing crystal, wander, lean downwind with the sand's gusts and fade out, so a crystal field shimmers from a long way off. One `Points` draw for all
+  the crystals (about 600 motes), all the motion in the vertex shader (the CPU sets a clock, and fades a crystal's own motes when it is broken or grows
+  back); thin out from 70 m and gone by 150 m; none by day. They are sized in metres (so a mote looks the same on the Quest as on a monitor). The numbers
+  (count per crystal, rise, size, brightness) are in `MOTES`. The pond already had fireflies (`src/water-fireflies.js`), so these went to the crystals.
 - **Numbers** are in `MINING` (`src/mining.js`): health per kind and variant, damage per drop, what each tool does to each kind, respawn
   times, shake, level-of-detail distances. The layout numbers are `FINDS` (`src/desert-finds.js`).
 - **Files:** `src/find-shapes.js` (the shapes, pure procedural geometry with three levels each), `src/find-materials.js`, `src/mining.js`,
