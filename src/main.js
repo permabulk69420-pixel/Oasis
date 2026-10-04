@@ -13,6 +13,7 @@ import { createGroundFruit } from './glow-fruit.js';
 import { createCampfires, campfireSpot, campfireSite } from './campfire.js';
 import { createWindSand, WIND_SAND } from './wind-sand.js';
 import { createAlienBirds } from './alien-bird.js';
+import { createDuneStinger } from './dune-stinger.js';
 import { createBackpack, PACK } from './backpack.js';
 import { SPEAR } from './spear.js';
 import { stepBody } from './falling.js';
@@ -282,6 +283,12 @@ const alienBirds = createAlienBirds({
   getAvoid: () => campfires.list().map(fire => ({ x: fire.x, z: fire.z, r: 6 })),
   onError: message => console.warn(message),
 });
+// The dune stinger: one wanders the dunes to the right of the start and watches you when you come near. It cannot hurt you.
+const duneStinger = createDuneStinger({
+  scene, renderer, camera, field,
+  getExposure: () => renderer.toneMappingExposure,
+  onError: message => console.warn(message),
+});
 // Development-only: ?bird=perch|fly|flare puts a bird in view and stops time for it (?birdfreeze=0 lets it move),
 // ?birdd=<metres> sets how far ahead, ?birdseed=<n> makes the bird's choices repeatable.
 const devBirdParams = import.meta.env.DEV ? new URLSearchParams(location.search) : null;
@@ -543,6 +550,7 @@ function frame(time) {
   windTime.value = devWindTime ?? time * 0.001;
   windSand.update(windTime.value, head, renderer.xr.isPresenting ? WIND_SAND.vrViewHeight : renderer.getDrawingBufferSize(drawingSize).y);
   alienBirds.update(dt, head);
+  duneStinger.update(dt, head);
   if (devBird && alienBirds.ready) {
     const params = devBirdParams;
     const spot = Number(params.get('birdd')) || (devBird === 'perch' ? 9 : 20);
@@ -679,6 +687,7 @@ function frame(time) {
     canvas.dataset.position = JSON.stringify({ x: +head.x.toFixed(2), z: +head.z.toFixed(2), ground: +field.sample(head.x, head.z).toFixed(2), yaw: +rig.rotation.y.toFixed(3) });
     canvas.dataset.render = JSON.stringify({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures });
     canvas.dataset.birds = JSON.stringify(alienBirds.list());
+    canvas.dataset.stinger = JSON.stringify(duneStinger.list());
     canvas.dataset.pack = JSON.stringify(backpack.list());
     canvas.dataset.campfires = JSON.stringify(campfires.list().map(fire => ({ x: +fire.x.toFixed(1), z: +fire.z.toFixed(1), lit: fire.lit })));
     canvas.dataset.survival = JSON.stringify(Object.fromEntries(Object.entries(getSurvivalStats()).map(([k, v]) => [k, +v.toFixed(1)])));
