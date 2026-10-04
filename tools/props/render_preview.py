@@ -37,6 +37,20 @@ def gl(v):
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=GLB)
+# The glTF importer leaves a vertex colour attribute unused; put it on the base colour, as the game does.
+for ob in bpy.data.objects:
+    if ob.type != "MESH" or not ob.data.color_attributes:
+        continue
+    layer = ob.data.color_attributes[0].name
+    for slot in ob.material_slots:
+        mat = slot.material
+        if not mat or not mat.use_nodes or mat.name.startswith("Glow"):
+            continue
+        bsdf = mat.node_tree.nodes.get("Principled BSDF")
+        if bsdf and not bsdf.inputs["Base Color"].is_linked:
+            node = mat.node_tree.nodes.new("ShaderNodeVertexColor")
+            node.layer_name = layer
+            mat.node_tree.links.new(node.outputs["Color"], bsdf.inputs["Base Color"])
 sc = bpy.context.scene
 sc.render.engine = "CYCLES"
 sc.cycles.device = "CPU"

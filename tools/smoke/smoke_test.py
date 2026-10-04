@@ -10,6 +10,7 @@ a game that does not start. It checks, by day and by night:
   - the picture is not blank,
   - the scene stays inside a blow-out budget (draw calls and triangles at the spawn point; this catches a runaway, it is not a Quest budget),
   - the stinger's model loads and it shows up in the telemetry,
+  - the giant bones (src/giant-bones.js) are laid out, three sites, and each one has a model on screen,
   - the desert finds (src/mining.js) are laid out, and striking one with a pickaxe takes health off it and drops a stone,
   - saving (src/save-game.js): what you carry, a lit campfire and where you stand come back after a reload, and ?fresh=1 starts clean.
 Add a check here when a new system could silently fail to load. Exit code 0 is a pass.
@@ -51,10 +52,19 @@ def check_view(browser, base, hour, shots):
         if stinger:
             break
         page.wait_for_timeout(1000)
+    # the giant bones: three sites, and the far models arrive in the background (each site reports which level it shows, -1 for none yet)
+    bones = []
+    for _ in range(60):
+        bones = json.loads(page.evaluate("document.querySelector('canvas').dataset.bones || '[]'"))
+        if len(bones) == 3 and all(b["shown"] >= 0 for b in bones):
+            break
+        page.wait_for_timeout(1000)
     page.wait_for_timeout(2500)
     render = json.loads(page.evaluate("document.querySelector('canvas').dataset.render"))
     if not stinger:
         problems.append(f"hour {hour}: the dune stinger never loaded")
+    if len(bones) != 3 or any(b["shown"] < 0 for b in bones):
+        problems.append(f"hour {hour}: the giant bones never showed up ({bones})")
     problems += check_finds(page, hour)
     for key, limit in BUDGET.items():
         if render.get(key, 0) > limit:
@@ -69,7 +79,7 @@ def check_view(browser, base, hour, shots):
         problems.append(f"hour {hour}: the picture is blank (pixel spread {spread:.1f})")
     for e in errors[:8]:
         problems.append(f"hour {hour}: {e}")
-    info = {"first_frame_s": round(drawn, 1), "render": render, "stinger": bool(stinger), "pixel_spread": round(spread, 1)}
+    info = {"first_frame_s": round(drawn, 1), "render": render, "stinger": bool(stinger), "bones": [b["shown"] for b in bones], "pixel_spread": round(spread, 1)}
     page.close()
     return problems, info
 
