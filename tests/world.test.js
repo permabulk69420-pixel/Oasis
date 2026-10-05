@@ -45,7 +45,7 @@ test('collision exactly follows all mesh vertices and both triangle interiors', 
 });
 test('terrain samples stay finite across the playable square', () => {
   let min = Infinity, max = -Infinity;
-  for (const height of field.heights) { assert.ok(Number.isFinite(height)); min = Math.min(min, height); max = Math.max(max, height); }
+  for (const height of field.homeHeights()) { assert.ok(Number.isFinite(height)); min = Math.min(min, height); max = Math.max(max, height); }
   assert.ok(max < 45 && min > 0);
   assert.ok(Number.isFinite(field.sample(500, 500)));
 });
