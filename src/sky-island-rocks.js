@@ -172,7 +172,9 @@ export function addColumn(soup, spec) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------- where it all goes
-// `ctx`: { ground (the drawn ground), features (sky-island-places.js), pathIndex (sky-island-paths.js), config }. Returns [{ chunk, type, ...spec }].
+// `ctx`: { ground (the drawn ground), features (sky-island-places.js), pathIndex (sky-island-paths.js), config, avoid, waterY }. Returns [{ chunk, type, ...spec }].
+// `waterY` is the lake's surface in world metres (island.baseY + features.lakeSpec.level): the ground is in world metres, so a stone standing in the water can only be kept
+// clear of it by that number (the level alone is relative to the island and, compared with a world height, never did anything).
 export function layoutRocks(ctx, spec = ROCKS) {
   const { ground, features, pathIndex, config = SKY_ISLAND, avoid = [] } = ctx;
   const { lake, places, channel } = features;
@@ -182,7 +184,7 @@ export function layoutRocks(ctx, spec = ROCKS) {
   const cell = 6;
   const grid = new Map();
   const key = (x, z) => `${Math.floor(x / cell)},${Math.floor(z / cell)}`;
-  const level = features.lakeSpec.level;
+  const level = ctx.waterY ?? features.lakeSpec.level;
   const rand = (lo, hi) => lo + rng() * (hi - lo);
   const rimGap = (x, z) => outlineRadius(Math.atan2(z - config.z, x - config.x), config) - config.lip - Math.hypot(x - config.x, z - config.z);
   const channelDistance = (x, z) => {

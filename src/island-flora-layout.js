@@ -71,10 +71,11 @@ export function undersideEdge(item, front) {
 
 // ---------------------------------------------------------------------------------------------------------------------------- the layout
 // [{ type, x, y, z, yaw, scale, tiltX, tiltZ, place }] in world metres (the model name `type` is a key of FLORA_MODELS). ctx: { ground (the drawn ground), features,
-// pathIndex, paths (the path data), config, obstacles: [{ x, z, r }] (palms, glow plants), rocks (the rock layout) }.
+// pathIndex, paths (the path data), config, obstacles: [{ x, z, r }] (palms, glow plants), rocks (the rock layout), waterY (the lake's surface in world metres) }.
 export function layoutIslandFlora(ctx, spec = ISLAND_FLORA) {
   const { ground, features, pathIndex, paths = [], config = SKY_ISLAND, obstacles = [], rocks = [] } = ctx;
   const { lake, places, channel } = features;
+  const waterY = ctx.waterY ?? features.lakeSpec.level;
   const random = mulberry32(spec.seed);
   const rand = (lo, hi) => lo + random() * (hi - lo);
   const items = [];
@@ -344,7 +345,7 @@ export function layoutIslandFlora(ctx, spec = ISLAND_FLORA) {
         // flat enough here, and the cushion's whole foot is on the stone
         const around = [[0.3, 0], [-0.3, 0], [0, 0.3], [0, -0.3]].map(([dx, dz]) => boulderTop(rock, x + dx * sc, z + dz * sc));
         if (around.some(h => h === null || Math.abs(h - top) > 0.22 * sc)) continue;
-        if (lake.signed(x, z) > -0.5 && top < features.lakeSpec.level + 0.4) continue;
+        if (lake.signed(x, z) > -0.5 && top < waterY + 0.4) continue;
         if (items.some(i => i.type === 'cushion' && Math.hypot(i.x - x, i.z - z) < 1.6 * sc)) continue;
         put('cushion', x, z, { y: top, sink: 0.05, scale: sc, place: rock.place, free: true });
         n++;
@@ -372,7 +373,7 @@ export function layoutIslandFlora(ctx, spec = ISLAND_FLORA) {
         if (s.along < next || n >= want) continue;
         const side = random() < 0.5 ? 1 : -1, off = s.half + rand(0.5, 1.6);
         const x = s.x - s.tz * off * side, z = s.z + s.tx * off * side;
-        if (room(x, z, 0.35, { onPath: true, pathGap: 0.2, slope: 0.7, meadowGap: 0 }) && pathIndex.clearance(x, z) > 0.3) {
+        if (room(x, z, 0.35, { onPath: true, pathGap: 0.2, slope: 0.7, meadowGap: 0.6 }) && pathIndex.clearance(x, z) > 0.3) {
           put('mushrooms', x, z, { scale: rand(...spec.scale.mushrooms), place: 'path', r: 0.4, soft: true });
           n++; next = s.along + every * rand(0.7, 1.3);
         } else next = s.along + 1.5;
@@ -383,7 +384,7 @@ export function layoutIslandFlora(ctx, spec = ISLAND_FLORA) {
       const anchor = near[k % near.length];
       const a = random() * TAU, d = rand(1.6, anchor.type === 'ribcage' ? 5 : 3.2);
       const x = anchor.x + Math.cos(a) * d, z = anchor.z + Math.sin(a) * d;
-      if (!room(x, z, 0.35, { pathGap: 0.9, slope: 0.7, free: true, meadowGap: 0 })) continue;
+      if (!room(x, z, 0.35, { pathGap: 0.9, slope: 0.7, free: true, meadowGap: 0.6 })) continue;
       put('mushrooms', x, z, { scale: rand(...spec.scale.mushrooms), place: anchor.place, r: 0.4, soft: true });
       n++;
     }

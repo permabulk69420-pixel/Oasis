@@ -16,10 +16,11 @@ const drawn = makeMeshGround(buildIsland(ground.baseY, SKY_ISLAND, features), SK
 const paths = layoutPaths(features, SKY_ISLAND);
 const pathIndex = createPathIndex(paths);
 const palms = layoutSkyTrees(SKY_ISLAND, SKY_TREES, { features, pathIndex });
-const rocks = layoutRocks({ ground: drawn, features, pathIndex, config: SKY_ISLAND, avoid: palms });
+const waterY = ground.baseY + features.lakeSpec.level; // the lake's surface in world metres
+const rocks = layoutRocks({ ground: drawn, features, pathIndex, config: SKY_ISLAND, avoid: palms, waterY });
 const glow = layoutIslandGlow({ ground: drawn, features, pathIndex, paths, config: SKY_ISLAND, obstacles: [...rocks.filter(r => r.r >= 0.3), ...palms.map(p => ({ x: p.x, z: p.z, r: 0.7 * p.scale }))] });
 const obstacles = [...palms.map(p => ({ x: p.x, z: p.z, r: 0.7 * p.scale })), ...glow.map(g => ({ x: g.x, z: g.z, r: 0.5 * g.scale, soft: true }))];
-const ctx = { ground: drawn, features, pathIndex, paths, config: SKY_ISLAND, obstacles, rocks };
+const ctx = { ground: drawn, features, pathIndex, paths, config: SKY_ISLAND, obstacles, rocks, waterY };
 const items = layoutIslandFlora(ctx);
 const { lake, places, channel } = features;
 const of = type => items.filter(i => i.type === type);
@@ -214,7 +215,7 @@ test('cushions sit on the stones that are flat enough, whole foot on the rock, a
     const rock = rocks.find(r => r.type === 'boulder' && boulderTop(r, c.x, c.z) !== null && Math.abs(boulderTop(r, c.x, c.z) - c.y) < 0.4);
     assert.ok(rock, 'a cushion with no stone under it');
     for (const [dx, dz] of [[0.3, 0], [-0.3, 0], [0, 0.3], [0, -0.3]]) assert.ok(boulderTop(rock, c.x + dx * c.scale, c.z + dz * c.scale) !== null, 'the cushion hangs over the stone\'s edge');
-    assert.ok(c.y > features.lakeSpec.level - 0.1 || lake.signed(c.x, c.z) < -0.5, 'a cushion under water');
+    assert.ok(c.y > waterY + 0.4 || lake.signed(c.x, c.z) < -0.5, `a cushion ${(c.y - waterY).toFixed(2)} m above the water, in it`);
   }
 });
 
