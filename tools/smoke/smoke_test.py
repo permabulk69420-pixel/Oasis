@@ -36,7 +36,7 @@ def check_view(browser, base, hour, shots):
     page.on("pageerror", lambda e: errors.append("PAGEERROR " + str(e)))
     page.on("console", lambda m: errors.append("console.error " + m.text) if m.type == "error" and not any(s in m.text for s in IGNORED_CONSOLE) else None)
     started = time.time()
-    page.goto(f"{base}/?hour={hour}")
+    page.goto(f"{base}/?hour={hour}&start=oasis")
     try:
         page.wait_for_function("document.querySelector('canvas') && document.querySelector('canvas').dataset.render", timeout=LOAD_TIMEOUT_MS)
     except Exception as exc:  # timeout
