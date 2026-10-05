@@ -5,12 +5,13 @@
 
 shots.json is a list of shots; every key is optional:
   {"name": "meadow_day", "hour": 14, "at": [-105, 635], "look": [-190, 500, 1.5], "eye": 1.7, "pitch": 0, "yaw": 0,
-   "size": [1280, 720], "wait": 2500, "eval": "window.__skyIsland.lakeLevel", "variants": [{"name": "b", "eval": "..."}]}
+   "size": [1280, 720], "wait": 2500, "shot_timeout": 180000, "eval": "window.__skyIsland.lakeLevel", "variants": [{"name": "b", "eval": "..."}]}
 `at` is where to stand (world metres; on the island's top it stands on the ground there), `look` what to face (x, z, metres above the ground), `eye` the
 camera's height above the ground (60 gives a bird's eye view of the place you stand over), `pitch` and `yaw` in degrees (yaw 0 faces north, -z, positive
 turns left), `hour` 0 is night, 14 day, 17 dusk. `eval` runs a JavaScript expression in the page first (a variant's runs before its picture) and its value is
 printed. The game starts on the island (`start=island`); add "oasis": true to stand in the oasis instead. About 20 to 60 s a shot in the software renderer.
-Prints each file name, the draw calls and triangles in view, and any page errors.
+Prints each file name, the draw calls and triangles in view, and any page errors. A shot that fails (a dense view can take the software renderer more than
+the default 30 s to draw) is reported and the run goes on; `shot_timeout` (ms, default 180000) sets how long a picture may take.
 """
 import json
 import os
@@ -46,19 +47,23 @@ with sync_playwright() as p:
                 query[key] = spec[key]
         for key, value in spec.get("query", {}).items():
             query[key] = value
-        page.goto(f"{BASE}/?{urlencode(query, safe=',')}")
-        page.add_style_tag(content="#welcome, #menu, #inventory-toggle, #touch-controls { display: none !important; }")
-        page.wait_for_function("document.querySelector('canvas') && document.querySelector('canvas').dataset.render", timeout=240000)
-        for variant in spec.get("variants", [{}]):
-            for code in (spec.get("eval"), variant.get("eval")):
-                if code:
-                    print("eval:", json.dumps(page.evaluate(code))[:400], flush=True)
-            page.wait_for_timeout(int(spec.get("wait", 2500)))
-            suffix = f"_{variant['name']}" if variant.get("name") else ""
-            out = os.path.join(outdir, f"{n:02d}_{name}{suffix}.png")
-            page.screenshot(path=out)
-            render = page.evaluate("document.querySelector('canvas').dataset.render || ''")
-            print(out, render, flush=True)
+        try:
+            page.goto(f"{BASE}/?{urlencode(query, safe=',')}")
+            page.add_style_tag(content="#welcome, #menu, #inventory-toggle, #touch-controls { display: none !important; }")
+            page.wait_for_function("document.querySelector('canvas') && document.querySelector('canvas').dataset.render", timeout=240000)
+            for variant in spec.get("variants", [{}]):
+                for code in (spec.get("eval"), variant.get("eval")):
+                    if code:
+                        print("eval:", json.dumps(page.evaluate(code))[:400], flush=True)
+                page.wait_for_timeout(int(spec.get("wait", 2500)))
+                suffix = f"_{variant['name']}" if variant.get("name") else ""
+                out = os.path.join(outdir, f"{n:02d}_{name}{suffix}.png")
+                page.screenshot(path=out, timeout=int(spec.get("shot_timeout", 180000)))
+                render = page.evaluate("document.querySelector('canvas').dataset.render || ''")
+                print(out, render, flush=True)
+        except Exception as error:  # one failed picture should not lose the others
+            problems.append(f"{name}: FAILED {str(error).splitlines()[0]}")
+            print(f"{name}: FAILED {str(error).splitlines()[0]}", flush=True)
         page.close()
     browser.close()
 print("\n".join(problems) if problems else "no page errors")
