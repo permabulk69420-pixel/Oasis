@@ -114,7 +114,7 @@ scene.add(terrain.group);
 const skyIsland = createSkyIsland(materials.sand);
 scene.add(skyIsland.group);
 // The lake and its waterfall, the paths, the stone and the palm grove: scenery, nothing in play touches it (src/sky-island-scenery.js).
-const skyScenery = createIslandScenery({ island: skyIsland, materials });
+const skyScenery = createIslandScenery({ island: skyIsland, materials, getExposure: () => renderer.toneMappingExposure });
 scene.add(skyScenery.group);
 if (import.meta.env.DEV) window.__skyIsland = Object.assign(skyIsland, { scenery: skyScenery }); // dev only: for screenshots
 // The ground under (x, z) for the player and what they carry: the island's top while you are on the island (and the point is over it),
@@ -731,6 +731,7 @@ function frame(time) {
   windSand.update(windTime.value, head, viewHeight);
   alienBirds.update(dt, head);
   glowGarden.update(head, dt);
+  skyScenery.updateFlora(head, dt);
   plantPush.update(head);
   weaponHits.update(dt);
   mining.update(dt, head);
