@@ -3,6 +3,8 @@ import './style.css';
 import { installAssetVersioning } from './asset-version.js';
 import { createHeightField, clamp, stickAxis, stickVector, pivotRig, isInPond, SPAWN, WATER, HERO_TREE } from './world.js';
 import { createTerrain } from './terrain.js';
+import { createSkyIsland } from './sky-island.js';
+import { createSkyIslandTrees } from './sky-island-trees.js';
 import { WALK } from './zones.js';
 import { TURBO, createTurboChord } from './turbo.js';
 import { createMaterials, createWater } from './materials.js';
@@ -100,6 +102,11 @@ const field = createHeightField();
 const materials = createMaterials(renderer, field);
 const terrain = createTerrain(field, materials.sand);
 scene.add(terrain.group);
+const skyIsland = createSkyIsland(materials.sand);
+scene.add(skyIsland.group);
+const skyIslandTrees = createSkyIslandTrees({ island: skyIsland });
+scene.add(skyIslandTrees.group);
+if (import.meta.env.DEV) window.__skyIsland = skyIsland; // dev only: for screenshots
 scene.add(createWater(field, materials.water));
 const sticksGroup = createGroundSticks({
   field,
@@ -831,7 +838,7 @@ function frame(time) {
     });
     footprints.walk(head.x, head.z, { onGround: jumpHeight <= 0.001, speed: Math.hypot(velocity.x, velocity.z) });
   }
-  if (time - lodTime > 100) { terrain.update(head.x, head.z, velocity.length()); lodTime = time; }
+  if (time - lodTime > 100) { terrain.update(head.x, head.z, velocity.length()); skyIslandTrees.update(head.x, head.z); lodTime = time; }
   materials.water.uniforms.uTime.value = time * 0.001;
   renderer.render(scene, camera);
   if (import.meta.env.DEV && time - telemetryTime > 1000) {
