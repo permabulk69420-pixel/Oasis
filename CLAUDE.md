@@ -164,6 +164,7 @@ work. What he has told me, or shown he wants, across sessions:
   plants, the first trees) multiply the texture by about 0.1. Either turn `vertexColors` off (the palms) or keep only the variation:
   `normaliseVertexColours` in `src/plant-colours.js` divides each channel by its average (the desert plants, #53). Read the accessor
   in the .glb with a few lines of Python before guessing at lights or emissive.
+- **The torch light hooks into the terrain and water shaders by matching exact lines** (`TORCH_SHADER_MARKERS` in `src/night-fill.js`, used by `src/torch.js`). Editing one of those lines in `src/materials.js` makes the torch silently stop lighting the sand (it happened in #99; fixed in the next PR). A test now fails if they drift: change the marker and the shader together.
 - Tests live in `tests/`. Add tests for game logic. Keep constants in one table at the top of a module.
 
 ## Roadmap

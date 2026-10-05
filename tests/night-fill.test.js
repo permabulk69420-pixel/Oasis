@@ -100,3 +100,13 @@ test('the real material types get the fill when installed', () => {
   own.onBeforeCompile(ownShader);
   assert.ok(!ownShader.uniforms.uNightFill);
 });
+
+test('the terrain and water shaders still contain the lines the torch light hooks into', async () => {
+  const { TORCH_SHADER_MARKERS } = await import('../src/night-fill.js');
+  const source = (await import('node:fs')).readFileSync(new URL('../src/materials.js', import.meta.url), 'utf8');
+  for (const [shader, markers] of Object.entries(TORCH_SHADER_MARKERS)) {
+    for (const [name, text] of Object.entries(markers)) {
+      assert.equal(source.split(text).length - 1, 1, `${shader} shader: "${name}" marker "${text}" must appear exactly once in src/materials.js`);
+    }
+  }
+});
