@@ -86,7 +86,9 @@ export function holsterPose(holster = {}, side = 'right') {
   return { position, quaternion };
 }
 
-export function createTools({ scene, states, kinds, renderer = null, camera = null, rig = null, heightAt = terrainHeight, onError = console.warn }) {
+// `copyStart` ({ from: {x, z}, to: {x, z} }) stands a second set of the starting tools at another start point: each kind's `spawns` moved
+// from `from` to `to` (Kane, 5 Oct: an extra copy of his tools on the floating island). The first set stays where it is.
+export function createTools({ scene, states, kinds, renderer = null, camera = null, rig = null, heightAt = terrainHeight, copyStart = null, onError = console.warn }) {
   if (!scene || !Array.isArray(states) || !Array.isArray(kinds)) throw new Error('Tools require the scene, VR hand states and tool kinds.');
 
   const kindById = new Map(kinds.map(kind => [kind.id, kind]));
@@ -160,7 +162,9 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
       kind.shape = { bottom: box.min.y, top: box.max.y };
       kind.prepareTemplate?.(template);
       kind.template = template;
-      for (const spot of kind.spawns || []) {
+      const spots = [...(kind.spawns || [])];
+      if (copyStart) for (const spot of kind.spawns || []) spots.push({ x: copyStart.to.x + (spot.x - copyStart.from.x), z: copyStart.to.z + (spot.z - copyStart.from.z) });
+      for (const spot of spots) {
         const instance = spawn(kind.id);
         if (instance) instance.defaultSpawn = true; // standing where the game puts it at the start; a saved game replaces these
         toGround(instance, spot.x, spot.z);
@@ -196,7 +200,7 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
   function toGround(instance, x, z) {
     if (!instance) return;
     scene.attach(instance.root);
-    instance.root.position.set(x, terrainHeight(x, z) + (instance.kind.groundBottom || 0), z);
+    instance.root.position.set(x, heightAt(x, z) + (instance.kind.groundBottom || 0), z);
     instance.root.quaternion.identity();
     instance.root.scale.set(1, 1, 1);
     instance.root.updateMatrixWorld(true);

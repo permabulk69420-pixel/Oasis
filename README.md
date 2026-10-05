@@ -490,3 +490,6 @@ A floating island hangs 250 m above the dunes south-west of the pond, at (-150, 
 - Dev: `window.__skyIsland`. To stand on top in a screenshot use `?at=-150,700&eye=256&yaw=180` (`eye` is metres above the ground below, so the top is about 256 up there); some spots are inside the rock, check `groundHeight(x, z)`.
 - Not done on purpose: any way up, walking on it (the player's ground is still the desert), grass blades (the top has the shader's grass texture only), caves, rocks or water on top, shadows cast on the desert, smaller islands above, levels of detail (it is one 107k mesh).
 
+
+### Starting on the sky island (5 Oct)
+A new game starts on the island (`ISLAND_START` in `src/sky-island-ground.js`) with a second set of the starting tools and the backpack beside you. `?start=oasis` starts by the pond. There is no edge stop: walking off drops you to the desert far below. Water, sticks and stones are only in the desert.
