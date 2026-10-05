@@ -25,6 +25,7 @@ import { createBackpack, PACK } from './backpack.js';
 import { SPEAR } from './spear.js';
 import { stepBody } from './falling.js';
 import { windTime, windStrength } from './wind.js';
+import { createPlantPush, pushSettings } from './plant-push.js';
 import { installNightFill } from './night-fill.js';
 import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater, damagePlayer, exportSurvival, importSurvival } from './survival.js';
 import { createPlacement } from './placement.js';
@@ -115,6 +116,8 @@ scene.add(glowFruit.group);
 // The oasis's glow plants: reeds at the water's edge, lantern blooms on the banks and round the hero tree.
 const glowGarden = createGlowGarden({ field, getExposure: () => renderer.toneMappingExposure, sunDirection: materials.sand.uniforms.uSun.value, onError: message => console.warn(message) });
 scene.add(glowGarden.group);
+// Plants give way to your feet and hands (src/wind.js PUSH; `?push=0` switches it off to compare).
+const plantPush = createPlantPush({ rig, states: hands.states, enabled: pushSettings(location.search) });
 if (import.meta.env.DEV) window.__glowGarden = glowGarden; // dev only: for screenshots
 const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), materials.sky);
 sky.frustumCulled = false; sky.renderOrder = -10; sky.name = 'Sky'; scene.add(sky);
@@ -670,6 +673,7 @@ function frame(time) {
   windSand.update(windTime.value, head, viewHeight);
   alienBirds.update(dt, head);
   glowGarden.update(head, dt);
+  plantPush.update(head);
   weaponHits.update(dt);
   mining.update(dt, head);
   crystalMotes.update(dt, viewHeight);
