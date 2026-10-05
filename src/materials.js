@@ -295,6 +295,9 @@ export function createMaterials(renderer, field) {
         float rockAmt = clamp(vZone.x, 0.0, 1.0);
         float saltAmt = clamp(vZone.y, 0.0, 1.0);
         float gravelAmt = clamp(vZone.z, 0.0, 1.0);
+        // The floating island's own stone is stored as a negative salt value (zone.y below zero), so it needs no new attribute: dark, cool rock, the same
+        // dark forms as the oasis, in place of the desert's warm strata.
+        float stoneAmt = clamp(-vZone.y, 0.0, 1.0);
 
         // World-projected tangent basis keeps the sand texture aligned across all terrain LODs.
         vec3 tangentSeed = vec3(0.84, 0.0, 0.54);
@@ -332,7 +335,7 @@ export function createMaterials(renderer, field) {
         vec3 mapNormal = texture2D(uPbrNormal, pbrUv).xyz * 2.0 - 1.0;
         vec3 mappedNormal = normalize(tangent * mapNormal.x + bitangent * mapNormal.y + baseNormal * max(mapNormal.z, 0.05));
         float normalFade = 1.0 - smoothstep(20.0, 70.0, distance);
-        vec3 sandNormal = normalize(mix(baseNormal, mappedNormal, uHasPbrNormal * normalFade * (1.0 - grass) * (1.0 - max(max(rockAmt, saltAmt), gravelAmt))));
+        vec3 sandNormal = normalize(mix(baseNormal, mappedNormal, uHasPbrNormal * normalFade * (1.0 - grass) * (1.0 - max(max(max(rockAmt, saltAmt), gravelAmt), stoneAmt))));
         vec3 grassNormal = baseNormal;
         if (grass > 0.001 && uHasGrassNormal > 0.5 && normalFade > 0.001) {
           vec3 grassMapNormal = texture2D(uGrassNormal, grassUv).xyz * 2.0 - 1.0;
@@ -364,7 +367,7 @@ export function createMaterials(renderer, field) {
         }
 
         // Bedrock, salt and gravel (the zones beyond the oasis). Inside the oasis square all three are zero, so nothing there changes.
-        if (rockAmt + saltAmt + gravelAmt > 0.002) {
+        if (rockAmt + saltAmt + gravelAmt + stoneAmt > 0.002) {
           float grain = dot(textureBase, vec3(0.299, 0.587, 0.114));
           float steep = 1.0 - clamp(baseNormal.y, 0.0, 1.0);
           // Strata: soft bands of colour by height (one cycle about 6 m), wobbled so the layers do not run level. The bands fade
@@ -387,6 +390,16 @@ export function createMaterials(renderer, field) {
           float speckFade = 1.0 - smoothstep(10.0, 90.0, distance);
           vec3 gravelColour = mix(vec3(0.46, 0.34, 0.24), vec3(0.64, 0.52, 0.38), vData.g) * (0.55 + 0.9 * grain) * mix(1.0, 0.45 + 1.1 * pebbles, speckFade);
           base = mix(base, gravelColour, gravelAmt);
+          // The island's stone: near black blue-grey, a touch greener where the ground varies, mottled by the sand photo at another scale, darker down
+          // the steep faces (a streaked, weathered look). Not tinted by the sun's red: it is dark rock under a low golden light.
+          if (stoneAmt > 0.002) {
+            float stoneGrain = dot(texture2D(uPbrBase, pbrUv * 1.7 + vec2(0.21, 0.83)).rgb, vec3(0.299, 0.587, 0.114));
+            float stoneFine = dot(texture2D(uPbrBase, pbrUv * 6.3 + vec2(0.57, 0.12)).rgb, vec3(0.299, 0.587, 0.114));
+            vec3 stoneColour = mix(vec3(0.060, 0.070, 0.086), vec3(0.082, 0.098, 0.100), vData.g);
+            stoneColour *= 0.55 + 1.15 * stoneGrain + mix(0.0, 0.5 * (stoneFine - 0.5), 1.0 - smoothstep(6.0, 40.0, distance));
+            stoneColour = mix(stoneColour, vec3(0.034, 0.044, 0.046), steep * 0.55);
+            base = mix(base, stoneColour, stoneAmt);
+          }
         }
 
         float roughnessMap = texture2D(uPbrRoughness, pbrUv).r;
@@ -394,7 +407,7 @@ export function createMaterials(renderer, field) {
         float grassRoughness = 0.95;
         if (grass > 0.001 && uHasGrassRoughness > 0.5) grassRoughness = texture2D(uGrassRoughness, grassUv).r;
         roughness = mix(roughness, grassRoughness, grass);
-        roughness = mix(roughness, 0.95, max(rockAmt, gravelAmt));
+        roughness = mix(roughness, 0.95, max(max(rockAmt, gravelAmt), stoneAmt));
         float poolDistance = length((vWorld.xz - uWater.xz) / uWaterRadii);
         float wet = (1.0 - smoothstep(uWater.y + 0.05, uWater.y + 0.60, vWorld.y)) * (1.0 - smoothstep(1.1, 1.6, poolDistance));
         base = mix(base, base * vec3(0.49, 0.48, 0.43), wet * 0.80);
@@ -419,6 +432,7 @@ export function createMaterials(renderer, field) {
         // Turf is far darker than sand, so it gets a moonlit floor (cool blue-green) to stay readable.
         vec3 fillBase = mix(base, max(base, GRASS_NIGHT_FLOOR), grass);
         fillBase = mix(fillBase, max(fillBase * 0.5 + ZONE_NIGHT_FLOOR * 0.5, fillBase), clamp(max(rockAmt, max(saltAmt, gravelAmt)), 0.0, 1.0)); // lifted toward the floor, keeping half the texture
+        fillBase = mix(fillBase, max(fillBase, vec3(0.085, 0.115, 0.155)), stoneAmt); // the island's stone: a faint cool floor, a little below the turf's
         gl_FragColor.rgb += fillBase * MOON_FILL * mix(0.55, 1.0, max(n.y, 0.0)) * (1.0 - environmentDay);
         // Cyan pools under the veil tree's glowing pods. Only evaluated near the tree and at night.
         if (uPodLightArea.w > 0.001 && length(vWorld.xz - uPodLightArea.xy) < uPodLightArea.z) {

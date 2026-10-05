@@ -4,7 +4,7 @@ import { installAssetVersioning } from './asset-version.js';
 import { createHeightField, clamp, stickAxis, stickVector, pivotRig, isInPond, SPAWN, WATER, HERO_TREE } from './world.js';
 import { createTerrain } from './terrain.js';
 import { createSkyIsland } from './sky-island.js';
-import { createSkyIslandTrees } from './sky-island-trees.js';
+import { createIslandScenery } from './sky-island-scenery.js';
 import { ISLAND_START } from './sky-island-ground.js';
 import { startPlace } from './start-place.js';
 import { createFall, stepFall, fallDamage } from './player-fall.js';
@@ -113,9 +113,10 @@ const terrain = createTerrain(field, materials.sand);
 scene.add(terrain.group);
 const skyIsland = createSkyIsland(materials.sand);
 scene.add(skyIsland.group);
-const skyIslandTrees = createSkyIslandTrees({ island: skyIsland });
-scene.add(skyIslandTrees.group);
-if (import.meta.env.DEV) window.__skyIsland = skyIsland; // dev only: for screenshots
+// The lake and its waterfall, the paths, the stone and the palm grove: scenery, nothing in play touches it (src/sky-island-scenery.js).
+const skyScenery = createIslandScenery({ island: skyIsland, materials });
+scene.add(skyScenery.group);
+if (import.meta.env.DEV) window.__skyIsland = Object.assign(skyIsland, { scenery: skyScenery }); // dev only: for screenshots
 // The ground under (x, z) for the player and what they carry: the island's top while you are on the island (and the point is over it),
 // the desert's ground otherwise. Desert systems (rocks, grass, the creatures) keep reading `field` directly.
 function groundAt(x, z) {
@@ -141,7 +142,7 @@ scene.add(stonesGroup);
 const glowFruit = createGroundFruit({ field, sunDirection: materials.sand.uniforms.uSun.value });
 scene.add(glowFruit.group);
 // The oasis's glow plants: reeds at the water's edge, lantern blooms on the banks and round the hero tree.
-const glowGarden = createGlowGarden({ field, getExposure: () => renderer.toneMappingExposure, sunDirection: materials.sand.uniforms.uSun.value, onError: message => console.warn(message) });
+const glowGarden = createGlowGarden({ field, getExposure: () => renderer.toneMappingExposure, sunDirection: materials.sand.uniforms.uSun.value, onError: message => console.warn(message), extra: skyScenery.glow });
 scene.add(glowGarden.group);
 // Plants give way to your feet and hands (src/wind.js PUSH; `?push=0` switches it off to compare).
 const plantPush = createPlantPush({ rig, states: hands.states, enabled: pushSettings(location.search) });
@@ -887,7 +888,7 @@ function frame(time) {
     });
     footprints.walk(head.x, head.z, { onGround: jumpHeight <= 0.001, speed: Math.hypot(velocity.x, velocity.z) });
   }
-  if (time - lodTime > 100) { terrain.update(head.x, head.z, velocity.length()); skyIslandTrees.update(head.x, head.z); lodTime = time; }
+  if (time - lodTime > 100) { terrain.update(head.x, head.z, velocity.length()); skyScenery.update(head.x, head.z); lodTime = time; }
   materials.water.uniforms.uTime.value = time * 0.001;
   renderer.render(scene, camera);
   if (import.meta.env.DEV && time - telemetryTime > 1000) {

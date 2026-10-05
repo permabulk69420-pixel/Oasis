@@ -61,14 +61,14 @@ test('the top is ground you can stand on, and the mesh agrees with the function'
   }
 });
 
-test('the palms are laid out the same every time, on the top, apart from each other and clear of the middle', () => {
+test('the palms are laid out the same every time, on the top, apart from each other and clear of the meadow', () => {
   const a = layoutSkyTrees(), b = layoutSkyTrees();
   assert.deepEqual(a, b);
   assert.ok(a.length > 40);
   for (const [i, tree] of a.entries()) {
     assert.ok(topGround(tree.x, tree.z) !== null);
-    assert.ok(Math.hypot(tree.x - SKY_ISLAND.x, tree.z - SKY_ISLAND.z) >= SKY_TREES.clearing);
-    for (let k = i + 1; k < a.length; k++) assert.ok(Math.hypot(tree.x - a[k].x, tree.z - a[k].z) >= SKY_TREES.spacing - 1e-6);
+    assert.ok(Math.hypot(tree.x - ISLAND_START.x, tree.z - ISLAND_START.z) >= SKY_TREES.clearing);
+    for (let k = i + 1; k < a.length; k++) assert.ok(Math.hypot(tree.x - a[k].x, tree.z - a[k].z) >= SKY_TREES.grove.spacing - 1e-6);
   }
 });
 
