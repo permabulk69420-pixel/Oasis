@@ -11,6 +11,19 @@ import * as THREE from 'three';
 // 0 by day, 1 at full night. The day/night cycle sets it every frame.
 export const nightFill = { value: 0 };
 
+// The exact text the torch code in src/torch.js hooks into in the terrain and water shaders (src/materials.js). If a shader edit changes one
+// of these lines the torch light silently stops reaching the sand or the water (it did once, 5 Oct), so a test checks materials.js still has them.
+export const TORCH_SHADER_MARKERS = Object.freeze({
+  terrain: Object.freeze({
+    uniform: 'uniform float uGrassTileMetres;',
+    light: 'vec3 light = ambient + sunColour() * sun;',
+  }),
+  water: Object.freeze({
+    uniform: 'uniform sampler2D uElevation;',
+    colour: 'vec3 color = mix(transmission, reflectedColor, fresnel);',
+  }),
+});
+
 // The lit torch, shared by everything that lights itself from it: the terrain and water shaders (src/torch.js injects
 // their own loop) and, through this file, every standard material (grass, ferns, palms, hands, tools). The torch
 // updates both fields every frame; strength 0 means no lit torch. World-space position, in metres.
