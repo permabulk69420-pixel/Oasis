@@ -3,18 +3,16 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { addWindSwayToModel, SWAY } from './wind.js';
 import { applySurfaceTextures } from './surface-textures.js';
 import { pickTreeSet, levelDistance } from './tree-sets.js';
-import { layoutSkyTrees } from './sky-island-layout.js';
 
 // The island's palms: the oasis's own blue palm models (three levels of detail, nothing new to download for anyone who has been to the
-// oasis), set out by sky-island-layout.js. They are scenery for now: not choppable, no projected shadow. They load when you are within
+// oasis), set out by sky-island-layout.js (grouped into a grove and a few strays). They are scenery for now: not choppable, no projected shadow. They load when you are within
 // LOAD_DISTANCE of the island (flat distance), because from the desert floor the top cannot be seen at all.
 const LOAD_DISTANCE = 700;
 const TREE_SET = pickTreeSet(globalThis.location?.search || '');
 
-export function createSkyIslandTrees({ island }) {
+export function createSkyIslandTrees({ island, layout }) {
   const group = new THREE.Group();
   group.name = 'Sky island palms';
-  const layout = layoutSkyTrees(island.config);
   let started = false;
   let ready = false;
 

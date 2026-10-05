@@ -75,19 +75,63 @@ function finRidge(theta, v, config) {
 
 function underRadius(v) { return Math.pow(1 - Math.pow(v, 1.2), 1.05); } // close to a cone, a little fuller at the top
 
-// Where the ground is on top at (x, z), metres above the island's reference level, or null outside the top's edge.
-export function topGround(x, z, config = SKY_ISLAND) {
+// The underside at an angle and at a depth fraction v (0 at the lip, 1 at the tip): its distance from the island's centre and its world height, given
+// the height `yLip` of the lip's lowest edge. An upside-down mountain: ledges (the radius steps in, at different heights round the island), fins, then
+// lumps cut in with 3D noise. (The waterfall over the rim uses this too, to hang clear of any bulge.)
+export function undersidePoint(theta, v, yLip, config = SKY_ISLAND) {
+  const c = Math.cos(theta), s = Math.sin(theta);
+  const edge = outlineRadius(theta, config);
+  const fin = finRidge(theta, v, config);
+  const phase = circle(theta, 1.9, config.seed * 1.3, config.seed * 0.7);
+  const K = 9;
+  const q = v * K + phase * 0.9;
+  const stair = Math.floor(q) + smooth(0.74, 1.0, q - Math.floor(q));
+  const vEff = mix(v, clamp((stair - phase * 0.9) / K, 0, 1), 0.7 * smooth(0.04, 0.25, v));
+  const amount = smooth(0.02, 0.4, v) * (1 - 0.3 * v);
+  let radial = underRadius(vEff) * (1 - 0.30 * amount * (1 - fin)) + 0.05 * amount * fin;
+  const yBase = yLip - config.thickness * v;
+  const px = c * edge * radial, pz = s * edge * radial;
+  const lump = fbm3((config.x + px) / 58, yBase / 58, (config.z + pz) / 58, config.seed) - 0.5;
+  const chunk = fbm3((config.x + px) / 17, yBase / 17, (config.z + pz) / 17, config.seed * 3) - 0.5;
+  const rough = 0.46 * lump + 0.14 * chunk;
+  const ramp = smooth(0.0, 0.09, v) * (1 - 0.6 * smooth(0.85, 1.0, v));
+  // the lumps fade out towards the tip, and the radius never collapses to nothing (that pinched the mesh into zero-area faces)
+  const tipFade = Math.min(1, 0.12 + radial * 3);
+  radial = Math.max(radial + rough * ramp * tipFade, radial * 0.35);
+  return { r: edge * radial, y: yBase + 8 * chunk * ramp + 22 * lump * ramp };
+}
+
+const patchy = (x, z) => smooth(0.70, 0.82, noise(x / 42 + 7, z / 42 - 5));
+const variation = (x, z) => noise(x * 0.019 + 9, z * 0.019);
+
+// What the top is made of at (x, z): grass and stone (0 to 1), gravel, and a slow variation of tone (the vertex colour's green). The shape's own bare patches
+// and then the places' changes (`features.paint`, sky-island-places.js). The island mesh and the paths laid on it both read the ground this way.
+export function topPaint(x, z, config = SKY_ISLAND, features = null, out = { grass: 1, stone: 0, gravel: 0, variation: 0 }) {
+  const dx = x - config.x, dz = z - config.z;
+  const rho = Math.hypot(dx, dz) / outlineRadius(Math.atan2(dz, dx), config);
+  const rockPatch = patchy(x, z) * (1 - smooth(0.80, 0.97, rho) * 0.5);
+  out.grass = 1 - rockPatch * 0.92; out.stone = rockPatch; out.gravel = 0;
+  if (features) features.paint(x, z, out);
+  out.variation = variation(x, z);
+  return out;
+}
+
+// Where the ground is on top at (x, z), metres above the island's reference level, or null outside the top's edge. `features` (optional,
+// see sky-island-places.js) reshapes the ground for the places on it: a lake, a rise, a hollow.
+export function topGround(x, z, config = SKY_ISLAND, features = null) {
   const dx = x - config.x, dz = z - config.z;
   const dist = Math.hypot(dx, dz);
   const theta = Math.atan2(dz, dx);
   const edge = outlineRadius(theta, config);
   const rho = dist / edge;
   if (rho > 1 - config.lip / edge) return null;
-  return topOffset(x, z, rho, config);
+  const base = topOffset(x, z, rho, config);
+  return features ? features.height(x, z, base) : base;
 }
 
-// Everything the mesh needs, as plain arrays. `baseY` is the world height of the top's reference level.
-export function buildIsland(baseY, config = SKY_ISLAND) {
+// Everything the mesh needs, as plain arrays. `baseY` is the world height of the top's reference level. `features` (optional) reshapes and paints the
+// top for the places on it (sky-island-places.js): `height(x, z, base)` and `paint(x, z, out)`.
+export function buildIsland(baseY, config = SKY_ISLAND, features = null) {
   const A = config.around;
   const rings = []; // each ring: { pole: true, y, ... } or a row of A points built below
   const total = 1 + config.topRings + config.lipRings + config.underRings + 1;
@@ -96,18 +140,24 @@ export function buildIsland(baseY, config = SKY_ISLAND) {
   const zones = new Float32Array(positions.length);
   const indices = [];
   let w = 0;
-  const put = (x, y, z, grass, rock, gv) => {
+  // `rock` is the desert's warm strata (the lip and the underside); `stone` is the island's own dark rock (the top). The terrain shader reads stone as a
+  // negative salt value (zone.y), see materials.js.
+  const put = (x, y, z, grass, rock, gv, gravel = 0, stone = 0) => {
     positions[w * 3] = x; positions[w * 3 + 1] = y; positions[w * 3 + 2] = z;
     colors[w * 3] = 1; colors[w * 3 + 1] = gv; colors[w * 3 + 2] = grass;
-    zones[w * 3] = rock;
+    zones[w * 3] = rock; zones[w * 3 + 1] = -stone; zones[w * 3 + 2] = gravel;
     return w++;
   };
+  // the ground's height and look at a point on top, with the places' changes
+  const topHeight = (x, z, rho) => {
+    const base = topOffset(x, z, rho, config);
+    return features ? features.height(x, z, base) : base;
+  };
   const ringStart = [];
-  const patchy = (x, z) => smooth(0.70, 0.82, noise(x / 42 + 7, z / 42 - 5));
-  const variation = (x, z) => noise(x * 0.019 + 9, z * 0.019);
+  const painted = { grass: 1, stone: 0, gravel: 0, variation: 0 };
 
   // pole at the middle of the top
-  const topCentre = put(config.x, baseY + topOffset(config.x, config.z, 0, config), config.z, 1, 0, variation(config.x, config.z));
+  const topCentre = put(config.x, baseY + topHeight(config.x, config.z, 0), config.z, 1, 0, variation(config.x, config.z));
   ringStart.push(topCentre);
 
   const lipRing0 = config.topRings; // index of the last top ring (the lip's start)
@@ -119,19 +169,18 @@ export function buildIsland(baseY, config = SKY_ISLAND) {
       const c = Math.cos(theta), s = Math.sin(theta);
       const edge = outlineRadius(theta, config);
       const lipStart = edge - config.lip; // radius where the rounding begins
-      let r, y, grass, rock, nearX, nearZ;
+      let r, y, grass, rock = 0, gravel = 0, stone = 0;
       if (i <= config.topRings) {
         r = (i / config.topRings) * lipStart;
         const x = config.x + c * r, z = config.z + s * r;
         const rho = r / edge;
-        y = baseY + topOffset(x, z, rho, config);
-        const rockPatch = patchy(x, z) * (1 - smooth(0.80, 0.97, rho) * 0.5);
-        grass = 1 - rockPatch * 0.92;
-        rock = rockPatch;
+        y = baseY + topHeight(x, z, rho);
+        const look = topPaint(x, z, config, features, painted);
+        grass = look.grass; stone = look.stone; gravel = look.gravel;
       } else if (i <= config.topRings + config.lipRings) {
         const phi = ((i - config.topRings) / config.lipRings) * (Math.PI / 2);
         const x0 = config.x + c * lipStart, z0 = config.z + s * lipStart;
-        const yLip = baseY + topOffset(x0, z0, lipStart / edge, config);
+        const yLip = baseY + topHeight(x0, z0, lipStart / edge);
         r = lipStart + config.lip * Math.sin(phi);
         y = yLip - config.lip * (1 - Math.cos(phi));
         const t = phi / (Math.PI / 2);
@@ -140,31 +189,13 @@ export function buildIsland(baseY, config = SKY_ISLAND) {
       } else {
         const v = (i - config.topRings - config.lipRings) / config.underRings;
         const x0 = config.x + c * (edge - config.lip), z0 = config.z + s * (edge - config.lip);
-        const yLip = baseY + topOffset(x0, z0, (edge - config.lip) / edge, config) - config.lip;
-        // An upside-down mountain: ledges (the radius steps in, at different heights round the island), fins, then lumps cut in with 3D noise.
-        const fin = finRidge(theta, v, config);
-        const phase = circle(theta, 1.9, config.seed * 1.3, config.seed * 0.7);
-        const K = 9;
-        const q = v * K + phase * 0.9;
-        const stair = Math.floor(q) + smooth(0.74, 1.0, q - Math.floor(q));
-        const vEff = mix(v, clamp((stair - phase * 0.9) / K, 0, 1), 0.7 * smooth(0.04, 0.25, v));
-        const amount = smooth(0.02, 0.4, v) * (1 - 0.3 * v);
-        let radial = underRadius(vEff) * (1 - 0.30 * amount * (1 - fin)) + 0.05 * amount * fin;
-        const yBase = yLip - config.thickness * v;
-        const px = c * edge * radial, pz = s * edge * radial;
-        const lump = fbm3((config.x + px) / 58, yBase / 58, (config.z + pz) / 58, config.seed) - 0.5;
-        const chunk = fbm3((config.x + px) / 17, yBase / 17, (config.z + pz) / 17, config.seed * 3) - 0.5;
-        const rough = 0.46 * lump + 0.14 * chunk;
-        const ramp = smooth(0.0, 0.09, v) * (1 - 0.6 * smooth(0.85, 1.0, v));
-        // the lumps fade out towards the tip, and the radius never collapses to nothing (that pinched the mesh into zero-area faces)
-        const tipFade = Math.min(1, 0.12 + radial * 3);
-        radial = Math.max(radial + rough * ramp * tipFade, radial * 0.35);
-        r = edge * radial;
-        y = yBase + 8 * chunk * ramp + 22 * lump * ramp;
+        const yLip = baseY + topHeight(x0, z0, (edge - config.lip) / edge) - config.lip;
+        const under = undersidePoint(theta, v, yLip, config);
+        r = under.r; y = under.y;
         grass = 0; rock = 1;
       }
       const x = config.x + c * r, z = config.z + s * r;
-      put(x, y, z, grass, rock, variation(x, z));
+      put(x, y, z, grass, rock, variation(x, z), gravel, stone);
     }
   }
   // pole at the tip
@@ -203,6 +234,35 @@ export function buildIsland(baseY, config = SKY_ISLAND) {
     normals[k] /= len; normals[k + 1] /= len; normals[k + 2] /= len;
   }
   return { positions, normals, colors, zones, indices: Uint32Array.from(indices), vertexCount: w };
+}
+
+// The drawn ground: where the mesh from `buildIsland` really is at (x, z), in world metres, or null where there is no top (the same domain as
+// `topGround`). The mesh is a polar grid, a ring of `around` points per ring and `topRings` rings, so this finds the quad the point is in and
+// interpolates the triangle the faces split it into. Anything that walks or stands on the island uses this, so nothing floats over or sinks into
+// what is drawn (the smooth `topGround` is up to a quarter of a metre off on the rocky rise, where the mesh cannot follow every crag).
+export function makeMeshGround(data, config = SKY_ISLAND) {
+  const A = config.around, R = config.topRings;
+  const { positions } = data;
+  const high = (i, j) => positions[(i === 0 ? 0 : 1 + (i - 1) * A + (((j % A) + A) % A)) * 3 + 1];
+  return function meshGround(x, z) {
+    const dx = x - config.x, dz = z - config.z;
+    let theta = Math.atan2(dz, dx);
+    if (theta < 0) theta += TAU;
+    const lipStart = outlineRadius(theta, config) - config.lip;
+    const r = Math.hypot(dx, dz);
+    if (r >= lipStart) return null;
+    const fj = (theta / TAU) * A;
+    const j = Math.min(Math.floor(fj), A - 1), tj = fj - j;
+    const fi = (r / lipStart) * R;
+    const i = Math.min(Math.floor(fi), R - 1), ti = fi - i;
+    if (i === 0) { // the fan round the pole
+      return high(0, 0) * (1 - ti) + (high(1, j) * (1 - tj) + high(1, j + 1) * tj) * ti;
+    }
+    const a0 = high(i, j), a1 = high(i, j + 1), b0 = high(i + 1, j), b1 = high(i + 1, j + 1);
+    // the quad is cut along the line from a1 to b0 (see the faces in buildIsland)
+    if (tj + ti <= 1) return a0 + (a1 - a0) * tj + (b0 - a0) * ti;
+    return b1 + (a1 - b1) * (1 - ti) + (b0 - b1) * (1 - tj);
+  };
 }
 
 export { clamp, mix };

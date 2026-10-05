@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SKY_ISLAND, buildIsland } from './sky-island-shape.js';
+import { SKY_ISLAND, buildIsland, makeMeshGround } from './sky-island-shape.js';
 import { createSkyIslandGround } from './sky-island-ground.js';
 
 // The floating island as a mesh (shape in sky-island-shape.js, the ground you walk on in sky-island-ground.js). It wears the terrain's own
@@ -8,7 +8,7 @@ import { createSkyIslandGround } from './sky-island-ground.js';
 export function createSkyIsland(material, config = SKY_ISLAND) {
   const ground = createSkyIslandGround(config);
   const baseY = ground.baseY;
-  const data = buildIsland(baseY, config);
+  const data = buildIsland(baseY, config, ground.features);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(data.positions, 3));
   geometry.setAttribute('normal', new THREE.BufferAttribute(data.normals, 3));
@@ -22,9 +22,11 @@ export function createSkyIsland(material, config = SKY_ISLAND) {
   group.name = 'Sky island group';
   group.add(mesh);
   return {
-    group, mesh, baseY, config, ground,
+    group, mesh, baseY, config, ground, features: ground.features,
     triangles: data.indices.length / 3,
-    // World height of the top at (x, z), or null where there is no ground on top (off the edge).
-    groundHeight: ground.groundHeight,
+    // World height of the top at (x, z), or null where there is no ground on top (off the edge): where the drawn mesh really is, so nothing stands
+    // above or in it. (`ground.groundHeight` is the smooth analytic version the layout is worked out from; they differ by centimetres, a quarter
+    // of a metre at most on the rocky rise.)
+    groundHeight: makeMeshGround(data, config),
   };
 }
