@@ -1,6 +1,6 @@
 # Oasis
 
-A VR desert game: one kilometre of desert, an oasis to live around, light survival, gathering and crafting, with continuous first-person movement. It is heading towards Shadow of the Colossus style fights with giant creatures; for now there is one small creature to fight. Built for Meta Quest 3 using Three.js and Vite.
+A VR desert game: a four kilometre desert with an oasis to start at and other places to find, light survival, gathering and crafting, with continuous first-person movement. It is heading towards Shadow of the Colossus style fights with giant creatures; for now there is one small creature to fight. Built for Meta Quest 3 using Three.js and Vite.
 
 ## Explore
 
@@ -10,14 +10,38 @@ Desktop: **Explore**, WASD / arrow up and down to walk, mouse to look, Shift to 
 
 ## World
 
-- The walkable area is 1,000 × 1,000 metres, centred on `(0, 0)`.
+- The walkable area is 4,000 × 4,000 metres: x from -1,500 to 2,500 and z from -2,500 to 1,500 (`AREA` in `src/zones.js`; mountains close it in, see "The wider world"). The oasis square, x and z from -500 to 500, is the world as it was before it grew and is unchanged.
 - The pool centre is `(300, -400)`, exactly 500 metres from spawn. It is approximately 80 × 68 metres, with an irregular shoreline and a maximum depth of 0.88 metres.
 - A bare sandy bank surrounds the water, followed by a textured grass band on a gently sloping shelf.
 - Seeded wind-shaped dunes, sand ripples, wet shore sand, and animated shallow water with fireflies (the first plain reeds were removed on 5 Oct, the glow reeds took their place).
 - Around the oasis: blue alien palms (see The blue palms), green ferns, alien desert plants, loose sticks and stones. The glowing 81 m veil tree stands a short walk from the pool (`?hero=crimson` swaps the old 60 m tree back in for comparison); small glow fruit lie around its base.
 - A short day/night cycle (3 min day, 3 min night while testing; `DAY_SECONDS` / `NIGHT_SECONDS` in `src/day-night.js`) with 2,400 twinkling stars, a moon with a face and a phase, a Milky Way band, now and then a shooting star and the great ringed planet this moon circles (`src/night-sky.js`, see "The ringed planet and the sun's path"), desert ambience, sand footsteps, and a lightable torch. Night is dark and moonlit; the veil tree's pods glow and light the ground beneath them. Wind blows sand along the dunes: fine grains skimming the ground, soft veils spilling over the crests and big slow clouds of dust, all moved on the GPU (`src/wind-sand.js`). The air is calm at the oasis. The grass, ferns, glow plants, desert plants and alien trees sway in the same wind, bending downwind with the gusts that throw the sand, with ripples running across the grass field; it is all in the vertex shader from one time uniform, with nothing for the CPU to do per frame (`src/wind.js`; the hero tree stays still). Lit objects (props, trees, hands, tools) get a faint moonlit fill and a thin cool rim at night so they read as shapes instead of black holes (`src/night-fill.js`).
 - Alien birds fly over by day, and now and then one lands on the bank to drink (see Alien birds in the game).
-- A coarse continuation of the sand outside the playable square hides the world edge.
+- Beyond the walkable area a mountain rim carries on out of sight, so there is no edge to see.
+
+## The wider world
+
+The desert is 4 km by 4 km, and the oasis (the old 1 km square, x and z from -500 to 500) sits in it exactly as it was: `terrainHeight` is the old function inside that square and `tests/zones.test.js` pins twelve of its heights. Everything new is in `src/zones.js`, which is data (`AREA`) plus `shapeTerrain`, so a later area is a new table rather than new terrain code. It is still one biome; the variety is where the bedrock comes through and where the dunes flatten out.
+
+- **The gravel plain** (a 1 km oval north of the oasis, centre `(-120, -1300)`, level at 11.5 m) is the likely home of the first colossus: flat, empty of finds on purpose, and framed by a long ridge on its north and west sides, with the open dunes to its east and south.
+- **The mesa landmark** (`(420, -1960)`, 125 m high, stepped cliffs) stands 1.7 km north of the oasis and shows over the dunes from the start. There are two more mesas.
+- **Badlands** east (`(1750, -250)`) and west (`(-1050, 380)`): dunes give way to layered bedrock cut into buttes and gravel washes (noise stepped into strata, `badlands` in `AREA`).
+- **The canyon**: a plateau at `(1700, -1250)` with a winding cut through it from west to east, a floor you can walk and walls 70 m high.
+- **The salt pan** south (`(450, 950)`): a pale, perfectly flat floor lower than the dunes, with a ridge behind it.
+- **The rim**: from 140 m inside the edge the ground rises into mountains (up to about 270 m), carries on outside the walkable area and ends in a coarse horizon mesh out to 12 km. The player is stopped 40 m inside the edge, already on the mountain side (`WALK`).
+
+The ground reads the zones from a third vertex attribute, `zone` (rock, salt, gravel, each 0 to 1), which the sand shader uses for strata colours (banded by height, wobbled, faded with distance so far mountains do not shimmer), pale salt and pebbly gravel. Inside the oasis square the zone is zero and the shader is unchanged. Slopes and the zones do not change how the player moves.
+
+How it is drawn (`src/terrain-tiles.js` chooses, `src/terrain.js` builds and shows):
+- A quadtree of square tiles around the player. The smallest is the old 62.5 m chunk with the old two levels of detail (32 segments within 140 m, 16 beyond), so the oasis looks as it did; tiles double in size to 125, 250, 500 and 1,000 m with distance (`TERRAIN.sizes`; a tile splits into four when the player is within `split` metres). Skirts (deeper for coarser tiles) hide the cracks between levels.
+- Heights come from a lazy tile cache (`createHeightField` in `src/world.js`, tiles of 32 cells with a one cell apron). Nothing is computed until someone walks or looks near it. `sample` is still mesh-accurate. Coarser tiles read `terrainHeight` directly.
+- Tiles the player will need soon (`TERRAIN.lead`, 25% further out) are built a few at a time, nearest first (`buildBudgetMs` per update), and old geometry is dropped when more than `cacheLimit` are held. A tile that is on screen and not yet built is built at once, so there are never holes.
+- The oasis' water shaders still read their own fixed 513 x 513 height texture of the old square. The wind-blown sand, which can be anywhere, keeps a 128 x 128 window of the ground round the player (`src/ground-window.js`), moved when the player is 36 m off its middle.
+- Beyond a 600 m haze distance the air thickens more slowly than before (`air` in `src/materials.js`), so a mesa a kilometre or two away still reads.
+
+Finds: the wider world has 16 rock groups and 11 spire groves (`wild*` in `FINDS`, `src/desert-finds.js`), placed by a second pass with its own random stream so the oasis' 123 nodes and their ids are untouched. No new crystals (Kane, 5 Oct). Not on the gravel, the salt or the rim.
+
+Dev: `?at=x,z&look=x,z,h&eye=metres` puts the camera anywhere (`eye` is the camera height above the ground, so `&eye=300&pitch=-30` is a bird's eye view). `window.__terrain` in the dev build shows the tile counts.
 
 ## Run
 
@@ -36,11 +60,11 @@ WebXR requires HTTPS, or localhost during development. A phone/PC on a plain LAN
 
 ## Performance and structure
 
-Terrain uses 62.5 m chunks with four distance-based geometry levels and skirts to seal LOD edges. Collision samples the same triangles as the nearest terrain. Static dune shadows are computed once during startup. There are no real-time shadow maps, reflection cameras, postprocessing passes, imported art assets, or per-frame geometry generation. A 512 × 512 mipmapped sand detail texture and a 513 × 513 packed height texture are generated locally. Water reflects the real sky, drifting clouds and nearby dunes (a short height-field trace), ripples with two scrolling noise layers, and approximates shallow-water absorption; it does not run a second scene render.
+Terrain is a quadtree of tiles around the player (see "The wider world"), with skirts to seal the edges between levels of detail. Collision samples the same triangles as the nearest terrain. Static dune shadows are computed once during startup. There are no real-time shadow maps, reflection cameras, postprocessing passes, imported art assets, or per-frame geometry generation. A 512 × 512 mipmapped sand detail texture and a 513 × 513 packed height texture are generated locally. Water reflects the real sky, drifting clouds and nearby dunes (a short height-field trace), ripples with two scrolling noise layers, and approximates shallow-water absorption; it does not run a second scene render.
 
 VR requests a 72 Hz refresh rate when supported, a framebuffer scale of 1, and fixed foveation of 0.65. Actual headset frame rate still needs verification on Quest 3; desktop/browser checks cannot certify hardware performance.
 
-`src/world.js` owns dimensions, deterministic height generation, water and hero tree placement, and collision. `src/terrain.js` builds the terrain. `src/materials.js` owns the sand, sky, and water shaders. `src/grass-texture.js` configures the grass texture and its repeat size. `src/oasis-vegetation.js` places the trees, bushes and hero tree. `src/hands.js` owns the VR hands (models in `public/models/hands`) and the held objects. `src/main.js` handles input and rendering. Development-only `?view=shore`, `?view=oasis` (elevated overview), and `?view=wide` camera fixtures support visual QA and are removed by the production build.
+`src/world.js` owns dimensions, deterministic height generation, water and hero tree placement, and collision; `src/zones.js` shapes the ground beyond the oasis. `src/terrain.js` builds the terrain. `src/materials.js` owns the sand, sky, and water shaders. `src/grass-texture.js` configures the grass texture and its repeat size. `src/oasis-vegetation.js` places the trees, bushes and hero tree. `src/hands.js` owns the VR hands (models in `public/models/hands`) and the held objects. `src/main.js` handles input and rendering. Development-only `?view=shore`, `?view=oasis` (elevated overview), and `?view=wide` camera fixtures support visual QA and are removed by the production build.
 
 ## Inventory, crafting and hips
 

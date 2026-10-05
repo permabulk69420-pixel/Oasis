@@ -1,4 +1,5 @@
 import { SPAWN, WATER, HERO_TREE, isInPond } from './world.js';
+import { AREA } from './zones.js';
 import { ROCK_VARIANTS, CRYSTAL_VARIANTS, SPIRE_VARIANTS, mulberry32 } from './find-shapes.js';
 
 // Where the things worth walking out to are. Three kinds (src/find-shapes.js, src/mining.js):
@@ -27,6 +28,12 @@ export const FINDS = Object.freeze({
   rockSites: 8,
   crystalSites: 9,
   spireSites: 7,
+  // The wider world (beyond the oasis square): rock groups and spire groves, no crystals (Kane, 5 Oct: no more of them).
+  wildRockSites: 16,
+  wildSpireSites: 11,
+  wildSpacing: 120, // between the middles of two wild sites
+  wildInset: 280, // from the edge of the world, outside the mountain rim
+  wildClearOfHome: 40, // beyond the oasis square by at least this much (the oasis already has its own)
   stingerHome: Object.freeze({ x: SPAWN.x + 46, z: SPAWN.z - 6 }), // dune-stinger.js; the crystals near it are the first prize
   maxSlope: Object.freeze({ rock: 0.62, crystal: 0.5, spire: 0.5 }), // highest minus lowest ground under the footprint, in metres per metre of footprint radius
 });
@@ -67,7 +74,7 @@ export function groundUnder(heightAt, x, z, r) {
 
 export function layoutFinds({ heightAt, seed = FINDS.seed } = {}) {
   if (typeof heightAt !== 'function') throw new Error('layoutFinds needs a heightAt(x, z) function');
-  const rng = mulberry32(seed);
+  let rng = mulberry32(seed);
   const rand = (a, b) => a + (b - a) * rng();
   const pick = list => list[Math.min(list.length - 1, Math.floor(rng() * list.length))];
   const nodes = [];
@@ -77,9 +84,13 @@ export function layoutFinds({ heightAt, seed = FINDS.seed } = {}) {
   const distance = (ax, az, bx, bz) => Math.hypot(ax - bx, az - bz);
   const ponded = (x, z) => distance(x, z, WATER.x, WATER.z) < FINDS.pondClear * 0.6 || isInPond(x, z, heightAt(x, z)) || heightAt(x, z) < WATER.y + 0.4;
 
+  // The oasis square for the first pass, the wider world for the second.
+  let wildPass = false;
+  let within = (x, z) => Math.abs(x) <= FINDS.worldLimit && Math.abs(z) <= FINDS.worldLimit;
+
   // Can a node of this kind stand at (x, z)? Not in the pond or the hero tree's clearing, not on the start, not too steep, not touching another.
   function fits(kind, variant, x, z, scale, { ignoreSpawn = false, allowNearPond = false } = {}) {
-    if (Math.abs(x) > FINDS.worldLimit || Math.abs(z) > FINDS.worldLimit) return false;
+    if (!within(x, z)) return false;
     if (!allowNearPond && distance(x, z, WATER.x, WATER.z) < FINDS.pondClear) return false;
     if (ponded(x, z)) return false;
     if (distance(x, z, HERO_TREE.x, HERO_TREE.z) < FINDS.heroClear) return false;
@@ -103,7 +114,7 @@ export function layoutFinds({ heightAt, seed = FINDS.seed } = {}) {
     const height = ground.min + (kind === 'rock' ? 0.04 : 0.02) * heightOf(kind, variant) * scale - (kind === 'rock' ? 0 : 0.04);
     const node = {
       id: `${kind[0]}${String(counts[kind]++).padStart(2, '0')}`,
-      kind, variant, x, z, y: height, yaw: rng() * TAU, scale, radius, site, ...extra,
+      kind, variant, x, z, y: height, yaw: rng() * TAU, scale, radius, site, ...(wildPass ? { wild: true } : {}), ...extra,
     };
     nodes.push(node);
     return node;
@@ -168,7 +179,7 @@ export function layoutFinds({ heightAt, seed = FINDS.seed } = {}) {
     }
   }
 
-  function buildRockSite(cx, cz, richness, index) {
+  function buildRockSite(cx, cz, richness, index, crystals = true) {
     const site = `rocks ${index}`;
     const names = Object.keys(ROCK_VARIANTS);
     const landmark = rng() < 0.55 ? 'hoodoo' : 'mesa';
@@ -179,7 +190,7 @@ export function layoutFinds({ heightAt, seed = FINDS.seed } = {}) {
       addNear('rock', pick(names), cx + Math.cos(angle) * r, cz + Math.sin(angle) * r, rand(0.8, 1.3), site, 8);
     }
     // sometimes a crystal grows in the lee of the stone
-    if (rng() < 0.4 + 0.3 * richness) {
+    if (crystals && rng() < 0.4 + 0.3 * richness) {
       const angle = rng() * TAU, r = rand(9, 15);
       addNear('crystal', pick(['cluster', 'fan']), cx + Math.cos(angle) * r, cz + Math.sin(angle) * r, rand(0.9, 1.3), site, 6);
     }
@@ -204,6 +215,36 @@ export function layoutFinds({ heightAt, seed = FINDS.seed } = {}) {
     for (let i = 0; i < count; i++) {
       const angle = rng() * TAU, r = rand(1, 5 + 14 * Math.sqrt(rng()));
       addNear('spire', rng() < 0.6 ? 'tall' : 'squat', cx + Math.cos(angle) * r, cz + Math.sin(angle) * r, rand(0.85, 1.25), site, 5);
+    }
+  }
+
+  // ---------------------------------------------------------------------- the wider world
+  // A second pass with its own random stream, run after everything above, so the oasis' nodes (and their ids) are exactly as
+  // they were. Sites go on dunes and bedrock; not on the flat gravel (kept clear for a colossus), the salt pan or the mountain rim.
+  {
+    rng = mulberry32(seed + 7919);
+    wildPass = true;
+    const b = AREA.bounds, h = AREA.home, inset = FINDS.wildInset;
+    within = (x, z) => x > b.minX + inset && x < b.maxX - inset && z > b.minZ + inset && z < b.maxZ - inset;
+    const awayFromHome = (x, z) => x < h.minX - FINDS.wildClearOfHome || x > h.maxX + FINDS.wildClearOfHome || z < h.minZ - FINDS.wildClearOfHome || z > h.maxZ + FINDS.wildClearOfHome;
+    const inEllipse = (x, z, f, k) => Math.hypot((x - f.x) / f.rx, (z - f.z) / f.rz) < k;
+    const open = (x, z) => !AREA.flats.some(f => inEllipse(x, z, f, 1.05)) && !AREA.salt.some(f => inEllipse(x, z, f, 1.0));
+    const wild = [];
+    for (let i = 0; i < FINDS.wildRockSites; i++) wild.push('rock');
+    for (let i = 0; i < FINDS.wildSpireSites; i++) wild.push('spire');
+    for (let i = wild.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [wild[i], wild[j]] = [wild[j], wild[i]]; }
+    for (const kind of wild) {
+      for (let attempt = 0; attempt < 600; attempt++) {
+        const cx = rand(b.minX + inset, b.maxX - inset), cz = rand(b.minZ + inset, b.maxZ - inset);
+        if (!awayFromHome(cx, cz) || !open(cx, cz)) continue;
+        if (sites.some(site => distance(cx, cz, site.x, site.z) < FINDS.wildSpacing)) continue;
+        const richness = rng();
+        const before = nodes.length;
+        if (kind === 'rock') buildRockSite(cx, cz, richness, sites.length, false);
+        else buildSpireSite(cx, cz, richness, sites.length);
+        if (nodes.length - before >= (kind === 'rock' ? 2 : 3)) { sites.push({ name: `${kind} site ${sites.length}`, x: cx, z: cz, kind, richness, wild: true }); break; }
+        nodes.length = before;
+      }
     }
   }
 

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { AREA } from '../src/zones.js';
 import { createHeightField, SPAWN, WATER, HERO_TREE } from '../src/world.js';
 import { layoutFinds, footprintOf, heightOf, groundUnder, FINDS, FINDS_VERSION, NODE_KINDS } from '../src/desert-finds.js';
 
@@ -15,7 +16,7 @@ test('the layout is the same every time', () => {
 });
 
 test('there is plenty out there, of every kind, with unique ids', () => {
-  assert.ok(nodes.length >= 80 && nodes.length <= 200, `${nodes.length} nodes`);
+  assert.ok(nodes.length >= 80 && nodes.length <= 320, `${nodes.length} nodes`);
   assert.equal(new Set(nodes.map(n => n.id)).size, nodes.length, 'ids are unique');
   for (const kind of NODE_KINDS) assert.ok(nodes.filter(n => n.kind === kind).length >= 15, `${kind} count`);
   for (const node of nodes) {
@@ -34,7 +35,7 @@ test('there is something to find close to the start: stone, fibre and (guarded) 
 });
 
 test('the far sites are far, apart from each other, and the richer ones further out', () => {
-  const far = sites.filter(s => !s.near);
+  const far = sites.filter(s => !s.near && !s.wild);
   assert.ok(far.length >= 18, `${far.length} far sites`);
   for (const site of far) assert.ok(away(site, SPAWN) >= FINDS.farMin - 1 && away(site, SPAWN) <= FINDS.farMax + 1, `${site.name} at ${away(site, SPAWN)}`);
   for (let i = 0; i < far.length; i++) for (let j = i + 1; j < far.length; j++) assert.ok(away(far[i], far[j]) >= FINDS.siteSpacing - 1, `${far[i].name} and ${far[j].name}`);
@@ -45,7 +46,7 @@ test('the far sites are far, apart from each other, and the richer ones further 
 
 test('nothing in the pond, the hero tree\'s clearing, the start, or the edge of the world', () => {
   for (const node of nodes) {
-    assert.ok(Math.abs(node.x) <= FINDS.worldLimit + 1 && Math.abs(node.z) <= FINDS.worldLimit + 1, `${node.id} inside the world`);
+    if (!node.wild) assert.ok(Math.abs(node.x) <= FINDS.worldLimit + 1 && Math.abs(node.z) <= FINDS.worldLimit + 1, `${node.id} inside the oasis square`);
     assert.ok(away(node, HERO_TREE) >= FINDS.heroClear - 1, `${node.id} clear of the hero tree`);
     assert.ok(away(node, SPAWN) >= FINDS.spawnClear - 1, `${node.id} clear of the start`);
     assert.ok(away(node, WATER) >= FINDS.pondClear * 0.6 - 1, `${node.id} clear of the pond`);
@@ -76,4 +77,20 @@ test('footprint and height helpers know every variant', () => {
   }
   assert.throws(() => footprintOf('rock', 'nonsense'));
   assert.throws(() => layoutFinds({}));
+});
+
+test('the wider world has its own rock groups and spire groves: spread out, off the gravel and salt, away from the rim, and no new crystals', () => {
+  const wild = nodes.filter(n => n.wild), wildSites = sites.filter(s => s.wild);
+  assert.ok(wildSites.length >= 20, `${wildSites.length} wild sites`);
+  assert.ok(wild.length >= 60, `${wild.length} wild nodes`);
+  assert.equal(wild.filter(n => n.kind === 'crystal').length, 0, 'no crystals out there');
+  for (let i = 0; i < wildSites.length; i++) for (let j = i + 1; j < wildSites.length; j++) assert.ok(away(wildSites[i], wildSites[j]) >= FINDS.wildSpacing - 1, `${wildSites[i].name} and ${wildSites[j].name}`);
+  for (const node of wild) {
+    assert.ok(node.x > AREA.bounds.minX + FINDS.wildInset - 1 && node.x < AREA.bounds.maxX - FINDS.wildInset + 1 && node.z > AREA.bounds.minZ + FINDS.wildInset - 1 && node.z < AREA.bounds.maxZ - FINDS.wildInset + 1, `${node.id} inside the walkable world`);
+    for (const f of AREA.flats) assert.ok(Math.hypot((node.x - f.x) / f.rx, (node.z - f.z) / f.rz) >= 1, `${node.id} is on the gravel plain`);
+    for (const f of AREA.salt) assert.ok(Math.hypot((node.x - f.x) / f.rx, (node.z - f.z) / f.rz) >= 0.95, `${node.id} is on the salt pan`);
+  }
+  // the oasis' own nodes are exactly the ones it had before the world grew (their ids are saved)
+  const home = nodes.filter(n => !n.wild);
+  assert.equal(home.length, 123);
 });

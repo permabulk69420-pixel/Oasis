@@ -26,6 +26,7 @@ the moment", so keep it loose: he said not to get into too much of the specifics
   asking. Lighting and exposure are art, so those are mine to try and show (current: 3 minutes day, 3 minutes night, `src/day-night.js`; day exposure about 0.62, night about 0.035; since 5 Oct the sun never climbs past 14 degrees, see README "The ringed planet and the sun's path").
 - **Climbing is in, and gliding too (Kane, 5 Oct).** Both tie into stamina, which already exists (`src/survival.js`). It is the colossus climb above and probably a general
   ability as well. What each costs in stamina and how they feel are his calls, not mine to invent.
+- **The world is 4 km now (Kane, 5 Oct):** the oasis is the start, with a gravel plain (the colossus's likely home), ridges, mesas, a canyon, badlands and a salt pan, one biome, no new crystals. See "The wider world" below.
 - The full write-up is `claude/direction.md` in the Project (the `Projects` tool). Keep it and this section in step.
 
 ## How we work (Kane and me)
@@ -138,7 +139,7 @@ work. What he has told me, or shown he wants, across sessions:
   skill when a procedure needs more than a few lines here (Kane gave me full authority over this file and the skills).
 - `gh pr create` fails here (GraphQL is blocked): use the REST API. Commands, merge routine and stop-hook notes are in the `ship-a-change` skill.
 - `?fresh=1` starts a new game (only matters with `?save=1`; the old save is kept aside, see "Saving" below). Saving is off unless the address has `?save=1` (any build), so the fixtures below never meet a save.
-- Dev-only URL fixtures (stripped from production): `?view=...`, `?hour=N` (0 night, 14 day),
+- Dev-only URL fixtures (stripped from production): `?at=x,z&look=x,z,h&eye=metres&pitch=deg` anywhere in the 4 km world (`eye` is the camera height above the ground, so `&eye=300&pitch=-30` is a bird's eye view; the far haze hides most of the world from high up), `?view=...`, `?hour=N` (0 night, 14 day),
   `?camp=lit|unlit`, `?campd=<metres>`, `?bird=perch|fly|flare`, `?view=pack`, `?pack=worn`, `?view=spear`, `?treelod=0|1|2` (every tree at
   one level of detail). `?trees=old` also works in production (the first blue trees, for comparison). Add one when a new
   feature needs a repeatable screenshot.
@@ -215,6 +216,17 @@ Kane saw the first renders and said "I like what you're doing too, don't worry a
 no collision and nothing to harvest; the lantern has no violet; the stems go dark at night so the bulbs seem to float; the models carry vertex colours plus UVs but no textures yet; the plants add a few draw calls (one per material per level).
 
 Plants give way to you (Kane's idea, 5 Oct; my call on the numbers; README "Plants that give way to you", `PUSH` in `src/wind.js`, `src/plant-push.js`): feet and both hands shove nearby grass, ferns and glow plants away, shader only, no memory. `?push=0` compares with it off. Grass is pushed per vertex, everything else leans rigidly from its root (the first version pushed every vertex and warped the glow plants when a hand came near; Kane noticed). Oddities to tell Kane: the radii (0.62 m feet, 0.42 m hands) and the reach are my numbers; a plant snaps back the instant you leave it; the cost on a Quest is my guess (10 to 20 percent more plant vertex work), not measured, so if the frame rate dips trim `push` on the grass first. He liked the idea of a lantern bloom glowing brighter when brushed, to try after he has felt this.
+
+The wider world (Kane, 5 Oct: the oasis is "fucking small", "we need way larger areas or something to explore"; "you just want to work on making this feel like a bigger sort of environment with other areas"; my call on the places; README "The wider world", `src/zones.js`, `src/terrain-tiles.js`, `src/terrain.js`, `tests/zones.test.js`):
+the desert is now 4 km by 4 km (x -1500 to 2500, z -2500 to 1500, `AREA.bounds`) with the oasis square (-500 to 500) **exactly** as it was (a test pins twelve of its heights; do not touch `homeHeight` in `src/world.js`).
+It is one biome, as Kane asked: where the bedrock comes through (ridges, mesas, a canyon plateau, badlands of buttes and gravel washes), a flat gravel plain north of the oasis (`AREA.flats`, framed by ridges, left empty on purpose as the likely colossus ground, his idea of "flat areas, maybe the Colossus in one"),
+a salt pan south, and mountains round the whole edge that the player is stopped inside (`WALK`). **No new crystals (Kane: "not 100% sold on those crystals... too colourful funky less realistic", he plans to thin them out): the wider world has plain sandstone outcrops and spire plants only, glow stays rare. Do not add crystals out there unless he asks.**
+Zones are a data table (`AREA`) plus `shapeTerrain`, so the next area is a new table, not new terrain code. The ground is a lazy tile cache (`createHeightField`), the sand a quadtree of tiles (62.5 m chunks with the old two levels of detail near the player, then 125, 250, 500, 1000 m), the sand shader reads a `zone` vertex attribute
+(rock, salt, gravel) for strata, salt and pebbles; the wind-blown sand reads its own 128 cell window of the ground round the player (`src/ground-window.js`) because the old fixed height texture covered only the oasis square (the water shaders still use that).
+Heights past 64 m exist now: anything that packs or assumes a height range under 64 m must change (the oasis height texture is only the old square, which is fine). `FINDS` has a second pass (`wild*`) with its own random stream so the oasis' node ids never move.
+The air thickens more slowly past 600 m (`air` in `src/materials.js`) so far mesas read. Things I did not do yet, on purpose, because he asked to see this first: more giant bones out there, a second colossus-sized landmark, anything living in the new areas (no new creatures: that is gameplay),
+resources beyond rocks and spires (no wood out there), a map or a compass (UI), fast travel. Oddities to tell Kane: a mesa is a cliff you can walk straight up (there is no slope limit, as before); the canyon floor and the plain are the nice places to look first; new tiles are built a few at a time as you walk,
+so a very fast walk could show a coarse tile for a moment; the mountain wall is steep but the invisible stop is on its slope, so you can walk a little way up it; the terrain is about 70 draw calls and 80k triangles in view (measured in the desktop run with the sand hidden and shown; the smoke test at spawn reads 188 calls and 497k triangles in all); the strata look and the pale salt are mine.
 
 ## Overnight progress log (3 to 4 Oct 2026)
 

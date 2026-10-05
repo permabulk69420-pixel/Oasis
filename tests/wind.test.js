@@ -1,3 +1,4 @@
+import { createHeightField } from '../src/world.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -25,8 +26,8 @@ test('the sand and the plants lean into the same gusts', () => {
       uSun: { value: new THREE.Vector3(0, 1, 0) },
       uWater: { value: new THREE.Vector3(300, 3.1, -400) },
       uWaterRadii: { value: new THREE.Vector2(40, 34) },
-      uElevation: { value: new THREE.DataTexture(new Uint8Array(4), 1, 1) },
     },
+    field: createHeightField(),
   });
   const vertex = sand.meshes[0].material.vertexShader;
   assert.ok(vertex.includes(WIND_GLSL), 'the sand shader includes the shared wind functions');
