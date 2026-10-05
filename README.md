@@ -99,7 +99,7 @@ Deliberately light (`src/survival.js`, rates in one table at the top):
 
 ## Saving
 
-The game saves itself, quietly (`src/save-game.js`): no button and no menu. The Quest browser reloads a page now and then (for instance
+**Saving is switched off for now** (Kane, 5 Oct: he wants a fresh world each time while testing; a save the player chooses may come later). Open the page with `?save=1` to turn it on, in any build; the rest of this section describes it when it is on. The game then saves itself, quietly (`src/save-game.js`): no button and no menu. The Quest browser reloads a page now and then (for instance
 after the headset has been off), and with this a reload puts you back where you were.
 
 - **What is saved**: what you carry, health, food, water and stamina, the time of day, where you stand and which way you face, every
@@ -116,7 +116,7 @@ after the headset has been off), and with this a reload puts you back where you 
   just does not save.
 - **A VR session starts where the saved game left you** (not at the start of the world). Leaving VR and entering again continues from
   where you left off.
-- **Development**: a dev build saves nothing unless the address has `?save=1` (so the screenshot fixtures stay repeatable). The browser
+- **Development**: saving is off unless the address has `?save=1` (in every build) (so the screenshot fixtures stay repeatable). The browser
   check is in `tools/smoke/smoke_test.py`. Tools take part with `snapshot()` / `restoreSnapshot()` in `src/tools.js` (a kind adds
   `saveState` / `loadState` for what it keeps about itself, e.g. the torch's flame); the backpack with `snapshot()` / `restore()`;
   the mined rocks with `serialize()` / `restore()` in `src/mining.js`. When a part of the game changes what it holds, add it to the
