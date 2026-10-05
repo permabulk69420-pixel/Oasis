@@ -1,4 +1,8 @@
 // Metres, Y-up. Keep world shape independent of the renderer and locomotion.
+import { clamp, mix, smooth, noise } from './world-math.js';
+import { shapeTerrain } from './zones.js';
+export { clamp, mix, smooth, noise };
+
 export const WORLD_SIZE = 1000;
 export const HALF_WORLD = WORLD_SIZE / 2;
 export const GRID_SEGMENTS = 512;
@@ -9,22 +13,6 @@ export const SPAWN = Object.freeze({ x: 319, z: -292 });
 // The 60 m crimson landmark tree, and the clearing kept free of other plants and rocks.
 export const HERO_TREE = Object.freeze({ x: 372, z: -414, yaw: 0.55, groundInset: 0.55, clearRadius: 48 });
 export const SUN = Object.freeze({ x: -0.728, y: 0.469, z: -0.499 });
-export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-export const mix = (a, b, t) => a + (b - a) * t;
-export const smooth = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
-
-function hash(x, y) {
-  let n = Math.imul(x, 374761393) + Math.imul(y, 668265263) + 1337;
-  n = Math.imul(n ^ (n >>> 13), 1274126177);
-  return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
-}
-
-export function noise(x, y) {
-  const ix = Math.floor(x), iy = Math.floor(y);
-  const fx = smooth(0, 1, x - ix), fy = smooth(0, 1, y - iy);
-  return mix(mix(hash(ix, iy), hash(ix + 1, iy), fx), mix(hash(ix, iy + 1), hash(ix + 1, iy + 1), fx), fy);
-}
-
 function duneProfile(phase) {
   const p = phase - Math.floor(phase);
   // Long windward slope and a shorter lee slope, without a hard ridge normal.
@@ -50,7 +38,8 @@ export function grassCover(x, z) {
     * (1 - smooth(1.80, 2.08, r + edgeNoise));
 }
 
-export function terrainHeight(x, z) {
+// The dunes and the oasis basin: the whole world before the zones (src/zones.js) were added, and still all of it inside the oasis square.
+function homeHeight(x, z) {
   const wind = x * 0.84 + z * 0.54;
   const across = -x * 0.54 + z * 0.84;
   const bend = 44 * (noise(x * 0.0045 + 20, z * 0.0045) - 0.5)
@@ -74,6 +63,11 @@ export function terrainHeight(x, z) {
   return height;
 }
 
+const zoneScratch = { rock: 0, salt: 0, gravel: 0 };
+export function terrainHeight(x, z) { return shapeTerrain(x, z, homeHeight(x, z), zoneScratch); }
+// The same, also reporting what the ground is made of: out.rock, out.salt, out.gravel (each 0 to 1).
+export function terrainSurface(x, z, out) { return shapeTerrain(x, z, homeHeight(x, z), out); }
+
 // True when ground at (x, z) sits under the pond's still water by enough to be wading, not just
 // at the wet edge. `ground` is the terrain height there (pass field.sample for the live one).
 export const WADE_DEPTH = 0.06;
@@ -81,22 +75,49 @@ export function isInPond(x, z, ground = terrainHeight(x, z)) {
   return basinRadius(x, z) < 1.4 && WATER.y - ground > WADE_DEPTH;
 }
 
+// The ground as a grid of GRID_STEP metres that reaches as far as anyone can walk. It is filled in lazily, a tile of
+// TILE cells (62.5 m, the terrain chunk) at a time, with a one cell apron so a chunk and its normals live in one tile.
+// `sample` matches the rendered triangles exactly, including the diagonal.
+export const TILE = 32;
+const TILE_SIDE = TILE + 3;
 export function createHeightField() {
-  const side = GRID_SEGMENTS + 1;
-  const heights = new Float32Array(side * side);
-  for (let iz = 0; iz < side; iz++) {
-    for (let ix = 0; ix < side; ix++) heights[iz * side + ix] = terrainHeight(ix * GRID_STEP - HALF_WORLD, iz * GRID_STEP - HALF_WORLD);
+  const tiles = new Map();
+  let lastKey = NaN, lastTile = null;
+  function tile(tx, tz) {
+    const key = (tx + 4096) * 8192 + (tz + 4096);
+    if (key === lastKey) return lastTile;
+    let data = tiles.get(key);
+    if (!data) {
+      data = new Float32Array(TILE_SIDE * TILE_SIDE);
+      for (let iz = 0; iz < TILE_SIDE; iz++) {
+        const z = (tz * TILE + iz - 1) * GRID_STEP - HALF_WORLD;
+        for (let ix = 0; ix < TILE_SIDE; ix++) data[iz * TILE_SIDE + ix] = terrainHeight((tx * TILE + ix - 1) * GRID_STEP - HALF_WORLD, z);
+      }
+      tiles.set(key, data);
+    }
+    lastKey = key; lastTile = data;
+    return data;
   }
-  const vertex = (ix, iz) => heights[clamp(iz, 0, GRID_SEGMENTS) * side + clamp(ix, 0, GRID_SEGMENTS)];
+  const vertex = (ix, iz) => {
+    const tx = Math.floor(ix / TILE), tz = Math.floor(iz / TILE);
+    return tile(tx, tz)[(iz - tz * TILE + 1) * TILE_SIDE + (ix - tx * TILE + 1)];
+  };
   function sample(x, z) {
-    const gx = clamp((x + HALF_WORLD) / GRID_STEP, 0, GRID_SEGMENTS - 0.00001);
-    const gz = clamp((z + HALF_WORLD) / GRID_STEP, 0, GRID_SEGMENTS - 0.00001);
+    const gx = (x + HALF_WORLD) / GRID_STEP, gz = (z + HALF_WORLD) / GRID_STEP;
     const ix = Math.floor(gx), iz = Math.floor(gz), fx = gx - ix, fz = gz - iz;
     const a = vertex(ix, iz), b = vertex(ix + 1, iz), c = vertex(ix, iz + 1), d = vertex(ix + 1, iz + 1);
-    // Matches the rendered triangles exactly, including the diagonal.
     return fx + fz <= 1 ? a + (b - a) * fx + (c - a) * fz : d + (c - d) * (1 - fx) + (b - d) * (1 - fz);
   }
-  return { heights, vertex, sample };
+  // One tile's samples (cells -1 to TILE + 1 on each axis, row length TILE + 3), for a chunk to read in one go.
+  const chunkData = (tx, tz) => tile(tx, tz);
+  const loaded = (tx, tz) => tiles.has((tx + 4096) * 8192 + (tz + 4096));
+  // The oasis square as one array of (GRID_SEGMENTS + 1) squared heights, the way the water shaders read it.
+  function homeHeights() {
+    const side = GRID_SEGMENTS + 1, heights = new Float32Array(side * side);
+    for (let iz = 0; iz < side; iz++) for (let ix = 0; ix < side; ix++) heights[iz * side + ix] = vertex(ix, iz);
+    return heights;
+  }
+  return { vertex, sample, chunkData, loaded, homeHeights, tileCount: () => tiles.size };
 }
 
 export function stickAxis(v, deadzone = 0.16) {

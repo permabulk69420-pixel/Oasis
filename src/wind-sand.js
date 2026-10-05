@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { WIND, WIND_GLSL } from './wind.js';
+import { GRID_STEP } from './world.js';
+import { createGroundWindow, GROUND_WINDOW } from './ground-window.js';
 
 // Wind-blown sand: the desert's constant, quiet motion.
 //
@@ -121,7 +123,8 @@ const VERTEX = /* glsl */`
   uniform vec2 uWind;
   uniform float uRadius;
   uniform float uGain;
-  uniform sampler2D uElevation;
+  uniform sampler2D uGroundMap;
+  uniform vec2 uGroundOrigin;
   uniform float uViewHeight;
   uniform vec3 uWater;
   uniform vec2 uWaterRadii;
@@ -142,8 +145,8 @@ const VERTEX = /* glsl */`
   ${WIND_GLSL}
 
   float groundAt(vec2 p) {
-    vec2 rg = texture2D(uElevation, ((p + 500.0) / 1000.0 * 512.0 + 0.5) / 513.0).rg;
-    return dot(rg, vec2(256.0, 1.0)) * (255.0 * 64.0 / 65535.0);
+    vec2 rg = texture2D(uGroundMap, ((p - uGroundOrigin) / ${GRID_STEP.toFixed(6)} + 0.5) / ${GROUND_WINDOW.cells.toFixed(1)}).rg;
+    return dot(rg, vec2(256.0, 1.0)) * (255.0 * ${GROUND_WINDOW.range.toFixed(1)} / 65535.0) + (${GROUND_WINDOW.minHeight.toFixed(1)});
   }
 
   void main() {
@@ -300,20 +303,22 @@ function buildLayer(name, layer, shared, center) {
   return mesh;
 }
 
-// uniforms: shared uniform objects { uSun, uWater, uWaterRadii, uElevation } from the terrain and water
-// materials, so the sun, the pond and the height data stay in step without copying.
-export function createWindSand({ scene, uniforms, layers = WIND_SAND.layers } = {}) {
+// uniforms: shared uniform objects { uSun, uWater, uWaterRadii } from the terrain and water materials, so the sun and the
+// pond stay in step without copying. field: the height field; the sand keeps a window of it round the player (ground-window.js).
+export function createWindSand({ scene, uniforms, field, layers = WIND_SAND.layers } = {}) {
   if (!scene) throw new Error('Wind sand needs the scene.');
-  for (const key of ['uSun', 'uWater', 'uWaterRadii', 'uElevation']) {
+  if (!field) throw new Error('Wind sand needs the height field.');
+  for (const key of ['uSun', 'uWater', 'uWaterRadii']) {
     if (!uniforms?.[key]) throw new Error(`Wind sand needs the ${key} uniform.`);
   }
   const wind = new THREE.Vector2(...WIND_SAND.wind).normalize();
   const center = new THREE.Vector3();
+  const ground = createGroundWindow(field);
   const shared = {
     uSun: uniforms.uSun,
     uWater: uniforms.uWater,
     uWaterRadii: uniforms.uWaterRadii,
-    uElevation: uniforms.uElevation,
+    ...ground.uniforms,
     uTime: { value: 0 },
     uWind: { value: wind },
     uGain: { value: 1 }, // overall strength; the dev build can turn it up with ?sandgain=
@@ -334,7 +339,7 @@ export function createWindSand({ scene, uniforms, layers = WIND_SAND.layers } = 
     // seconds: any steadily increasing clock. position: where the player is. viewHeight: pixels tall.
     update(seconds, position, viewHeight = 720) {
       shared.uTime.value = Number.isFinite(seconds) ? seconds % 3600 : 0;
-      if (position) center.set(position.x, position.y, position.z);
+      if (position) { center.set(position.x, position.y, position.z); ground.update(position.x, position.z); }
       shared.uViewHeight.value = Math.max(1, viewHeight);
     },
     dispose() {

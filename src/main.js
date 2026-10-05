@@ -3,6 +3,7 @@ import './style.css';
 import { installAssetVersioning } from './asset-version.js';
 import { createHeightField, clamp, stickAxis, stickVector, pivotRig, isInPond, SPAWN, WATER, HERO_TREE } from './world.js';
 import { createTerrain } from './terrain.js';
+import { WALK } from './zones.js';
 import { createMaterials, createWater } from './materials.js';
 import { createVRHands } from './hands.js';
 import { createDayNightCycle } from './day-night.js';
@@ -122,15 +123,15 @@ if (import.meta.env.DEV) window.__glowGarden = glowGarden; // dev only: for scre
 const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), materials.sky);
 sky.frustumCulled = false; sky.renderOrder = -10; sky.name = 'Sky'; scene.add(sky);
 const dayNight = createDayNightCycle({ scene, renderer, materials });
-// Wind-blown sand and drifting dust. It shares the terrain's sun and pond uniforms and the water's height texture.
+// Wind-blown sand and drifting dust. It shares the terrain's sun and pond uniforms and keeps its own window of the ground round the player.
 const windSand = createWindSand({
   scene,
   uniforms: {
     uSun: materials.sand.uniforms.uSun,
     uWater: materials.sand.uniforms.uWater,
     uWaterRadii: materials.sand.uniforms.uWaterRadii,
-    uElevation: materials.water.uniforms.uElevation,
   },
+  field,
 });
 if (import.meta.env.DEV) {
   const gain = Number(new URLSearchParams(location.search).get('sandgain'));
@@ -333,7 +334,7 @@ const crystalMotes = createCrystalMotes({ scene, nodes: mining.nodes, getExposur
 const giantBones = createGiantBones({ scene, camera, heightAt: field.sample, onError: message => console.warn(message) });
 if (import.meta.env.DEV) window.__bones = giantBones; // dev only: for screenshots
 if (import.meta.env.DEV) window.__mining = mining; // dev only: lets a test strike a node without swinging a tool
-if (import.meta.env.DEV) { window.__stinger = duneStinger; window.__sandPuffs = sandPuffs; window.__prints = footprints; } // dev only: lets a screenshot script read or hurt the stinger and throw dust
+if (import.meta.env.DEV) { window.__stinger = duneStinger; window.__sandPuffs = sandPuffs; window.__prints = footprints; window.__terrain = terrain; } // dev only: lets a screenshot script read or hurt the stinger and throw dust
 const weaponHits = createWeaponHits({ tools: hands.tools, rig, targets: [duneStinger, mining] });
 // Development-only: ?bird=perch|fly|flare puts a bird in view and stops time for it (?birdfreeze=0 lets it move),
 // ?birdd=<metres> sets how far ahead, ?birdseed=<n> makes the bird's choices repeatable.
@@ -782,7 +783,7 @@ function frame(time) {
     target.multiplyScalar((sprinting ? FAST_SPEED : WALK_SPEED) * carrySpeedMultiplier);
     velocity.lerp(target, 1 - Math.exp(-dt * (target.lengthSq() ? 18 : 28)));
     const dx = velocity.x * dt, dz = velocity.z * dt;
-    const nextX = clamp(head.x + dx, -498, 498), nextZ = clamp(head.z + dz, -498, 498);
+    const nextX = clamp(head.x + dx, WALK.minX, WALK.maxX), nextZ = clamp(head.z + dz, WALK.minZ, WALK.maxZ);
     const movedX = nextX - head.x, movedZ = nextZ - head.z;
     rig.position.x += movedX; rig.position.z += movedZ;
     head.x = nextX; head.z = nextZ;
@@ -817,7 +818,7 @@ function frame(time) {
     });
     footprints.walk(head.x, head.z, { onGround: jumpHeight <= 0.001, speed: Math.hypot(velocity.x, velocity.z) });
   }
-  if (time - lodTime > 350) { terrain.update(head.x, head.z); lodTime = time; }
+  if (time - lodTime > 100) { terrain.update(head.x, head.z); lodTime = time; }
   materials.water.uniforms.uTime.value = time * 0.001;
   renderer.render(scene, camera);
   if (import.meta.env.DEV && time - telemetryTime > 1000) {
