@@ -62,12 +62,15 @@ export const WIND_GLSL = /* glsl */`
 //   flutter: a quick tremble on top, in metres (leaves, blades)
 //   shade:   how much the colour brightens and dims as the wind rolls over it (the grass field)
 //   push:    how much it gives way to your feet and hands (0 or left out: not at all, 1: fully); see PUSH
+//   pushVertex: grass only: each blade is shoved on its own (a patch is many blades). Everything else leans as one piece from its root,
+//            or a bulb or a stem would be torn apart by a hand next to it
+//   pushPad: metres a hand can be from the plant's middle and still lean it (a wide plant is touched at its edge, not its axis)
 export const SWAY = Object.freeze({
-  grass: Object.freeze({ name: 'grass', top: 0.50, reach: 0.14, lean: 0.25, bend: 1.7, radial: 0.0, rate: 1.0, flutter: 0.010, shade: 0.09, push: 1 }),
-  fern: Object.freeze({ name: 'fern', top: 1.34, reach: 0.13, lean: 0.25, bend: 1.5, radial: 0.45, rate: 0.9, flutter: 0.012, shade: 0.0, push: 1 }),
+  grass: Object.freeze({ name: 'grass', top: 0.50, reach: 0.14, lean: 0.25, bend: 1.7, radial: 0.0, rate: 1.0, flutter: 0.010, shade: 0.09, push: 1, pushVertex: true }),
+  fern: Object.freeze({ name: 'fern', top: 1.34, reach: 0.13, lean: 0.25, bend: 1.5, radial: 0.45, rate: 0.9, flutter: 0.012, shade: 0.0, push: 1, pushPad: 0.35 }),
   reed: Object.freeze({ name: 'reed', top: 1.75, reach: 0.12, lean: 0.25, bend: 2.0, radial: 0.0, rate: 0.8, flutter: 0.008, shade: 0.0 }),
-  plantStem: Object.freeze({ name: 'plant-stem', top: 3.1, reach: 0.08, lean: 0.30, bend: 2.0, radial: 0.0, rate: 0.55, flutter: 0.0, shade: 0.0, push: 0.35 }),
-  plantLeaf: Object.freeze({ name: 'plant-leaf', top: 3.1, reach: 0.08, lean: 0.30, bend: 2.0, radial: 0.0, rate: 0.55, flutter: 0.012, shade: 0.0, push: 0.35 }),
+  plantStem: Object.freeze({ name: 'plant-stem', top: 3.1, reach: 0.08, lean: 0.30, bend: 2.0, radial: 0.0, rate: 0.55, flutter: 0.0, shade: 0.0, push: 0.35, pushPad: 0.3 }),
+  plantLeaf: Object.freeze({ name: 'plant-leaf', top: 3.1, reach: 0.08, lean: 0.30, bend: 2.0, radial: 0.0, rate: 0.55, flutter: 0.012, shade: 0.0, push: 0.35, pushPad: 0.3 }),
   trunk: Object.freeze({ name: 'trunk', top: 4.4, reach: 0.10, lean: 0.30, bend: 2.0, radial: 0.0, rate: 0.5, flutter: 0.0, shade: 0.0 }),
   foliage: Object.freeze({ name: 'foliage', top: 4.4, reach: 0.10, lean: 0.30, bend: 2.0, radial: 0.0, rate: 0.5, flutter: 0.014, shade: 0.0 }),
 });
@@ -93,16 +96,17 @@ export function windSwayGLSL(profile) {
     : 'float shade = 1.0;';
   const push = profile.push > 0 ? /* glsl */`
     uniform vec4 uWindPush[3];
-    // Where you are (feet and hands) shoves this point away, more the higher up the plant it is. worldPos is the vertex in the world.
-    vec3 windPush(vec3 worldPos, vec3 local, float size, float upright) {
+    // Where you are (feet and hands) shoves this point away, more the higher up the plant it is. worldPos is the vertex in the world, base the
+    // plant's root. Grass is shoved vertex by vertex; anything else leans as one piece, measured from its own axis at this height.
+    vec3 windPush(vec3 worldPos, vec3 base, vec3 local, float size, float upright) {
       float h = clamp(local.y / ${num(profile.top)} + length(local.xz) * ${num(profile.radial)}, 0.0, 1.0);
       float weight = pow(h, ${num(profile.bend)}) * upright * ${num(profile.push)};
       vec2 shove = vec2(0.0);
       for (int i = 0; i < 3; i++) {
         vec4 p = uWindPush[i];
         if (p.w > 0.0) {
-          vec3 d = worldPos - p.xyz;
-          float dist = length(d);
+          vec3 d = ${profile.pushVertex ? 'worldPos' : 'vec3(base.x, worldPos.y, base.z)'} - p.xyz;
+          float dist = max(length(d) - ${num(profile.pushPad ?? 0)}, 0.0);
           if (dist < p.w) {
             float f = 1.0 - smoothstep(0.0, p.w, dist);
             shove += d.xz / max(length(d.xz), 0.08) * (f * f * p.w * ${num(PUSH.reachPerRadius)});
@@ -167,7 +171,7 @@ export function patchWindSway(shader, profile) {
       #ifdef USE_INSTANCING
         windWorld = ( modelMatrix * ( instanceMatrix * vec4( position, 1.0 ) ) ).xyz;
       #endif
-      windMove.xyz += windPush( windWorld, position, windSize, windUpright );` : '';
+      windMove.xyz += windPush( windWorld, windBase, position, windSize, windUpright );` : '';
   shader.vertexShader = source
     .replace('#include <common>', () => `#include <common>\n${windSwayGLSL(profile)}`)
     .replace('#include <begin_vertex>', () => /* glsl */`#include <begin_vertex>

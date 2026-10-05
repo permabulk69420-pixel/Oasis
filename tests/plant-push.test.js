@@ -42,7 +42,7 @@ test('grass, ferns and the glow plants give way; a trunk does not', () => {
   assert.ok(SWAY.grass.push > 0 && SWAY.fern.push > 0);
   assert.equal(SWAY.trunk.push ?? 0, 0);
   assert.match(windSwayGLSL(SWAY.grass), /uniform vec4 uWindPush\[3\];/);
-  assert.match(windSwayGLSL(SWAY.grass), /vec3 windPush\(vec3 worldPos, vec3 local, float size, float upright\)/);
+  assert.match(windSwayGLSL(SWAY.grass), /vec3 windPush\(vec3 worldPos, vec3 base, vec3 local, float size, float upright\)/);
   assert.doesNotMatch(windSwayGLSL(SWAY.trunk), /windPush/);
 });
 
@@ -51,9 +51,19 @@ test('the patch adds the push for a plant that gives way and leaves the uniform 
   const grass = { vertexShader: source, uniforms: {} };
   assert.equal(patchWindSway(grass, SWAY.grass), true);
   assert.equal(grass.uniforms.uWindPush, windPush);
-  assert.match(grass.vertexShader, /windMove\.xyz \+= windPush\( windWorld, position, windSize, windUpright \);/);
+  assert.match(grass.vertexShader, /windMove\.xyz \+= windPush\( windWorld, windBase, position, windSize, windUpright \);/);
   const trunk = { vertexShader: source, uniforms: {} };
   assert.equal(patchWindSway(trunk, SWAY.trunk), true);
   assert.equal(trunk.uniforms.uWindPush, undefined);
   assert.doesNotMatch(trunk.vertexShader, /windPush/);
+});
+
+test('only the grass is shoved blade by blade; every other plant leans as one piece from its own axis', () => {
+  assert.equal(SWAY.grass.pushVertex, true);
+  assert.match(windSwayGLSL(SWAY.grass), /vec3 d = worldPos - p\.xyz;/);
+  for (const profile of [SWAY.fern, SWAY.plantStem, SWAY.plantLeaf]) {
+    assert.ok(!profile.pushVertex, `${profile.name} is not shoved vertex by vertex`);
+    assert.match(windSwayGLSL(profile), /vec3 d = vec3\(base\.x, worldPos\.y, base\.z\) - p\.xyz;/);
+    assert.ok(profile.pushPad > 0, `${profile.name} has a pad for its width`);
+  }
 });
