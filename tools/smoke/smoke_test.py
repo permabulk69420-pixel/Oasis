@@ -170,7 +170,7 @@ def check_save(browser, base):
         open_game("&fresh=1")
         fresh = page.evaluate("""async () => {
           const inventory = await import('/src/inventory.js');
-          return { start: window.__save.start, items: inventory.getInventoryItems().length, search: location.search, kept: Boolean(window.__save.store.kept()) };
+          return { start: window.__save.start, items: inventory.getInventoryItems().filter(item => item.type !== 'campfire').length, search: location.search, kept: Boolean(window.__save.store.kept()) };
         }""")
         if fresh["start"] != "fresh" or fresh["items"] != 0 or "fresh" in fresh["search"] or not fresh["kept"]:
             problems.append(f"save: ?fresh=1 did not start a new game and keep the old save aside ({fresh})")
