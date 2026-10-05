@@ -7,7 +7,7 @@ import * as THREE from 'three';
 // coloured, glowing a little when the sun is behind them, a faint moonlit smudge at night.
 
 export const PUFFS = Object.freeze({
-  capacity: 96,
+  capacity: 192,
   drag: 2.3, // per second: how quickly a puff's speed dies away
   rise: 0.45, // metres per second squared of lift
   grow: 2.1, // how many times wider a puff is at the end of its life than at the start
@@ -237,6 +237,13 @@ export function createSandPuffs({ scene = null, sun, heightAt = () => 0, capacit
     collapse(x, z, { size = 1 } = {}) {
       const y = ground(x, z);
       sim.emit(x, y + 0.15, z, 16, { radius: 2 * size, outward: 3.2 * size, up: 1.1, jitter: 0.7, size: [0.9 * size, 1.5 * size], life: [2.0, 3.4], alpha: 0.62 });
+    },
+    // a colossal foot coming down: a wide ring of heavy dust pushed out along the ground and a slow plume. `size` is roughly the radius of the foot in metres
+    // (the stinger's presets are for a creature a few metres long; this one is eight metres across), so the puffs are big, last for seconds and billow up slowly.
+    stomp(x, z, { size = 8, strength = 1 } = {}) {
+      const y = ground(x, z);
+      sim.emit(x, y + 0.2 * size, z, Math.round(14 * strength) + 4, { radius: 0.8 * size, outward: 1.9 * size, up: 0.3 * size, jitter: 0.35 * size, size: [0.45 * size, 0.75 * size], life: [2.6, 4.4], alpha: 0.5 });
+      sim.emit(x, y + 0.3 * size, z, Math.round(5 * strength), { radius: 0.5 * size, outward: 0.2 * size, up: 0.55 * size, jitter: 0.25 * size, size: [0.5 * size, 0.85 * size], life: [3.2, 5.2], alpha: 0.4 });
     },
     // a few grains shaken loose and drifting off a point
     trickle(x, z, { size = 1, count = 2, radius = 1.2 } = {}) {

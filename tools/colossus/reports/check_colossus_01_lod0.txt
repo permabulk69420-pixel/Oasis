@@ -1,0 +1,125 @@
+== colossus_01_lod0.glb  (41.7 MB, level 0)
+ -- structure
+  [PASS] parts: 9 mesh objects
+  [PASS] every part is skinned to one armature (1 skin)
+  [PASS] 33 primitives (limit 40)
+  [PASS] 38 bones (limit 100)
+  [PASS] bone names match the brief exactly
+  [PASS] hierarchy matches the brief
+  [PASS] no animations, textures, shape keys or cameras
+  [PASS] mesh nodes have identity transforms
+  [PASS] armature object "Colossus_01_Rig" has an identity transform
+  [INFO] 35 of 38 bones have a non-identity rest rotation (fine, the game reads pivots, not axes)
+ -- size
+  [INFO] bounding box x [-15.3, 15.3] y [0.00, 54.6] z [-56.8, 71.8]  -> height 54.6 m, length 128.6 m, width 30.6 m
+  [PASS] faces +Z (head z 47.6, pelvis z -19.0, tail_08 z -53.0)
+  [PASS] left legs at +X, right legs at -X
+  [PASS] origin vs the middle of the four feet: x offset 0.00 m, z offset -0.00 m (origin is 0,0,0)
+  [PASS] soles lie on y = 0: FL +0.000, FR +0.000, BL +0.000, BR +0.000
+  [PASS] lowest point of the whole model y = +0.000
+  [PASS] leg bones mirror across X = 0 (worst 0.0 cm)
+  [PASS] spine, neck, head, jaw and tail bones sit on X = 0 (worst 0.0 cm)
+  [PASS] shoulder top: 54.6 m (brief 52 to 58)
+  [PASS] hip top: 49.6 m (brief 45 to 51)
+  [PASS] belly underside: 26.9 m (brief 24 to 28)
+  [PASS] chest to rump (torso z length): 56.6 m (brief 50 to 60)
+  [PASS] neck (neck_01 to head pivot): 26.7 m (brief 24 to 32)
+  [PASS] head length (head z extent): 28.8 m (brief 22 to 30)
+  [PASS] tail length (tail z extent): 32.5 m (brief 28 to 36)
+  [PASS] nose to tail tip: 128.6 m (brief 110 to 130)
+  [PASS] leg FL pillar width at the top (slab y=38.0, x 9.9 z 9.7): 9.9 m (brief 8 to 11)
+  [PASS] leg FL pillar width at the ankle (slab y=9.0, x 7.7 z 8.7): 7.7 m (brief 5.5 to 8)
+  [PASS] leg BL pillar width at the top (slab y=35.0, x 9.6 z 9.8): 9.6 m (brief 8 to 11)
+  [PASS] leg BL pillar width at the ankle (slab y=9.0, x 7.7 z 8.1): 7.7 m (brief 5.5 to 8)
+  [PASS] foot FL width (x, y<3.6): 10.3 m (brief 8 to 12)
+  [PASS] foot FL length (z, y<3.6): 13.0 m (brief 10 to 14)
+  [PASS] foot BL width (x, y<3.6): 10.3 m (brief 8 to 12)
+  [PASS] foot BL length (z, y<3.6): 13.0 m (brief 10 to 14)
+  [PASS] left to right stance (foot pivots): 18.0 m (brief 16 to 20)
+  [PASS] front to rear stance (foot pivots): 38.0 m (brief 34 to 42)
+ -- symmetry
+  [PASS] symmetry Leg_FL vs Leg_FR: 100.0% of vertices mirror within 2 cm, 100.0% within 20 cm (99th percentile 0.00 m)
+  [PASS] symmetry Leg_BL vs Leg_BR: 100.0% of vertices mirror within 2 cm, 100.0% within 20 cm (99th percentile 0.00 m)
+  [PASS] symmetry Head halves: 100.0% of vertices mirror within 2 cm, 100.0% within 20 cm (99th percentile 0.00 m)
+  [PASS] symmetry Jaw halves: 100.0% of vertices mirror within 2 cm, 100.0% within 20 cm (99th percentile 0.00 m)
+  [PASS] symmetry Neck halves: 100.0% of vertices mirror within 2 cm, 100.0% within 20 cm (99th percentile 0.00 m)
+  [PASS] symmetry Torso halves: 100.0% of vertices mirror within 2 cm, 100.0% within 20 cm (99th percentile 0.00 m)
+  [PASS] symmetry Tail halves: 100.0% of vertices mirror within 2 cm, 100.0% within 20 cm (99th percentile 0.00 m)
+ -- materials
+  [PASS] materials ['Colossus hide', 'Colossus plate', 'Colossus crystal', 'Colossus glow']
+  [PASS] all opaque and single-sided
+  [INFO] Colossus hide base colour #33434a (brief #26343b to #33434a)
+  [INFO] Colossus plate base colour #cfc3a8 (brief #cfc3a8)
+  [PASS] Colossus crystal emissive #1eb4dd x1, base #ffffff
+  [PASS] Colossus glow emissive #25d0ff x1.4, base #25d0ff
+  [FAIL] triangles 793,104 against the lod0 budget of 500,000 (159% of it, 532,597 vertices)
+  [INFO] by part: Head 43,728, Jaw 20,240, Leg_BL 110,024, Leg_BR 110,024, Leg_FL 113,880, Leg_FR 113,880, Neck 61,776, Tail 43,776, Torso 175,776
+  [INFO] by material: Colossus hide 435,616 (55%), Colossus plate 287,968 (36%), Colossus crystal 55,968 (7%), Colossus glow 13,552 (2%)
+ -- skinning
+  [PASS] at most 3 bone influences per vertex
+  [PASS] weights sum to 1 and reference real joints (0 bad sums, 0 bad joints)
+  [PASS] rest pose equals the bind pose (largest vertex difference 0.00 cm)
+  [PASS] plates: 100.00% of vertices weighted 100% to one bone; 0 of 147 pieces are split across bones
+  [PASS] crystals: 100.00% of vertices weighted 100% to one bone; 0 of 1162 pieces are split across bones
+  [INFO] glow seams: 100.0% of vertices weighted fully to one bone, 0 of 26 pieces span more than one bone
+  [INFO] hide: 41.4% of vertices blend between bones; blended vertices lie a median 4.5 m (95th percentile 9.4 m) from their joint pivot
+  [PASS] the hide blends only in a band around the joints
+ -- colour
+  [PASS] Colossus hide: vertex colour x base colour gives sRGB luminance 1% 0.221, median 0.237, 99% 0.258; darkest corner #2b393f, median #303f46; 0.0% of vertices are darker than #1f2a30 (the brief says the game is dim and darker hide reads as black)
+  [INFO] Colossus plate: vertex colour x base colour gives sRGB luminance 1% 0.457, median 0.635, 99% 0.759; darkest corner #6b624e, median #aea184
+  [INFO] crystal vertex colour: 8% violet-ish vertices. Note: glTF vertex colour multiplies the BASE colour only, not the emissive, so a violet crystal still glows cyan unless the game tints the emissive (I do that in the game code).
+ -- glow
+  [PASS] glowing surface (crystal + glow): 2.2% of the surface area (brief 2 to 4%): crystal 1.58%, seams and eyes 0.60%
+ -- mesh
+  [INFO] 793,104 triangles, 1,189,656 edges after merging vertices at the same position
+  [PASS] 0 loose vertices
+  [PASS] 0 zero-area faces
+  [PASS] 0 duplicate faces (they would z-fight)
+  [PASS] 0 non-manifold edges (shared by 3 or more faces)
+  [PASS] hide: 13 pieces, 13 closed, 0 open edges
+  [PASS] plate: 147 pieces, 147 closed, 0 open edges
+  [PASS] crystal: 1,162 pieces, 1,162 closed, 0 open edges
+  [PASS] glow: 26 pieces, 26 closed, 0 open edges
+  [PASS] no inside-out closed shells
+  [PASS] 8,589 edges under 3 cm (0.7% of all; the brief wants no detail under about 3 cm because it shimmers in VR)
+ -- uv
+  [PASS] every primitive has UV0
+  [PASS] UVs lie inside 0..1
+  [PASS] UV overlap Head: -2.5% of the island area is covered twice (192 islands)
+  [PASS] UV overlap Jaw: -2.9% of the island area is covered twice (51 islands)
+  [PASS] UV overlap Leg_BL: -1.8% of the island area is covered twice (445 islands)
+  [PASS] UV overlap Leg_BR: -1.8% of the island area is covered twice (445 islands)
+  [PASS] UV overlap Leg_FL: -1.8% of the island area is covered twice (466 islands)
+  [PASS] UV overlap Leg_FR: -1.9% of the island area is covered twice (466 islands)
+  [PASS] UV overlap Neck: -2.3% of the island area is covered twice (333 islands)
+  [PASS] UV overlap Tail: -2.3% of the island area is covered twice (27 islands)
+  [PASS] UV overlap Torso: -2.6% of the island area is covered twice (1,515 islands)
+  [INFO] texel density at 1024 (px per metre, area-weighted median per mesh): Head 4, Jaw 4, Leg_BL 4, Leg_BR 4, Leg_FL 4, Leg_FR 4, Neck 4, Tail 4, Torso 4
+  [PASS] texel density differs between meshes by x1.1 (median); a steady density helps the later texture paint
+  [PASS] inside one mesh the 5th to 95th percentile density ratio is up to x2.8
+  [WARN] islands closer than 4 px at 1024 (share of covered pixels): Head 4%, Jaw 4%, Neck 5%, Torso 10%
+ -- crystals
+  [PASS] 1,162 separate crystal pieces (brief: at least 300)
+  [PASS] crystal length: median 0.46 m, 5th to 95th percentile 0.43 to 0.49 m; 100% within 0.3 to 0.5 m
+  [PASS] crystal base thickness: median 23 cm, 5th percentile 23 cm; 100% are at least 12 cm (a hand is about 10 cm wide)
+  [PASS] 100.0% of crystals are closed, outward-facing solids (not flat cards)
+  [PASS] 100.0% of crystals are weighted 100% to a single bone
+  [INFO] crystal direction: 99% point upward (y > 0.2), 0% point down; median tilt from vertical 46 degrees
+  [INFO] spacing to the nearest other crystal: median 0.71 m, 10th percentile 0.42 m, 90th percentile 0.82 m (brief 0.6 to 1 m apart, in clusters and runs)
+  [PASS] first holds on the FL foot and ankle (base 1.0 to 2.5 m above the sole): 29 on foot/toe bones, 29 anywhere on that leg
+  [PASS] first holds on the FR foot and ankle (base 1.0 to 2.5 m above the sole): 29 on foot/toe bones, 29 anywhere on that leg
+  [PASS] first holds on the BL foot and ankle (base 1.0 to 2.5 m above the sole): 29 on foot/toe bones, 29 anywhere on that leg
+  [PASS] first holds on the BR foot and ankle (base 1.0 to 2.5 m above the sole): 29 on foot/toe bones, 29 anywhere on that leg
+  [INFO] routes at 1 m reach: 910 of 1162 holds connect to the ground holds (highest 53.8 m); by region legs 532/532, pelvis/belly 114/142, spine/flanks 264/358, neck 0/86, head/jaw 0/44
+  [INFO] routes at 1.3 m reach: 1040 of 1162 holds connect to the ground holds (highest 53.8 m); by region legs 532/532, pelvis/belly 114/142, spine/flanks 264/358, neck 86/86, head/jaw 44/44
+  [PASS] 90% of holds are on a route from the ground at 1.3 m reach
+  [INFO] crystals by region: leg 532, spine 358, pelvis 142, neck 86, head 44
+  [INFO] 92 violet-ish and 1070 cyan-ish crystals by vertex colour
+ -- pose
+  [INFO] bend test: 58 joint poses of 25 degrees in 4 s
+  [INFO] most strained joints (stretch / squash of the worst edge): spine_02:x x1.6 / x0.10; spine_01:x x1.5 / x0.12; spine_03:x x1.7 / x0.14; spine_03:y x1.8 / x0.17; spine_02:y x1.8 / x0.19; spine_04:x x2.1 / x0.20
+  [PASS] no torn seams in any pose (largest gap 0.0 cm)
+  [PASS] hide stretch: 1 poses have an edge longer than 2x its rest length; 0 poses have one over 4x (worst x2.1 in spine_04:x)
+  [WARN] hide squash: 18 poses have an edge under 0.4x its rest length; 3 under 0.15x (worst x0.10 in spine_02:x)
+  [PASS] flipped triangles: 1 poses flip some (10 at most, in spine_04:x, 0.00% of all triangles)
+== colossus_01_lod0.glb: 89 pass, 2 warn, 1 fail (12 s)
