@@ -54,6 +54,11 @@ export function campfireSite(x, z, heightAt = terrainHeight, radius = CAMPFIRE.f
   return { y: (low + high) / 2, slope: high - low };
 }
 
+// The turn a fire at this spot gets: different for every fire, the same for the same spot (so a reloaded save puts it back the same way).
+export function campfireYaw(x, z) {
+  return ((Math.sin(x * 12.9898 + z * 78.233) * 43758.5453) % 1 + 1) % 1 * Math.PI * 2;
+}
+
 export function canPlaceCampfire(x, z, existing = [], heightAt = terrainHeight) {
   if (!Number.isFinite(x) || !Number.isFinite(z)) return { ok: false, message: 'Can’t build a fire there.' };
   if (existing.length >= CAMPFIRE.maxCount) return { ok: false, message: 'That’s enough fires for now.' };
@@ -203,6 +208,11 @@ export function createCampfires({
     return canPlaceCampfire(x, z, instances, heightAt);
   }
 
+  // A copy of the fire's model for the placement ghost (null until it has loaded). The caller restyles it.
+  function createPreview() {
+    return model ? model.clone(true) : null;
+  }
+
   function place(x, z, { lit = false } = {}) {
     if (!canPlace(x, z).ok) return null;
     const root = model.clone(true);
@@ -211,7 +221,7 @@ export function createCampfires({
     const groundY = campfireSite(x, z, heightAt).y;
     root.position.set(x, groundY, z);
     // A different turn for every fire, but the same one for the same spot.
-    root.rotation.y = ((Math.sin(x * 12.9898 + z * 78.233) * 43758.5453) % 1 + 1) % 1 * Math.PI * 2;
+    root.rotation.y = campfireYaw(x, z);
     root.traverse(object => {
       if (!object.isMesh) return;
       object.castShadow = false;
@@ -333,6 +343,8 @@ export function createCampfires({
     update,
     place,
     canPlace,
+    createPreview,
+    siteAt: (x, z) => campfireSite(x, z, heightAt),
     setLit,
     light,
     uniforms,
