@@ -15,11 +15,11 @@ export const GLOW_GARDEN = Object.freeze({
   seed: 5105,
   reed: Object.freeze({
     name: 'Glow reeds', file: 'glow_reed', count: 22, spacing: 5.5, scale: [0.85, 1.3], drawDistance: 170,
-    sway: Object.freeze({ name: 'glow-reed', top: 1.4, reach: 0.11, lean: 0.25, bend: 1.8, radial: 0.25, rate: 0.8, flutter: 0.008, shade: 0.0, push: 1 }),
+    sway: Object.freeze({ name: 'glow-reed', top: 1.4, reach: 0.11, lean: 0.25, bend: 1.8, radial: 0.25, rate: 0.8, flutter: 0.008, shade: 0.0, push: 1, pushPad: 0.2 }),
   }),
   lantern: Object.freeze({
     name: 'Lantern blooms', file: 'lantern_bloom', bankCount: 12, groveCount: 12, spacing: 7, scale: [0.8, 1.25], drawDistance: 190,
-    sway: Object.freeze({ name: 'lantern-bloom', top: 1.7, reach: 0.07, lean: 0.28, bend: 2.0, radial: 0.35, rate: 0.6, flutter: 0.01, shade: 0.0, push: 1 }),
+    sway: Object.freeze({ name: 'lantern-bloom', top: 1.7, reach: 0.07, lean: 0.28, bend: 2.0, radial: 0.35, rate: 0.6, flutter: 0.01, shade: 0.0, push: 1, pushPad: 0.35 }),
   }),
   lodDistance: Object.freeze([28, 75]), // metres: the close level up to the first, the middle one up to the second, the far one beyond
   lodHysteresis: 4,
