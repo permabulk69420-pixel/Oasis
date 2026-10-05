@@ -14,6 +14,10 @@ import { createIslandGroundGlow } from './island-ground-glow.js';
 // stone, the palm grove. It is all set dressing, nothing in play touches it. The layouts are pure and seeded (so the island is the same every time),
 // worked out in the order that lets each avoid the one before: paths first, then the palms, then the stone, which keeps off both, then the glow plants,
 // then the new plants and landmarks (src/island-flora-layout.js), which keep off everything.
+export const ISLAND_SCENERY = Object.freeze({
+  paths: false,   // Kane, 6 Oct: "we shouldn't have paths... it's not great if you follow paths and can see everything". The code stays (src/sky-island-paths.js), nothing is laid.
+});
+
 export function createIslandScenery({ island, materials, getExposure = () => 1 }) {
   const group = new THREE.Group();
   group.name = 'Sky island scenery';
@@ -25,10 +29,10 @@ export function createIslandScenery({ island, materials, getExposure = () => 1 }
   const spill = createSpill({ island, material: createFlowMaterial(materials.water) });
   group.add(spill.mesh);
 
-  const pathData = layoutPaths(island.features, island.config);
+  const pathData = ISLAND_SCENERY.paths ? layoutPaths(island.features, island.config) : [];
   const pathIndex = createPathIndex(pathData);
-  const paths = createPathMesh({ island, material: materials.sand, paths: pathData });
-  group.add(paths.mesh);
+  const paths = ISLAND_SCENERY.paths ? createPathMesh({ island, material: materials.sand, paths: pathData }) : { mesh: null, paths: pathData, triangles: 0 };
+  if (paths.mesh) group.add(paths.mesh);
 
   const palmLayout = layoutSkyTrees(island.config, SKY_TREES, { features: island.features, pathIndex });
   const palms = createSkyIslandTrees({ island, layout: palmLayout });

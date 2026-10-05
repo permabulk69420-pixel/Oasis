@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { SKY_ISLAND, buildIsland, makeMeshGround } from '../src/sky-island-shape.js';
 import { createSkyIslandGround } from '../src/sky-island-ground.js';
-import { layoutPaths, createPathIndex } from '../src/sky-island-paths.js';
+import { createPathIndex } from '../src/sky-island-paths.js';
 import { layoutSkyTrees, SKY_TREES } from '../src/sky-island-layout.js';
 import { layoutRocks } from '../src/sky-island-rocks.js';
 import { layoutIslandGlow } from '../src/sky-island-glow.js';
@@ -13,7 +13,7 @@ import { GROUND_GLOW, layoutGroundGlow, buildGroundGlowMesh, groundGlowNight, cr
 const ground = createSkyIslandGround(SKY_ISLAND);
 const { features } = ground;
 const drawn = makeMeshGround(buildIsland(ground.baseY, SKY_ISLAND, features), SKY_ISLAND);
-const paths = layoutPaths(features, SKY_ISLAND);
+const paths = [];   // the island has no paths (Kane, 6 Oct)
 const pathIndex = createPathIndex(paths);
 const palms = layoutSkyTrees(SKY_ISLAND, SKY_TREES, { features, pathIndex });
 const rocks = layoutRocks({ ground: drawn, features, pathIndex, config: SKY_ISLAND, avoid: palms });
@@ -23,13 +23,13 @@ const flora = layoutIslandFlora({
   obstacles: [...palms.map(p => ({ x: p.x, z: p.z, r: 0.7 * p.scale })), ...glow.map(g => ({ x: g.x, z: g.z, r: 0.5 * g.scale, soft: true }))],
 });
 
-test('every light the island has makes a pool: each glow-tree, the arch, both stones, the mushroom patches, and the glow plants in groups', () => {
+test('every light the island has makes a pool: each glow-tree, the arch, any standing stones, the mushroom patches, and the glow plants in groups', () => {
   const pools = layoutGroundGlow({ flora, glow });
   const count = kind => pools.filter(p => p.kind === kind).length;
   assert.equal(count('weepingTree'), flora.filter(i => i.type === 'weepingTree').length);
   assert.ok(count('weepingTree') >= 4);
   assert.equal(count('rootArch'), 1);
-  assert.equal(count('standingStoneA') + count('standingStoneB'), 2);
+  assert.equal(count('standingStoneA') + count('standingStoneB'), flora.filter(i => i.type.startsWith('standingStone')).length);
   assert.equal(count('mushrooms'), flora.filter(i => i.type === 'mushrooms').length);
   const plants = pools.filter(p => p.kind === 'plants');
   assert.ok(plants.length >= 15 && plants.length < glow.length, `${plants.length} plant pools for ${glow.length} plants: grouped, not one each`);

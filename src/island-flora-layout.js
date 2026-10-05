@@ -15,6 +15,9 @@ import { addBoulder } from './sky-island-rocks.js';
 // which stands over one), the rocks, the palms and glow plants already placed, the water and the spill channel, and stands on the drawn ground.
 export const ISLAND_FLORA = Object.freeze({
   seed: 0x7f10a3,
+  // Kane, 6 Oct: "the log and some things are low quality assets... focus on good quality". These are not placed (their models stay in the code for a later,
+  // better version): the mossy cushions, both logs, the driftwood, the bones, the ribcage and the standing stones.
+  retired: Object.freeze(['cushion', 'fungusLog', 'log', 'driftwoodA', 'driftwoodB', 'driftwoodC', 'bonesA', 'bonesB', 'ribcage', 'standingStoneA', 'standingStoneB']),
   slopeLimit: 0.9,
   vineBulge: 0.45,            // how far the cliff may poke out past a rim curtain's anchor (the anchor moves out to meet it)
   vineSpacing: 15,            // metres along the rim between two curtains
@@ -76,6 +79,8 @@ export function layoutIslandFlora(ctx, spec = ISLAND_FLORA) {
   const { ground, features, pathIndex, paths = [], config = SKY_ISLAND, obstacles = [], rocks = [] } = ctx;
   const { lake, places, channel } = features;
   const waterY = ctx.waterY ?? features.lakeSpec.level;
+  const retired = new Set(spec.retired ?? []);
+  const wants = (...types) => types.some(type => !retired.has(type));
   const random = mulberry32(spec.seed);
   const rand = (lo, hi) => lo + random() * (hi - lo);
   const items = [];
@@ -151,6 +156,21 @@ export function layoutIslandFlora(ctx, spec = ISLAND_FLORA) {
   {
     const route = path('meadow to grove');
     let best = null;
+    // with no path to follow (the island has none now) the arch stands at the grove's edge on the line to the meadow, its opening along that line
+    if (!route) {
+      const toMeadow = Math.atan2(meadow.z - places.grove.z, meadow.x - places.grove.x);
+      for (let d = 22; d <= 34 && !best; d += 1.5) for (const da of [0, 0.12, -0.12, 0.25, -0.25, 0.4, -0.4]) {
+        const a = toMeadow + da, x = places.grove.x + Math.cos(a) * d, z = places.grove.z + Math.sin(a) * d;
+        if (Math.hypot(x - meadow.x, z - meadow.z) < meadow.radius + 4 || ground(x, z) === null || rimGap(x, z) <= 12 || slope(x, z) > 0.4) continue;
+        let clear = true;
+        for (const k of [-3, -1.5, 0, 1.5, 3]) {
+          const px = x + Math.cos(a) * k, pz = z + Math.sin(a) * k;
+          if (ground(px, pz) === null || lake.signed(px, pz) > -2) clear = false;
+          for (const o of grid.get(key(px, pz)) || []) if (Math.hypot(o.x - px, o.z - pz) < o.r + 0.9) clear = false;
+        }
+        if (clear) best = { s: { x, z }, yaw: Math.atan2(Math.cos(a), Math.sin(a)) };   // the passage runs along (sin yaw, cos yaw)
+      }
+    }
     if (route) for (const s of route.samples) {
       const dg = Math.hypot(s.x - places.grove.x, s.z - places.grove.z);
       if (Math.hypot(s.x - meadow.x, s.z - meadow.z) < meadow.radius + 2 || dg > 34 || dg < 14) continue;
@@ -181,7 +201,7 @@ export function layoutIslandFlora(ctx, spec = ISLAND_FLORA) {
   }
 
   // ---- the standing stones: a pair on the rim's lookout, one each side of the view, two different shapes
-  {
+  if (wants('standingStoneA', 'standingStoneB')) {
     const base = Math.atan2(places.rim.z - config.z, places.rim.x - config.x);
     const edge = outlineRadius(base, config) - config.lip;
     // each takes the nearest spot to the one it wants that has room: scanned outward over a small patch, kept on its own side of the view
@@ -221,6 +241,9 @@ export function layoutIslandFlora(ctx, spec = ISLAND_FLORA) {
     if (route) {
       const s = route.samples.find(q => Math.hypot(q.x - meadow.x, q.z - meadow.z) > meadow.radius + 12) ?? route.samples[Math.floor(route.samples.length / 3)];
       nearest(s.x - s.tz * 9, s.z + s.tx * 9, 'meadow', 12);
+    } else {
+      const toLake = Math.atan2(lakeCentre.z - meadow.z, lakeCentre.x - meadow.x);
+      nearest(meadow.x + Math.cos(toLake + 0.12) * (meadow.radius + 16), meadow.z + Math.sin(toLake + 0.12) * (meadow.radius + 16), 'meadow', 12);
     }
     // the lake: two on the bay (the broad north-east shore), one on the headland, one on the south shore
     nearest(...Object.values(lake.toWorld(8, 38)), 'lake', 11);
@@ -230,7 +253,7 @@ export function layoutIslandFlora(ctx, spec = ISLAND_FLORA) {
   }
 
   // ---- the ribcage in the hollow's mouth, with bones about it
-  {
+  if (wants('ribcage')) {
     const h = places.hollow;
     const roof = rocks.find(i => i.place === 'hollow' && i.half && i.half[0] > 4.5);
     let best = null;
@@ -249,7 +272,7 @@ export function layoutIslandFlora(ctx, spec = ISLAND_FLORA) {
   }
 
   // ---- logs and driftwood
-  {
+  if (wants('driftwoodA', 'fungusLog', 'log')) {
     const shore = lakeEdge(1.5, 4.5, p => true);
     let n = 0;
     for (let k = 0; k < 4000 && n < 6; k++) {
@@ -276,7 +299,7 @@ export function layoutIslandFlora(ctx, spec = ISLAND_FLORA) {
   }
 
   // ---- scattered bones: round the ribcage, in the hollow, and a couple elsewhere
-  {
+  if (wants('bonesA', 'bonesB')) {
     const cage = items.find(i => i.type === 'ribcage');
     const spots = [];
     if (cage) { spots.push(['hollow', cage.x + 5, cage.z + 1, 4], ['hollow', cage.x - 5, cage.z - 1, 4]); }
@@ -329,7 +352,7 @@ export function layoutIslandFlora(ctx, spec = ISLAND_FLORA) {
   }
 
   // ---- mossy cushions: on the boulders that are big enough and flat enough on top
-  {
+  if (wants('cushion')) {
     const candidates = rocks.filter(i => i.type === 'boulder' && !i.stepping && i.r >= 0.9 && i.r < 4.4 && Math.abs(i.tiltX) < 0.2 && Math.abs(i.tiltZ) < 0.2);
     // shuffle
     for (let i = candidates.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [candidates[i], candidates[j]] = [candidates[j], candidates[i]]; }
@@ -379,12 +402,21 @@ export function layoutIslandFlora(ctx, spec = ISLAND_FLORA) {
         } else next = s.along + 1.5;
       }
     }
-    const near = items.filter(i => i.type === 'fungusLog' || i.type === 'standingStoneA' || i.type === 'standingStoneB' || i.type === 'ribcage' || i.type === 'rootArch');
-    for (let k = 0; k < 2000 && n < spec.count.mushrooms && near.length; k++) {
-      const anchor = near[k % near.length];
-      const a = random() * TAU, d = rand(1.6, anchor.type === 'ribcage' ? 5 : 3.2);
+    // in small groups: round the arch, and under the palms, at the hollow's mouth, along the lake's banks and at the foot of the rise
+    const anchors = items.filter(i => i.type === 'rootArch').map(i => ({ x: i.x, z: i.z, place: i.place, spread: 3.2 }));
+    for (const [place, cx, cz, rad, groups] of [['grove', places.grove.x, places.grove.z, 28, 5], ['hollow', places.hollow.x, places.hollow.z, 14, 2], ['lake', lakeCentre.x, lakeCentre.z, 55, 4], ['rise', places.rise.x, places.rise.z, 30, 2]]) {
+      for (let g = 0, tries = 0; g < groups && tries < 600; tries++) {
+        const c = disc(cx, cz, rad)();
+        if (!room(c.x, c.z, 1.2, { slope: 0.5, meadowGap: 6 })) continue;
+        anchors.push({ x: c.x, z: c.z, place, spread: 2.2 });
+        g++;
+      }
+    }
+    for (let k = 0; k < 3000 && n < spec.count.mushrooms && anchors.length; k++) {
+      const anchor = anchors[k % anchors.length];
+      const a = random() * TAU, d = rand(0.4, anchor.spread);
       const x = anchor.x + Math.cos(a) * d, z = anchor.z + Math.sin(a) * d;
-      if (!room(x, z, 0.35, { pathGap: 0.9, slope: 0.7, free: true, meadowGap: 0.6 })) continue;
+      if (!room(x, z, 0.35, { pathGap: 0.9, slope: 0.7, meadowGap: 0.6 })) continue;
       put('mushrooms', x, z, { scale: rand(...spec.scale.mushrooms), place: anchor.place, r: 0.4, soft: true });
       n++;
     }
