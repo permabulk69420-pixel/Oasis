@@ -12,9 +12,9 @@ const { lake, places } = features;
 const drawn = makeMeshGround(buildIsland(ground.baseY, SKY_ISLAND, features), SKY_ISLAND);
 const pathIndex = createPathIndex(layoutPaths(features, SKY_ISLAND));
 const palms = layoutSkyTrees(SKY_ISLAND, SKY_TREES, { features, pathIndex });
-const ctx = { ground: drawn, features, pathIndex, config: SKY_ISLAND, avoid: palms };
+const level = ground.baseY + features.lakeSpec.level; // the lake's surface in world metres
+const ctx = { ground: drawn, features, pathIndex, config: SKY_ISLAND, avoid: palms, waterY: level };
 const items = layoutRocks(ctx);
-const level = ground.baseY + features.lakeSpec.level;
 const rimGap = (x, z) => outlineRadius(Math.atan2(z - SKY_ISLAND.z, x - SKY_ISLAND.x), SKY_ISLAND) - SKY_ISLAND.lip - Math.hypot(x - SKY_ISLAND.x, z - SKY_ISLAND.z);
 
 test('the stone is laid out the same every time, a few hundred pieces in every place', () => {
@@ -42,6 +42,10 @@ test('stones in the lake are outcrops that stand clear of the water, and the ste
   const inWater = items.filter(item => item.type === 'boulder' && lake.signed(item.x, item.z) > item.r);
   const clear = inWater.filter(item => item.y + item.half[1] * 0.95 >= level + 0.45);
   assert.ok(clear.length >= 3, `${clear.length} outcrops stand clear of the water`);
+  // the three big outcrops are asked to stand at least 0.9 m clear (the lake's height has to be in world metres for that to mean anything)
+  const big = inWater.filter(item => item.r >= 1.5);
+  assert.ok(big.length >= 3, `${big.length} big outcrops`);
+  for (const item of big) assert.ok(item.y + item.half[1] * 0.95 >= level + 0.9 - 1e-6, `an outcrop stands ${(item.y + item.half[1] * 0.95 - level).toFixed(2)} m clear`);
   for (const item of clear) assert.ok(item.y + item.half[1] * 0.95 < level + 4, 'an outcrop is a boulder, not a tower');
   const steps = items.filter(item => item.stepping);
   assert.ok(steps.length >= 5, `${steps.length} stepping stones`);

@@ -7,6 +7,8 @@ import { createSkyIslandTrees } from './sky-island-trees.js';
 import { layoutIslandGlow } from './sky-island-glow.js';
 import { layoutIslandFlora } from './island-flora-layout.js';
 import { createIslandFlora } from './island-flora.js';
+import { createIslandMotes } from './island-motes.js';
+import { createIslandGroundGlow } from './island-ground-glow.js';
 
 // Everything that makes the island a place rather than a lawn (Kane, 5 Oct: it is the player's home base): the lake and the waterfall, the paths, the
 // stone, the palm grove. It is all set dressing, nothing in play touches it. The layouts are pure and seeded (so the island is the same every time),
@@ -15,6 +17,8 @@ import { createIslandFlora } from './island-flora.js';
 export function createIslandScenery({ island, materials, getExposure = () => 1 }) {
   const group = new THREE.Group();
   group.name = 'Sky island scenery';
+  const waterY = island.baseY + island.features.lakeSpec.level; // the lake's surface in world metres
+  const anchor = { x: island.config.x, z: island.config.z, distance: 700 };
 
   const lake = createLakeWater({ island, material: materials.water });
   group.add(lake.mesh);
@@ -30,7 +34,7 @@ export function createIslandScenery({ island, materials, getExposure = () => 1 }
   const palms = createSkyIslandTrees({ island, layout: palmLayout });
   group.add(palms.group);
 
-  const rockItems = layoutRocks({ ground: island.groundHeight, features: island.features, pathIndex, config: island.config, avoid: palmLayout });
+  const rockItems = layoutRocks({ ground: island.groundHeight, features: island.features, pathIndex, config: island.config, avoid: palmLayout, waterY });
   const rocks = createRockMeshes({ island, material: materials.sand, items: rockItems });
   group.add(rocks.group);
 
@@ -46,24 +50,32 @@ export function createIslandScenery({ island, materials, getExposure = () => 1 }
 
   // the island's own plants and landmarks: the weeping glow-trees, the root arch, the standing stones, the ribcage, ferns, night flowers, cushions, logs, mushrooms, vines
   const floraItems = layoutIslandFlora({
-    ground: island.groundHeight, features: island.features, pathIndex, paths: pathData, config: island.config, rocks: rockItems,
+    ground: island.groundHeight, features: island.features, pathIndex, paths: pathData, config: island.config, rocks: rockItems, waterY,
     obstacles: [
       ...palmLayout.map(p => ({ x: p.x, z: p.z, r: 0.7 * p.scale })),
       ...glowItems.map(item => ({ x: item.x, z: item.z, r: 0.5 * item.scale, soft: true })),
     ],
   });
   const flora = createIslandFlora({
-    items: floraItems, getExposure, sunDirection: materials.sand.uniforms.uSun.value, anchor: { x: island.config.x, z: island.config.z, distance: 700 },
+    items: floraItems, getExposure, sunDirection: materials.sand.uniforms.uSun.value, anchor,
     onError: message => console.warn(message),
   });
   group.add(flora.group);
 
+  // light that drifts: seed puffs lifting off the big pale night flowers, and glow-flies over the lake at night (src/island-motes.js)
+  const motes = createIslandMotes({ flowers: floraItems.filter(item => item.type === 'flower'), lake: island.features.lake, level: waterY, ground: island.groundHeight, getExposure, anchor });
+  group.add(motes.group);
+
+  // the ground takes the plants' light at night: a soft pool under each glow-tree, stone, the arch and every group of glow plants (src/island-ground-glow.js)
+  const groundGlow = createIslandGroundGlow({ flora: floraItems, glow: glowItems, ground: island.groundHeight, getExposure, anchor });
+  group.add(groundGlow.group);
+
   return {
-    group, lake, spill, paths, palms, rocks, pathIndex, palmLayout, rockItems, glow, flora, floraItems,
-    triangles: lake.triangles + spill.triangles + paths.triangles + rocks.triangles,
-    // every frame (cheap): loads the palms when you are near the island
-    update(x, z) { palms.update(x, z); },
-    // every frame: the plants' glow follows the light, and the nearest ones are drawn in detail
-    updateFlora(head, dt) { flora.update(head, dt); },
+    group, lake, spill, paths, palms, rocks, pathIndex, palmLayout, rockItems, glow, flora, floraItems, motes, groundGlow,
+    triangles: lake.triangles + spill.triangles + paths.triangles + rocks.triangles + groundGlow.triangles,
+    // every 100 ms (cheap): loads the palms when you are near the island, and picks the level of detail each is drawn at (y: the eye's height)
+    update(x, z, y) { palms.update(x, z, y); },
+    // every frame: the plants' glow follows the light, the nearest ones are drawn in detail, the motes drift and the ground takes the glow. viewHeight: pixels tall one eye's picture is
+    updateFlora(head, dt, viewHeight) { flora.update(head, dt); motes.update(head, dt, viewHeight); groundGlow.update(head); },
   };
 }
