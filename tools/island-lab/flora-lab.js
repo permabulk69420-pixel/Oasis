@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import { installNightFill, nightFill } from '../../src/night-fill.js';
-import { createIslandFlora } from '../../src/island-flora.js';
-import { buildFloraLevels } from '../../src/island-flora-models.js';
+import { createIslandFlora, levelsFor } from '../../src/island-flora.js';
 import { windTime } from '../../src/wind.js';
 
 // Stands island models in a row, lit like the game (the real night fill, ACES tone mapping at the game's exposures).
 //   models   comma-separated names from FLORA_MODELS (default fern)
 //   lod      0 | 1 | 2 | all (every level of each model, one row each; default 0)
 //   night    1 for the night light (exposure 0.035, moonlit, glow) else a dusky day
-//   cam      tq (default) | front | side | top | close | wide     d: camera distance, ty: target height, tx: target x
+//   cam      tq (default) | front | side | top | close | wide | up     d: camera distance, ty: target height, tx: target x
 //   n        copies of each model in a row (default 1), gap: metres between models (default 3), s: scale
 //   y        lift in metres (default: a model that hangs below its origin, like the vines, is lifted so it just clears the ground)
 //   wind     the wind clock in seconds (default 0, still)
+//   bg       the background colour as hex without the # (default: a night black or a dusky day blue-grey)
 //   w, h     the picture size (default 1500 x 800)
 const params = new URLSearchParams(location.search);
 const night = params.get('night') === '1';
@@ -35,7 +35,7 @@ renderer.toneMappingExposure = night ? 0.035 : 0.62;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(night ? 0x02040a : 0x6f7d96);
+scene.background = new THREE.Color(params.has('bg') ? parseInt(params.get('bg'), 16) : night ? 0x02040a : 0x6f7d96);
 if (night) {
   scene.add(new THREE.DirectionalLight(0x6f8cff, 8), new THREE.HemisphereLight(0x4a68c8, 0x101820, 4));
 } else {
@@ -53,7 +53,7 @@ let widest = 0;
 lods.forEach((lod, row) => {
   const rowItems = [];
   names.forEach((name, i) => {
-    const levels = buildFloraLevels(name);
+    const levels = levelsFor(name);
     const b = levels[0].bounds;
     widest = Math.max(widest, (b.max[0] - b.min[0]) * scale, (b.max[2] - b.min[2]) * scale);
     for (let c = 0; c < copies; c++) {
@@ -81,6 +81,7 @@ const views = {
   top: [0.01, d, depth / 2 + 0.2],
   close: [d * 0.4, 0.9, d * 0.5 + depth / 2],
   wide: [d * 0.9, d * 0.5, d * 1.2 + depth / 2],
+  up: [d * 0.3, 1.7, d * 0.35 + depth / 2],       // standing on the ground close by, looking up (set ty high)
 };
 camera.position.set(...(views[camMode] ?? views.tq));
 camera.lookAt(target);
