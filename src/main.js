@@ -30,7 +30,7 @@ import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater,
 import { createPlacement } from './placement.js';
 import { pulseHaptics } from './haptics.js';
 import { createSurvivorMenu } from './survivor-menu.js';
-import { getInventoryWeight, getCarryCapacity, getCarrySpeedMultiplier, removeInventoryItem, getInventoryItems, importInventoryItems } from './inventory.js';
+import { getInventoryWeight, getCarryCapacity, getCarrySpeedMultiplier, addInventoryItem, removeInventoryItem, getInventoryItems, importInventoryItems } from './inventory.js';
 import { createSaveStore, createAutosave, wantsFresh } from './save-game.js';
 
 // Every model and texture asks for ?v=<build id>, so a new deploy is never answered from the browser's 10 minute cache.
@@ -406,6 +406,10 @@ const autosave = createAutosave({
     { key: 'mining', read: () => mining.serialize(), write: data => mining.restore(data) },
   ],
 });
+// TESTING (Kane, 5 Oct): a new game starts with a campfire in your pockets, so placing and lighting one needs no gathering first.
+// Reload the page for another (saving is off, so every load is a new game). Empty this list when the real start is wanted.
+const TESTING_START_KIT = Object.freeze({ campfire: 1 });
+if (!saveStart.save) for (const [type, amount] of Object.entries(TESTING_START_KIT)) addInventoryItem(type, amount);
 autosave.update(); // what is already loaded goes back now, before the first frame
 if (import.meta.env.DEV) window.__save = { autosave, store: saveStore, start: saveStart.note, world: { THREE, renderer, scene, camera, rig, campfires, tools: hands.tools, backpack, mining, dayNight } }; // dev only: for the save's browser test
 document.addEventListener('visibilitychange', () => { if (document.hidden) autosave.flush(); });
