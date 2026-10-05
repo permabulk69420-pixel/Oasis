@@ -47,6 +47,44 @@ function fixture(t) {
   return { scene, rig, tools, state, handTo, squeeze, xrCamera };
 }
 
+test('copyStart stands a second set of the starting tools at another start point, on that ground', t => {
+  t.mock.method(GLTFLoader.prototype, 'load', (url, onLoad) => {
+    onLoad({ scene: toolModel(url.includes('/axe/') ? 'WoodenHandle' : 'WoodenShaft'), animations: [] });
+  });
+  const scene = new THREE.Scene();
+  const from = { x: 319, z: -292 }, to = { x: -105, z: 585 };
+  const tools = createTools({
+    scene, states: [], onError: () => {},
+    heightAt: (x, z) => (Math.abs(x - to.x) < 20 ? 277 : 5), // the second start is up on the island
+    copyStart: { from, to },
+    kinds: [createTorchKind({ scene, onError: () => {} }), createAxeKind({ scene, onError: () => {} })],
+  });
+  const axes = tools.getInstances('axe'), torches = tools.getInstances('torch');
+  assert.equal(axes.length, 2);
+  assert.equal(torches.length, 2);
+  const near = (instances, spot) => instances.find(i => Math.abs(i.root.position.x - spot.x) < 0.01 && Math.abs(i.root.position.z - spot.z) < 0.01);
+  // the axe and torch stand beside the start, so the copies keep the same offsets from the new start
+  const oasisAxe = axes.find(i => Math.abs(i.root.position.x - from.x) < 5);
+  const islandAxe = axes.find(i => Math.abs(i.root.position.x - to.x) < 5);
+  assert.ok(oasisAxe && islandAxe);
+  assert.ok(Math.abs((islandAxe.root.position.x - to.x) - (oasisAxe.root.position.x - from.x)) < 1e-6);
+  assert.ok(Math.abs((islandAxe.root.position.z - to.z) - (oasisAxe.root.position.z - from.z)) < 1e-6);
+  assert.ok(Math.abs(islandAxe.root.position.y - 277) < 0.5, 'on the island ground, not the desert far below');
+  assert.ok(Math.abs(oasisAxe.root.position.y - 5) < 0.5);
+  assert.ok(near(torches, { x: to.x + 0.75, z: to.z - 1.05 }), 'the torch keeps its place beside the new start');
+  assert.ok(near(torches, { x: from.x + 0.75, z: from.z - 1.05 }));
+  assert.ok(axes.every(i => i.defaultSpawn) && torches.every(i => i.defaultSpawn), 'a saved game replaces the copies too');
+});
+
+test('without copyStart there is one set', t => {
+  t.mock.method(GLTFLoader.prototype, 'load', (url, onLoad) => {
+    onLoad({ scene: toolModel(url.includes('/axe/') ? 'WoodenHandle' : 'WoodenShaft'), animations: [] });
+  });
+  const scene = new THREE.Scene();
+  const tools = createTools({ scene, states: [], onError: () => {}, kinds: [createAxeKind({ scene, onError: () => {} })] });
+  assert.equal(tools.getInstances('axe').length, 1);
+});
+
 function clearInventory(type) {
   removeInventoryItem(type, getInventoryCount(type));
 }

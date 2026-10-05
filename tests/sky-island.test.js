@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SKY_ISLAND, buildIsland, topGround, outlineRadius } from '../src/sky-island-shape.js';
+import { ISLAND_START, createSkyIslandGround } from '../src/sky-island-ground.js';
+import { terrainHeight, SPAWN, noise, smooth } from '../src/world.js';
 import { layoutSkyTrees, SKY_TREES } from '../src/sky-island-layout.js';
 
 const BASE = 270;
@@ -67,5 +69,41 @@ test('the palms are laid out the same every time, on the top, apart from each ot
     assert.ok(topGround(tree.x, tree.z) !== null);
     assert.ok(Math.hypot(tree.x - SKY_ISLAND.x, tree.z - SKY_ISLAND.z) >= SKY_TREES.clearing);
     for (let k = i + 1; k < a.length; k++) assert.ok(Math.hypot(tree.x - a[k].x, tree.z - a[k].z) >= SKY_TREES.spacing - 1e-6);
+  }
+});
+
+test('the island ground reads the same numbers as the mesh', () => {
+  const ground = createSkyIslandGround();
+  assert.equal(ground.baseY, terrainHeight(SKY_ISLAND.x, SKY_ISLAND.z) + SKY_ISLAND.altitude);
+  assert.equal(ground.groundHeight(SKY_ISLAND.x, SKY_ISLAND.z), ground.baseY + topGround(SKY_ISLAND.x, SKY_ISLAND.z));
+  assert.equal(ground.groundHeight(SKY_ISLAND.x + 5000, SKY_ISLAND.z), null);
+});
+
+test('the island start is open, level, high and well away from the edge, every palm and the oasis start', () => {
+  const { x, z } = ISLAND_START;
+  assert.ok(topGround(x, z) !== null);
+  let slope = 0;
+  for (let a = 0; a < Math.PI * 2; a += 0.4) for (const r of [1, 2, 4]) {
+    const h = topGround(x + Math.cos(a) * r, z + Math.sin(a) * r);
+    assert.ok(h !== null);
+    slope = Math.max(slope, Math.abs(h - topGround(x, z)) / r);
+  }
+  assert.ok(slope < 0.04, `the start's ground is level enough for the tools to stand on (${slope.toFixed(3)})`);
+  const edge = outlineRadius(Math.atan2(z - SKY_ISLAND.z, x - SKY_ISLAND.x));
+  assert.ok(edge - Math.hypot(x - SKY_ISLAND.x, z - SKY_ISLAND.z) > 60, 'a good walk from the edge');
+  for (const tree of layoutSkyTrees()) assert.ok(Math.hypot(tree.x - x, tree.z - z) > 30, 'no palm on top of the tools');
+  // the starting tools sit within a few metres of the start and must be on the top, too
+  for (const [dx, dz] of [[-0.85, -1.05], [0.75, -1.05], [-2.0, -1.25], [-3.1, -1.0], [2.0, -1.35]]) {
+    assert.ok(topGround(x + dx - 0, z + dz) !== null);
+  }
+  assert.ok(Math.hypot(x - SPAWN.x, z - SPAWN.z) > 500, 'far from the oasis start');
+  assert.equal(ISLAND_START.yaw, 0, 'faces -z like the oasis start, so the sky sits where it always has');
+});
+
+test('the island start is on grass, not on a rock patch', () => {
+  const { x, z } = ISLAND_START;
+  for (let a = 0; a < Math.PI * 2; a += 0.5) for (const r of [0, 10, 20]) {
+    const v = smooth(0.70, 0.82, noise((x + Math.cos(a) * r) / 42 + 7, (z + Math.sin(a) * r) / 42 - 5));
+    assert.ok(v < 0.05, 'grass all round the tools');
   }
 });
