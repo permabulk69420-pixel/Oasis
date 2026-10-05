@@ -84,6 +84,16 @@ export const atmosphere = /* glsl */`
     return smoothstep(-0.07, 0.16, uSun.y);
   }
 
+  // The sun only ever climbs about 14 degrees (src/sun-path.js): 0 with it on the horizon, 1 at the top of its arc. The whole day is
+  // a long golden hour, and this is how far from the red end of it we are.
+  float sunHigh() {
+    return smoothstep(0.02, 0.24, uSun.y);
+  }
+
+  vec3 sunColour() {
+    return mix(vec3(1.40, 0.70, 0.34), vec3(1.25, 0.98, 0.70), sunHigh());
+  }
+
   float twilightLevel() {
     return 1.0 - smoothstep(0.0, 0.30, abs(uSun.y));
   }
@@ -150,16 +160,21 @@ export const atmosphere = /* glsl */`
   vec3 skyColor(vec3 ray) {
     float altitude = max(ray.y, 0.0);
     float daylight = daylightLevel();
-    vec3 dayHorizon = vec3(0.56, 0.65, 0.69);
-    vec3 dayZenith = vec3(0.035, 0.19, 0.40);
+    float high = sunHigh();
+    // A twilight sky: a deep teal-indigo up high, a dusty rose-grey at the horizon (greyer and bluer when the sun is at the top of its arc),
+    // and a wide warm glow round the sun.
+    vec3 dayHorizon = mix(vec3(0.30, 0.20, 0.21), vec3(0.34, 0.37, 0.42), high);
+    vec3 dayZenith = mix(vec3(0.012, 0.045, 0.125), vec3(0.022, 0.085, 0.215), high);
     vec3 nightHorizon = vec3(0.006, 0.008, 0.014);
     vec3 nightZenith = vec3(0.003, 0.006, 0.015);
     vec3 horizon = mix(nightHorizon, dayHorizon, daylight);
     vec3 zenith = mix(nightZenith, dayZenith, daylight);
     vec3 sky = mix(horizon, zenith, pow(altitude, 0.42));
     float facingSun = max(dot(ray, uSun), 0.0);
-    sky += vec3(0.24, 0.19, 0.115) * pow(facingSun, 9.0) * daylight;
-    sky += vec3(0.46, 0.32, 0.13) * pow(facingSun, 140.0) * daylight;
+    float lowSun = 1.0 - 0.55 * high;
+    sky += vec3(0.46, 0.20, 0.07) * pow(facingSun, 3.0) * lowSun * daylight;
+    sky += vec3(0.70, 0.36, 0.13) * pow(facingSun, 24.0) * lowSun * daylight;
+    sky += vec3(0.55, 0.36, 0.15) * pow(facingSun, 220.0) * daylight;
     return sky;
   }
 
@@ -347,10 +362,10 @@ export function createMaterials(renderer, field) {
         base = mix(base, base * vec3(0.49, 0.48, 0.43), wet * 0.80);
         roughness = mix(roughness, 0.30, wet * 0.70);
 
-        vec3 dayAmbient = mix(vec3(0.20, 0.23, 0.29), vec3(0.28, 0.35, 0.43), max(n.y, 0.0));
+        vec3 dayAmbient = mix(vec3(0.13, 0.14, 0.21), vec3(0.17, 0.21, 0.31), max(n.y, 0.0));
         vec3 nightAmbient = mix(vec3(0.006, 0.009, 0.015), vec3(0.012, 0.018, 0.029), max(n.y, 0.0));
         vec3 ambient = mix(nightAmbient, dayAmbient, environmentDay);
-        vec3 light = ambient + vec3(1.23, 1.09, 0.86) * sun;
+        vec3 light = ambient + sunColour() * sun;
         vec3 halfVector = normalize(view + uSun);
         float specPower = mix(82.0, 7.0, roughness);
         float specStrength = mix(0.24, 0.018, roughness);
@@ -417,10 +432,11 @@ export function createMaterials(renderer, field) {
           float cloud = smoothstep(0.49, 0.65, rawCloud) * horizonFade * 0.86;
           float dense = smoothstep(0.60, 0.74, rawCloud);
           float twilight = twilightLevel();
-          vec3 cloudColor = mix(vec3(0.005, 0.007, 0.012), vec3(0.90, 0.91, 0.89), daylight);
+          // slate and mauve on the far side of the sky, lit coral and gold where they face the low sun
+          vec3 cloudColor = mix(vec3(0.005, 0.007, 0.012), mix(vec3(0.24, 0.22, 0.29), vec3(0.62, 0.60, 0.62), sunHigh()), daylight);
           cloudColor *= 1.0 - dense * 0.17;
-          float sunFacing = pow(max(dot(ray, uSun), 0.0), 7.0);
-          cloudColor += vec3(0.48, 0.25, 0.10) * twilight * sunFacing * 0.65 * daylight;
+          float sunFacing = pow(max(dot(ray, uSun), 0.0), 3.0);
+          cloudColor += vec3(0.95, 0.45, 0.17) * sunFacing * (1.0 - 0.45 * sunHigh()) * daylight;
           color = mix(color, cloudColor, cloud * (0.32 + daylight * 0.46));
         }
 
@@ -476,7 +492,7 @@ export function createMaterials(renderer, field) {
             vec3 dayAmbient = vec3(0.28, 0.35, 0.43);
             vec3 nightAmbient = vec3(0.008, 0.012, 0.020);
             vec3 reflectedLight = mix(nightAmbient, dayAmbient, environmentDay);
-            reflectedLight += vec3(1.23, 1.09, 0.86) * max(dot(n, uSun), 0.0) * environmentDay;
+            reflectedLight += sunColour() * max(dot(n, uSun), 0.0) * environmentDay;
             vec3 sand = vec3(0.68, 0.46, 0.23) * reflectedLight;
             return air(sand, ray, d);
           }
