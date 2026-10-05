@@ -28,6 +28,7 @@ import { windTime, windStrength } from './wind.js';
 import { installNightFill } from './night-fill.js';
 import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater, damagePlayer, exportSurvival, importSurvival } from './survival.js';
 import { createPlacement } from './placement.js';
+import { createGlowGarden } from './glow-garden.js';
 import { pulseHaptics } from './haptics.js';
 import { createSurvivorMenu } from './survivor-menu.js';
 import { getInventoryWeight, getCarryCapacity, getCarrySpeedMultiplier, addInventoryItem, removeInventoryItem, getInventoryItems, importInventoryItems } from './inventory.js';
@@ -111,6 +112,10 @@ scene.add(stonesGroup);
 // Glow fruit around the veil tree. They follow the live sun vector for their night glow.
 const glowFruit = createGroundFruit({ field, sunDirection: materials.sand.uniforms.uSun.value });
 scene.add(glowFruit.group);
+// The oasis's glow plants: reeds at the water's edge, lantern blooms on the banks and round the hero tree.
+const glowGarden = createGlowGarden({ field, getExposure: () => renderer.toneMappingExposure, sunDirection: materials.sand.uniforms.uSun.value, onError: message => console.warn(message) });
+scene.add(glowGarden.group);
+if (import.meta.env.DEV) window.__glowGarden = glowGarden; // dev only: for screenshots
 const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), materials.sky);
 sky.frustumCulled = false; sky.renderOrder = -10; sky.name = 'Sky'; scene.add(sky);
 const dayNight = createDayNightCycle({ scene, renderer, materials });
@@ -664,6 +669,7 @@ function frame(time) {
   const viewHeight = renderer.xr.isPresenting ? WIND_SAND.vrViewHeight : renderer.getDrawingBufferSize(drawingSize).y;
   windSand.update(windTime.value, head, viewHeight);
   alienBirds.update(dt, head);
+  glowGarden.update(head, dt);
   weaponHits.update(dt);
   mining.update(dt, head);
   crystalMotes.update(dt, viewHeight);
