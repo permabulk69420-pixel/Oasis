@@ -3,7 +3,7 @@ import { SPAWN } from './world.js';
 import { pulseHaptics } from './haptics.js';
 import { setGripSurface } from './grip-contact.js';
 import { createLoop } from './audio.js';
-import { torchGlow } from './night-fill.js';
+import { torchGlow, TORCH_SHADER_MARKERS } from './night-fill.js';
 
 const TORCH_URL = `${import.meta.env?.BASE_URL ?? '/'}models/torch/handheld_fire_torch.glb`;
 const TORCH_AUDIO_URL = `${import.meta.env?.BASE_URL ?? '/'}audio/fire/torch_fire_crackle_loop.mp3`;
@@ -95,8 +95,8 @@ function installTerrainTorchLight(material, positionUniform, strengthUniform) {
   if (!material?.isShaderMaterial) return false;
   if (material.userData.torchLightInstalled) return true;
 
-  const uniformMarker = 'uniform float uGrassTileMetres;';
-  const lightMarker = 'vec3 light = ambient + vec3(1.23, 1.09, 0.86) * sun;';
+  const uniformMarker = TORCH_SHADER_MARKERS.terrain.uniform;
+  const lightMarker = TORCH_SHADER_MARKERS.terrain.light;
   if (!material.fragmentShader.includes(uniformMarker) || !material.fragmentShader.includes(lightMarker)) return false;
 
   material.uniforms.uTorchPosition = positionUniform;
@@ -118,8 +118,8 @@ function installWaterTorchLight(material, positionUniform, strengthUniform) {
   if (!material?.isShaderMaterial) return false;
   if (material.userData.torchLightInstalled) return true;
 
-  const uniformMarker = 'uniform sampler2D uElevation;';
-  const colorMarker = 'vec3 color = mix(transmission, reflectedColor, fresnel);';
+  const uniformMarker = TORCH_SHADER_MARKERS.water.uniform;
+  const colorMarker = TORCH_SHADER_MARKERS.water.colour;
   if (!material.fragmentShader.includes(uniformMarker) || !material.fragmentShader.includes(colorMarker)) return false;
 
   material.uniforms.uTorchPosition = positionUniform;
