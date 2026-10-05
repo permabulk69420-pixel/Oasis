@@ -42,8 +42,8 @@ export function hitMenuControl(controls, x, y) {
   return controls.find(control => x >= control.x && x <= control.x + control.w && y >= control.y && y <= control.y + control.h) || null;
 }
 
-// onPlace(type) puts a placeable item (the campfire) in the world in front of the player and
-// returns { ok, message }. The menu closes on success so the player sees it appear.
+// onPlace(type, { hand }) starts placing an item (the campfire): the game shows a ghost to aim and confirm, and returns { ok, message }.
+// `hand` is the VR hand whose trigger chose Place (it aims), or null. The menu closes on ok so the player can see the ghost.
 // backpack ({ isWorn(), takeOff() -> { ok, message } }) is the pack you wear: the Back slot, and how much you can carry.
 export function createSurvivorMenu({ scene, renderer, states, tools = null, backpack = null, onToggle = () => {}, onPlace = null }) {
   const controllers = states.map(state => state.controller);
@@ -398,7 +398,7 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
     const canOff = canTakeOffPack();
     if (!canOff) wrap(`Your pockets only hold ${POCKET_CARRY_WEIGHT}, so it can only come off when you carry that much or less.`, left, 520, width, 20, C.warn);
     button('takeoff', canOff ? 'Take off' : 'Too much to carry without it', left, 776, width, 72, { primary: canOff, disabled: !canOff });
-    text('It goes on the ground in front of you.', left, 872, 20, C.dim);
+    text(renderer.xr.isPresenting ? 'You pick the spot, then pull the trigger. Y backs out.' : 'You pick the spot, then click. Y backs out.', left, 872, 20, C.dim);
   }
 
   function drawDetail() {
@@ -461,7 +461,7 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
     } else if (item.placeable && onPlace) {
       const have = getInventoryCount(type) > 0;
       button('place', have ? `Place ${item.name.toLowerCase()}` : `No ${item.name.toLowerCase()} in inventory`, left, 776, width, 72, { primary: have, disabled: !have });
-      text('It goes on the ground in front of you.', left, 872, 20, C.dim);
+      text(renderer.xr.isPresenting ? 'You pick the spot, then pull the trigger. Y backs out.' : 'You pick the spot, then click. Y backs out.', left, 872, 20, C.dim);
     }
     footer();
   }
@@ -502,7 +502,7 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
   function setHover(id) { if (hovered !== id) { hovered = id; dirty = true; } }
   function say(value) { message = value; announcement.textContent = value; }
 
-  function activate(id) {
+  function activate(id, hand = null) {
     if (!open || controls.find(control => control.id === id)?.disabled) return;
     if (id === 'close') { setOpen(false); return; }
     message = '';
@@ -539,7 +539,7 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
     }
     if (id === 'place' && onPlace) {
       const type = selected.kind === 'item' ? selected.id : getRecipeStatus(selected.id)?.recipe.output;
-      const result = type && getInventoryCount(type) > 0 ? onPlace(type) : null;
+      const result = type && getInventoryCount(type) > 0 ? onPlace(type, { hand }) : null;
       if (result?.ok) { dirty = true; setOpen(false); return; }
       say(result?.message || `No ${ITEMS[type]?.name.toLowerCase() || 'item'} to place.`);
     }
@@ -594,7 +594,7 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
     if (y && !yDown) setOpen(!open);
     yDown = y;
     if (session && !visible && open) setOpen(false);
-    let hover = '', pendingAction = null;
+    let hover = '', pendingAction = null, pendingHand = null;
     controllers.forEach((controller, index) => {
       // Use the connected hand source; source order can change after a reconnect.
       const source = states[index].inputSource;
@@ -610,13 +610,13 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
           const control = hitMenuControl(controls, hit.uv.x * WIDTH, (1 - hit.uv.y) * HEIGHT);
           if (control && !control.disabled) {
             hover = control.id;
-            if (pressed && !triggerDown[index]) pendingAction = control.id;
+            if (pressed && !triggerDown[index]) { pendingAction = control.id; pendingHand = states[index].handedness || null; }
           }
         }
       }
       triggerDown[index] = pressed;
     });
-    if (pendingAction) activate(pendingAction);
+    if (pendingAction) activate(pendingAction, pendingHand);
     if (renderer.xr.isPresenting) setHover(hover);
     if (open) {
       const current = JSON.stringify([getInventoryItems(), tools?.getHipSlots?.(), Object.values(getSurvivalStats()).map(Math.round), isPackWorn()]);

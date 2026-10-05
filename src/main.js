@@ -10,7 +10,7 @@ import { createSandFootsteps } from './footsteps.js';
 import { createGroundSticks } from './sticks.js';
 import { createGroundStones } from './stones.js';
 import { createGroundFruit } from './glow-fruit.js';
-import { createCampfires, campfireSpot, campfireSite } from './campfire.js';
+import { createCampfires, campfireSite, campfireYaw, CAMPFIRE } from './campfire.js';
 import { createWindSand, WIND_SAND } from './wind-sand.js';
 import { createAlienBirds } from './alien-bird.js';
 import { createDuneStinger } from './dune-stinger.js';
@@ -27,6 +27,7 @@ import { stepBody } from './falling.js';
 import { windTime, windStrength } from './wind.js';
 import { installNightFill } from './night-fill.js';
 import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater, damagePlayer, exportSurvival, importSurvival } from './survival.js';
+import { createPlacement } from './placement.js';
 import { pulseHaptics } from './haptics.js';
 import { createSurvivorMenu } from './survivor-menu.js';
 import { getInventoryWeight, getCarryCapacity, getCarrySpeedMultiplier, removeInventoryItem, getInventoryItems, importInventoryItems } from './inventory.js';
@@ -333,17 +334,29 @@ let devBird = devBirdParams?.get('bird') ?? null;
 if (devBirdParams?.has('birdseed')) alienBirds.debug.seed(Number(devBirdParams.get('birdseed')));
 // ?birdwait=<seconds>: with no fixture, the next bird turns up that many seconds into the day (instead of 12 to 22)
 if (devBirdParams?.has('birdwait')) alienBirds.debug.wait(Number(devBirdParams.get('birdwait')) || 0);
-const placeHead = new THREE.Vector3(), placeForward = new THREE.Vector3();
-function placeFromMenu(type) {
+// Placing a campfire: the menu's Place button starts a ghost that follows your aim (src/placement.js); the item is only spent when you confirm.
+const placement = createPlacement({
+  scene, renderer, camera, states: hands.states, heightAt: field.sample,
+  check: (x, z) => campfires.canPlace(x, z),
+  siteAt: campfires.siteAt,
+  makePreview: campfires.createPreview,
+  yawAt: campfireYaw,
+  radius: CAMPFIRE.footprint,
+  inputMode: () => (renderer.xr.isPresenting ? 'vr' : touchDevice ? 'touch' : 'desktop'),
+  onConfirm(x, z) {
+    const check = campfires.canPlace(x, z);
+    if (!check.ok) return check;
+    if (!removeInventoryItem('campfire', 1)) return { ok: false, message: 'No campfire in your inventory.' };
+    campfires.place(x, z);
+    return { ok: true, message: 'Campfire placed. Light it with a torch.' };
+  },
+});
+if (import.meta.env.DEV) window.__placement = placement; // dev only: for screenshots
+function placeFromMenu(type, { hand = null } = {}) {
   if (type !== 'campfire') return { ok: false, message: 'You can’t place that.' };
-  const view = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
-  view.getWorldPosition(placeHead); view.getWorldDirection(placeForward);
-  const spot = campfireSpot(placeHead, placeForward);
-  const check = campfires.canPlace(spot.x, spot.z);
-  if (!check.ok) return check;
-  if (!removeInventoryItem('campfire', 1)) return { ok: false, message: 'No campfire in your inventory.' };
-  campfires.place(spot.x, spot.z);
-  return { ok: true, message: 'Campfire placed. Light it with a torch.' };
+  if (!campfires.ready) return { ok: false, message: 'The campfire is still loading. Try again in a moment.' };
+  placement.start({ hand });
+  return { ok: true, message: '' };
 }
 // The backpack: lies on the sand by the starting tools. Grab it by the handle and let go behind your shoulder to put it on;
 // it then adds to how much you can carry (and is taken off again from the menu's Back slot).
@@ -404,6 +417,7 @@ const survivorMenu = createSurvivorMenu({
     velocity.set(0, 0, 0); footsteps.reset(); movePad.firstElementChild.style.transform = '';
     if (!open) autosave.flush(); // you have just crafted or packed something
     touchControls.hidden = open || !playing || !touchDevice || renderer.xr.isPresenting;
+    if (open) placement.cancel();
     if (open) document.exitPointerLock?.();
     else if (playing && !touchDevice && !renderer.xr.isPresenting) {
       // A close click/key is a user gesture; drag-to-look remains a fallback.
@@ -422,7 +436,7 @@ function clearInput() {
 }
 function setPlaying(value) {
   playing = value;
-  if (!value) survivorMenu.setOpen(false);
+  if (!value) { placement.cancel(); survivorMenu.setOpen(false); }
   inventoryToggle.hidden = !value || renderer.xr.isPresenting;
   welcome.hidden = value; menu.hidden = !value;
   touchControls.hidden = !value || !touchDevice || renderer.xr.isPresenting;
@@ -445,6 +459,7 @@ document.addEventListener('pointerlockchange', () => {
   if (!document.pointerLockElement && !touchDevice && !renderer.xr.isPresenting && !survivorMenu.isOpen()) setPlaying(false);
 });
 window.addEventListener('keydown', e => {
+  if (placement.isActive() && e.code === 'Enter' && !e.repeat && playing && !renderer.xr.isPresenting) { e.preventDefault(); placement.confirm(); return; }
   if (playing && !renderer.xr.isPresenting && (e.code === 'KeyY' || (e.code === 'Escape' && survivorMenu.isOpen()))) {
     e.preventDefault(); if (!e.repeat) survivorMenu.toggle(); return;
   }
@@ -462,6 +477,7 @@ document.addEventListener('mousemove', e => {
 });
 canvas.addEventListener('pointerdown', e => {
   if (!playing || survivorMenu.isOpen() || renderer.xr.isPresenting) return;
+  if (placement.isActive() && e.pointerType !== 'touch') { if (e.button === 0) placement.confirm(); return; }
   if (e.pointerType === 'touch') {
     if (e.clientX < innerWidth * 0.40 || touchLookId !== null) return;
     touchLookId = e.pointerId;
@@ -474,6 +490,13 @@ canvas.addEventListener('pointermove', e => {
   if ((e.pointerType === 'touch' && e.pointerId !== touchLookId) || (e.pointerType !== 'touch' && !mouseDragging)) return;
   look(e.clientX - previousPointer.x, e.clientY - previousPointer.y);
   previousPointer = { x: e.clientX, y: e.clientY };
+});
+// Touch: a quick tap with no drag places the ghost (a drag is looking round).
+let tap = null;
+canvas.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') tap = { id: e.pointerId, x: e.clientX, y: e.clientY, time: performance.now() }; });
+canvas.addEventListener('pointerup', e => {
+  if (tap && tap.id === e.pointerId && placement.isActive() && performance.now() - tap.time < 350 && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 14) placement.confirm();
+  if (tap && tap.id === e.pointerId) tap = null;
 });
 for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(event, e => {
   if (touchLookId === e.pointerId) touchLookId = null;
@@ -626,6 +649,7 @@ function frame(time) {
   // Resource storage compares controller and headset WORLD positions. Refresh
   // the XR camera first; its raw pose at frame start is reference-space local.
   hands.update(dt);
+  placement.update(dt);
   if (import.meta.env.DEV && devThrows && devThrows()) devThrows = null;
   backpack.update(dt); // after the hands, so a tool or stone in reach is grabbed first
   const activeCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;

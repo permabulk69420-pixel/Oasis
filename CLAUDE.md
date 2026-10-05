@@ -173,6 +173,10 @@ climb prototype once Kane says go (how it is beaten is his call). Kane tests on 
 Art-only extras still open (no decision needed): dust devils by day, a dawn and dusk look (part of the twilight direction in "Game direction"), a small skittering critter, a bone texture pass, and a `creature-pipeline`
 skill in `.claude/skills/` (the Blender to pose code to game procedure, written from the stinger v3 build).
 
+Campfire placement ghost (my call on the buttons, Kane asked for "a logical button and some ghost"; `src/placement.js`, `tests/placement.test.js`): the menu's Place starts a green/red ghost that follows your aim; VR: the hand that
+pressed Place aims, its trigger confirms (armed once released), Y/menu cancels; desktop: click or Enter, Y/Esc cancels; touch: tap. Item is spent only on confirm. Spot snaps to 0.2 m (so the ghost's turn, a hash of x,z, is stable and a reloaded fire sits the same way).
+Oddities to tell Kane: the hint text and ghost colours are mine; the ghost ring ignores depth so it never sinks into a slope; no sound.
+
 Backpack (done, `src/backpack.js`; my call, Kane approved): a physical pack you grab by its handle and put on by letting go
 behind your shoulder (reaching behind your back is the VR habit); it then disappears into the normal menu (a Back slot) and
 raises the carry limit from 40 (pockets) to 100. It only comes off when everything fits in your pockets. Oddities to tell
