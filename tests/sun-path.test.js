@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { sunDirectionFor, swing, INITIAL_SUN, INITIAL_PHASE, SUN_ARC, SUNRISE_BEARING } from '../src/sun-path.js';
+import { sunDirectionFor, swing, INITIAL_SUN, INITIAL_PHASE, SUN_ARC, SUN_PEAK_DEGREES, SUNRISE_BEARING } from '../src/sun-path.js';
 
 // The sun's path through the day (and so the moon's, always opposite). It used to jump 63 degrees across the sky at noon and again at
 // midnight; these tests keep it one smooth arc with the heights the game was tuned on.
@@ -11,9 +11,19 @@ const degrees = radians => radians * 180 / Math.PI;
 const angleBetween = (a, b) => degrees(Math.acos(THREE.MathUtils.clamp(a.dot(b), -1, 1)));
 const sunAt = phase => sunDirectionFor(phase, new THREE.Vector3());
 
-test('at the starting time the sun is exactly where the game has always started it', () => {
-  assert.ok(angleBetween(sunAt(INITIAL_PHASE), INITIAL_SUN) < 1e-6);
+test('at the starting time the sun is on the side of the sky the game has always started it, and low', () => {
+  const flat = v => Math.atan2(v.z, v.x);
+  const start = sunAt(INITIAL_PHASE);
+  assert.ok(Math.abs(Math.atan2(Math.sin(flat(start) - flat(INITIAL_SUN)), Math.cos(flat(start) - flat(INITIAL_SUN)))) < 1e-6, 'same bearing as INITIAL_SUN');
   assert.ok(INITIAL_PHASE > 0 && INITIAL_PHASE < 0.25, 'the game starts in the morning');
+  assert.ok(start.y > 0, 'with the sun up');
+});
+
+test('a twilight planet: the sun never climbs past its peak, a hand or so above the horizon', () => {
+  assert.ok(SUN_PEAK_DEGREES >= 8 && SUN_PEAK_DEGREES <= 20, 'a low sun is the point');
+  let highest = -1;
+  for (let i = 0; i <= 2000; i++) highest = Math.max(highest, sunAt(i / 2000).y);
+  assert.ok(Math.abs(degrees(Math.asin(highest)) - SUN_PEAK_DEGREES) < 0.01);
 });
 
 test('the sun moves smoothly: no jump anywhere in the cycle, at noon and midnight included', () => {
@@ -30,13 +40,13 @@ test('the sun moves smoothly: no jump anywhere in the cycle, at noon and midnigh
   assert.ok(angleBetween(sunAt(1), sunAt(0)) < 1e-9, 'the end of the cycle is the start of the next');
 });
 
-test('the heights are what they always were: a linear climb to 58.5 degrees at noon, and the mirror image by night', () => {
+test('the heights climb linearly to the peak at noon, and mirror it by night', () => {
   for (const phase of [0, 0.03, 0.08, 0.12, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 0.9]) {
     const wanted = Math.asin(Math.sin(phase * TAU)) * SUN_ARC;
     assert.ok(Math.abs(Math.asin(sunAt(phase).y) - wanted) < 1e-9, `phase ${phase}`);
   }
-  assert.ok(Math.abs(degrees(Math.asin(sunAt(0.25).y)) - 58.5) < 0.01, 'noon height');
-  assert.ok(Math.abs(degrees(Math.asin(sunAt(0.75).y)) + 58.5) < 0.01, 'midnight depth');
+  assert.ok(Math.abs(degrees(Math.asin(sunAt(0.25).y)) - SUN_PEAK_DEGREES) < 0.01, 'noon height');
+  assert.ok(Math.abs(degrees(Math.asin(sunAt(0.75).y)) + SUN_PEAK_DEGREES) < 0.01, 'midnight depth');
   assert.ok(Math.abs(sunAt(0).y) < 1e-12 && Math.abs(sunAt(0.5).y) < 1e-12, 'it crosses the horizon at sunrise and sunset');
 });
 

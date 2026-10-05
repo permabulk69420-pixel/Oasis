@@ -18,8 +18,8 @@ the moment", so keep it loose: he said not to get into too much of the specifics
 - The setting is a desert moon with a ringed planet in the sky and giant bones in the dunes: atmosphere only, with no story attached. Do not invent a plot.
 - **The look is a twilight planet (Kane, 5 Oct, still loose).** His words, roughly: the sun should come up lower and the days be darker, with similar hours of night or even
   more, because the game is "still a little bit too bright", it "has a better vibe at night", the darkness hides a lot of flaws, and the game leans on bioluminescence. So lean
-  darker and moodier, with the glow carrying the scene. Day length and the exact balance are not decided ("I don't know yet"), so do not change the day/night timing without
-  asking. Lighting and exposure are art, so those are mine to try and show (current: 3 minutes day, 3 minutes night, `src/day-night.js`; day exposure about 0.82, night about 0.035).
+  darker and moodier, with the glow carrying the scene. **First pass done (5 Oct, #97): the sun now tops out at 14 degrees and slides round the horizon, dusky sky, darker days; he said "we'll work that out later" for how it changes by area.** Day length and the exact balance are not decided ("I don't know yet"), so do not change the day/night timing without
+  asking. Lighting and exposure are art, so those are mine to try and show (current: 3 minutes day, 3 minutes night, `src/day-night.js`; day exposure about 0.62, night about 0.035; since 5 Oct the sun never climbs past 14 degrees, see README "The ringed planet and the sun's path").
 - **Climbing is in, and gliding too (Kane, 5 Oct).** Both tie into stamina, which already exists (`src/survival.js`). It is the colossus climb above and probably a general
   ability as well. What each costs in stamina and how they feel are his calls, not mine to invent.
 - The full write-up is `claude/direction.md` in the Project (the `Projects` tool). Keep it and this section in step.
@@ -141,7 +141,7 @@ work. What he has told me, or shown he wants, across sessions:
 - Held things (grip clipping, the hold lab, `lab_shot.py`, `probe_grip_point.py`): see the `grip-debug` skill.
 - Screenshots: Playwright with Chromium (SwiftShader) against `npm run dev`. Look at them; do not assume.
 - Triangle and draw-call counts per object: see the `perf-triangles` skill.
-- Day/night uses ACES tone mapping with very low night exposure (~0.035 vs day 0.82). Emissive and light
+- Day/night uses ACES tone mapping with very low night exposure (~0.035 vs day 0.62). Emissive and light
   levels must compensate for exposure, and night visibility relies on additive fills after tone mapping.
 - Place objects on `createHeightField().sample` (mesh-accurate), not the analytic `terrainHeight`.
 - Blender is headless (`import bpy` before `import bmesh`). It is not preinstalled in a fresh session, but it is
