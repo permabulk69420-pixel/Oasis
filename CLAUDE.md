@@ -46,6 +46,12 @@ work. What he has told me, or shown he wants, across sessions:
 - **Performance in the headset is fine right now** (he says the grass and the hero tree with no level of detail are not a problem), so do
   not optimise them ahead of a real problem. Real 1k CC0 PBR textures are fine where they matter up close (bark, ground), at 1k not 2k, and
   not on thin leaves. Poly Haven (`api.polyhaven.com`) and ambientCG are reachable and free.
+- **Be bolder with the triangle budget (Kane, 5 Oct).** His words: "I think we do pussyfoot with the budget somewhat... I'm never gonna know if I don't really hit these
+  limits." Meta's own guidance for Quest 3 and 3S is about 1.3 to 1.8 million triangles a frame and, by how busy the scene is, 200 to 300 (busy), 400 to 600 (medium) or
+  700 to 1000 (light) draw calls (developers.meta.com/vr/documentation/unity/unity-perf/). Oasis is far under that (roughly 0.4 to 0.56 million triangles and under 100 draw calls
+  at the spawn and shore views). A browser adds some cost, mostly to draw calls and per-frame code, perhaps 10 to 20 percent: that is a guess, not measured. His other VR game
+  runs a million-triangle house fine. So spend triangles where they show, build generously, and let his headset find the ceiling; do not trim detail on caution alone. The hero tree
+  (117k triangles, one level of detail) is fine for now and still gets a look later, with his OK first. A stress-test scene to find the real ceiling is an idea he has not asked for yet.
 - **He often talks to me by text-to-speech, with an Australian accent**, so messages come through long, without punctuation, and sometimes with
   words the transcriber got wrong. Read for the meaning. If a word or a whole request could be a mishearing and the guess would matter (which
   tree, which file, which look), ask him one short question rather than building on it. He asked for exactly that.
@@ -111,7 +117,7 @@ work. What he has told me, or shown he wants, across sessions:
    path became `/dummy` at the root of the disk. Scratch files go in the scratchpad (`$SP`), a variable is checked before it is used in a path, and a command
    that waits on stdin (a bare `cat >`) is never run. If a run seems to have stalled for no reason, the likely cause is a prompt nobody can answer.
 6. **Quest performance comes first.** No post-processing passes, no big shadow maps, no per-frame
-   allocations, keep triangle counts and draw calls modest. Kane knows desktop checks cannot prove how
+   allocations, keep triangle counts and draw calls sensible and measured (but see "Be bolder with the triangle budget" above: do not be timid). Kane knows desktop checks cannot prove how
    something looks, feels or runs on the headset, so never add "not tested on a headset" to a report or a
    PR. Only flag a specific thing worth looking at there (shimmer, tracking, frame rate) and say what to look for.
 7. **Art and atmosphere over mechanics.** Kane wants to be involved in important gameplay and UI decisions
