@@ -16,6 +16,7 @@ import { createDayNightCycle } from './day-night.js';
 import { createSandFootsteps } from './footsteps.js';
 import { createGroundSticks } from './sticks.js';
 import { createGroundStones } from './stones.js';
+import { createFarPickups } from './far-pickups.js';
 import { createGroundFruit } from './glow-fruit.js';
 import { createCampfires, campfireSite, campfireYaw, CAMPFIRE } from './campfire.js';
 import { createWindSand, WIND_SAND } from './wind-sand.js';
@@ -141,6 +142,8 @@ scene.add(stonesGroup);
 // Glow fruit around the veil tree. They follow the live sun vector for their night glow.
 const glowFruit = createGroundFruit({ field, sunDirection: materials.sand.uniforms.uSun.value });
 scene.add(glowFruit.group);
+// Loose stones, sticks and fruit are a draw call each: past a few hundred metres from you (the island start is 600 m from the pond) they are not drawn.
+const farPickups = createFarPickups({ groups: [sticksGroup, stonesGroup, glowFruit.group] });
 // The oasis's glow plants: reeds at the water's edge, lantern blooms on the banks and round the hero tree.
 const glowGarden = createGlowGarden({ field, getExposure: () => renderer.toneMappingExposure, sunDirection: materials.sand.uniforms.uSun.value, onError: message => console.warn(message), extra: skyScenery.glow });
 scene.add(glowGarden.group);
@@ -731,7 +734,7 @@ function frame(time) {
   windSand.update(windTime.value, head, viewHeight);
   alienBirds.update(dt, head);
   glowGarden.update(head, dt);
-  skyScenery.updateFlora(head, dt);
+  skyScenery.updateFlora(head, dt, viewHeight);
   plantPush.update(head);
   weaponHits.update(dt);
   mining.update(dt, head);
@@ -889,7 +892,7 @@ function frame(time) {
     });
     footprints.walk(head.x, head.z, { onGround: jumpHeight <= 0.001, speed: Math.hypot(velocity.x, velocity.z) });
   }
-  if (time - lodTime > 100) { terrain.update(head.x, head.z, velocity.length()); skyScenery.update(head.x, head.z); lodTime = time; }
+  if (time - lodTime > 100) { terrain.update(head.x, head.z, velocity.length()); skyScenery.update(head.x, head.z, head.y); farPickups.update(head.x, head.z); lodTime = time; }
   materials.water.uniforms.uTime.value = time * 0.001;
   renderer.render(scene, camera);
   if (import.meta.env.DEV && time - telemetryTime > 1000) {
