@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SKY_ISLAND, buildIsland, makeMeshGround, outlineRadius, undersidePoint } from '../src/sky-island-shape.js';
 import { createSkyIslandGround, ISLAND_START } from '../src/sky-island-ground.js';
-import { layoutPaths, createPathIndex } from '../src/sky-island-paths.js';
+import { createPathIndex } from '../src/sky-island-paths.js';
 import { layoutSkyTrees, SKY_TREES } from '../src/sky-island-layout.js';
 import { layoutRocks } from '../src/sky-island-rocks.js';
 import { layoutIslandGlow } from '../src/sky-island-glow.js';
@@ -13,7 +13,7 @@ import { FLORA_RENDER } from '../src/island-flora.js';
 const ground = createSkyIslandGround(SKY_ISLAND);
 const { features } = ground;
 const drawn = makeMeshGround(buildIsland(ground.baseY, SKY_ISLAND, features), SKY_ISLAND);
-const paths = layoutPaths(features, SKY_ISLAND);
+const paths = [];   // the island has no paths (Kane, 6 Oct); ISLAND_SCENERY.paths in src/sky-island-scenery.js
 const pathIndex = createPathIndex(paths);
 const palms = layoutSkyTrees(SKY_ISLAND, SKY_TREES, { features, pathIndex });
 const waterY = ground.baseY + features.lakeSpec.level; // the lake's surface in world metres
@@ -29,7 +29,7 @@ const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a
 
 test('the plants grow the same every time, and every one is a model the renderer can draw', () => {
   assert.deepEqual(layoutIslandFlora(ctx), items);
-  assert.ok(items.length > 200 && items.length < 340, `${items.length} items`);
+  assert.ok(items.length > 140 && items.length < 340, `${items.length} items`);
   for (const item of items) {
     assert.ok(FLORA_MODELS[item.type], `no model called ${item.type}`);
     assert.ok(FLORA_RENDER[item.type], `no render rule for ${item.type}`);
@@ -42,33 +42,26 @@ test('the plants grow the same every time, and every one is a model the renderer
 test('how many of each: a few big landmarks, a drift of small plants, and every model used', () => {
   const n = type => of(type).length;
   assert.equal(n('rootArch'), 1);
-  assert.equal(n('ribcage'), 1);
-  assert.equal(n('standingStoneA'), 1);
-  assert.equal(n('standingStoneB'), 1);
   assert.ok(n('weepingTree') >= 4 && n('weepingTree') <= 6, `${n('weepingTree')} trees`);
   assert.ok(n('fern') >= 55 && n('fern') <= 70, `${n('fern')} ferns`);
   assert.ok(n('flower') >= 40 && n('flower') <= 56, `${n('flower')} flowers`);
-  assert.ok(n('cushion') >= 35 && n('cushion') <= 58, `${n('cushion')} cushions`);
   assert.ok(n('mushrooms') >= 40 && n('mushrooms') <= 50, `${n('mushrooms')} mushrooms`);
-  assert.ok(n('fungusLog') >= 3 && n('log') >= 3, 'logs');
-  assert.ok(n('driftwoodA') + n('driftwoodB') + n('driftwoodC') >= 5, 'driftwood');
-  assert.ok(n('bonesA') + n('bonesB') >= 5, 'bones');
   assert.ok(n('vines') >= 10 && n('vines') <= 14, `${n('vines')} vine curtains`);
-  for (const type of Object.keys(FLORA_MODELS)) assert.ok(n(type) >= 1, `${type} is never used`);
+  // the weak models are retired (Kane, 6 Oct): none of them is placed, every other model is used
+  for (const type of ISLAND_FLORA.retired) assert.equal(n(type), 0, `${type} is retired but placed`);
+  for (const type of Object.keys(FLORA_MODELS)) if (!ISLAND_FLORA.retired.includes(type)) assert.ok(n(type) >= 1, `${type} is never used`);
 });
 
 test('each plant has its own places: the drifts, the trees and the landmarks are not scattered everywhere', () => {
   const allowed = {
-    weepingTree: ['meadow', 'lake'], fern: ['grove', 'hollow'], flower: ['meadow', 'lake', 'rim', 'grove'], fungusLog: ['grove'], log: ['meadow', 'rise'],
-    driftwoodA: ['lake'], driftwoodB: ['lake'], driftwoodC: ['lake'], rootArch: ['grove'], ribcage: ['hollow'], standingStoneA: ['rim'], standingStoneB: ['rim'],
-    vines: ['rim', 'hollow'], bonesA: ['hollow', 'rise', 'grove', 'lake'], bonesB: ['hollow', 'rise', 'grove', 'lake'],
-    mushrooms: ['path', 'rim', 'hollow', 'grove'], cushion: ['rise', 'rim', 'lake', 'hollow', 'meadow', 'grove'],
+    weepingTree: ['meadow', 'lake'], fern: ['grove', 'hollow'], flower: ['meadow', 'lake', 'rim', 'grove'], rootArch: ['grove'],
+    vines: ['rim', 'hollow'], mushrooms: ['rim', 'hollow', 'grove', 'lake', 'rise'],
   };
   for (const item of items) assert.ok(allowed[item.type].includes(item.place), `${item.type} in the ${item.place}`);
-  // and every place has several kinds of its own
-  for (const place of ['meadow', 'grove', 'lake', 'rise', 'rim', 'hollow']) {
+  // and most places have a few kinds of their own (the rise has only its mushrooms: its boulders are the rock layout's)
+  for (const place of ['meadow', 'grove', 'lake', 'rim', 'hollow']) {
     const kinds = new Set(items.filter(i => i.place === place).map(i => i.type));
-    assert.ok(kinds.size >= 3, `${place} has only ${[...kinds]}`);
+    assert.ok(kinds.size >= 2, `${place} has only ${[...kinds]}`);
   }
 });
 
@@ -111,36 +104,20 @@ test('the start stays open: the whole meadow around where you spawn is empty', (
   }
 });
 
-test('the root arch stands over the path into the grove, with its opening along the way', () => {
+test('the root arch is the grove\'s gateway: at its edge on the line to the meadow, with its opening along that line, on level ground', () => {
   const [arch] = of('rootArch');
-  const route = paths.find(p => p.name === 'meadow to grove');
-  const near = route.samples.reduce((best, s) => (Math.hypot(s.x - arch.x, s.z - arch.z) < Math.hypot(best.x - arch.x, best.z - arch.z) ? s : best));
-  assert.ok(Math.hypot(near.x - arch.x, near.z - arch.z) < 1.0, 'the arch is not over the path');
-  // its local z is the way through: yaw turns local +z to (sin yaw, cos yaw), which should run along the path
-  const along = Math.abs(Math.sin(arch.yaw) * near.tx + Math.cos(arch.yaw) * near.tz);
-  assert.ok(along > 0.9, `the opening faces ${along.toFixed(2)} along the path`);
-  const g = places.grove;
+  const g = places.grove, m = places.meadow;
   const dg = Math.hypot(arch.x - g.x, arch.z - g.z);
-  assert.ok(dg > 14 && dg < 34, `${dg.toFixed(1)} m from the grove's heart`);
+  assert.ok(dg > 20 && dg < 36, `${dg.toFixed(1)} m from the grove's heart`);
+  // its local z is the way through: yaw turns local +z to (sin yaw, cos yaw), which should run along the line from the grove to the meadow
+  const toMeadow = [m.x - g.x, m.z - g.z], len = Math.hypot(...toMeadow);
+  const along = Math.abs(Math.sin(arch.yaw) * toMeadow[0] / len + Math.cos(arch.yaw) * toMeadow[1] / len);
+  assert.ok(along > 0.8, `the opening faces ${along.toFixed(2)} along the line to the meadow`);
   // and the legs stand on level ground either side
   for (const side of [-1, 1]) {
     const fx = arch.x + Math.cos(arch.yaw) * side * 2.75, fz = arch.z - Math.sin(arch.yaw) * side * 2.75;
     assert.ok(Math.abs(drawn(fx, fz) - arch.y) < 1.4, 'a leg in the air or buried');
   }
-});
-
-test('the standing stones frame the lookout: one of each shape, one either side of the view, back from the rim', () => {
-  const [a] = of('standingStoneA'), [b] = of('standingStoneB');
-  const rimA = Math.atan2(places.rim.z - SKY_ISLAND.z, places.rim.x - SKY_ISLAND.x);
-  const angle = s => Math.atan2(s.z - SKY_ISLAND.z, s.x - SKY_ISLAND.x);
-  assert.ok(wrap(angle(a) - rimA) * wrap(angle(b) - rimA) < 0, 'both on the same side');
-  for (const s of [a, b]) {
-    const edge = outlineRadius(angle(s), SKY_ISLAND) - SKY_ISLAND.lip;
-    const gap = edge - Math.hypot(s.x - SKY_ISLAND.x, s.z - SKY_ISLAND.z);
-    assert.ok(gap > 8 && gap < 32, `${gap.toFixed(1)} m from the edge`);
-    assert.ok(Math.hypot(s.x - places.rim.x, s.z - places.rim.z) < 40, 'far from the lookout');
-  }
-  assert.ok(Math.hypot(a.x - b.x, a.z - b.z) > 9 && Math.hypot(a.x - b.x, a.z - b.z) < 40, 'the pair is too tight or too far apart');
 });
 
 test('the weeping trees: one standing sentinel off the meadow, the rest on the lake shore, none within 9 m of each other, none on a slope', () => {
@@ -159,12 +136,8 @@ test('the weeping trees: one standing sentinel off the meadow, the rest on the l
   assert.ok(dStart > 40 && dStart < 110, `${dStart.toFixed(0)} m from the start`);
 });
 
-test('the ribcage lies in the hollow\'s mouth, with bones about it, and nothing blocks it', () => {
-  const [cage] = of('ribcage');
+test('the hollow has three vine curtains under its overhang', () => {
   const h = places.hollow;
-  assert.ok(Math.hypot(cage.x - h.x, cage.z - h.z) <= h.radius * 1.4 + 1e-6, 'the ribcage is outside the hollow');
-  assert.ok(cage.z < h.z, 'the ribcage is behind the hollow, not in its mouth (the hollow opens north)');
-  assert.ok(where('bonesA', 'hollow').length + where('bonesB', 'hollow').length >= 2, 'bones in the hollow');
   for (const v of where('vines', 'hollow')) assert.ok(Math.hypot(v.x - h.x, v.z - h.z) < h.radius * 1.5, 'vines far from the overhang');
   assert.equal(where('vines', 'hollow').length, 3);
 });
@@ -197,37 +170,13 @@ test('rim vines hang off the lip into clear air, never into the cliff, and not o
   }
 });
 
-test('little mushrooms follow the paths a step off their edge, and cluster at the landmarks', () => {
-  const onPath = where('mushrooms', 'path');
-  assert.ok(onPath.length >= 25, `${onPath.length} along the paths`);
-  for (const m of onPath) {
-    const c = pathIndex.clearance(m.x, m.z);
-    assert.ok(c > 0.3 && c < 3.4, `${c.toFixed(2)} m from a path`);
-  }
-  const names = new Set(onPath.map(m => paths.reduce((best, p) => p.samples.reduce((b, s) => Math.min(b, Math.hypot(s.x - m.x, s.z - m.z)), Infinity) < best.d ? { d: p.samples.reduce((b, s) => Math.min(b, Math.hypot(s.x - m.x, s.z - m.z)), Infinity), name: p.name } : best, { d: Infinity, name: '' }).name));
-  assert.ok(names.size >= 5, `mushrooms along ${names.size} paths`);
-});
-
-test('cushions sit on the stones that are flat enough, whole foot on the rock, and not under water', () => {
-  const onRocks = of('cushion').filter(c => Math.abs(c.y - drawn(c.x, c.z)) > 0.3);
-  assert.ok(onRocks.length >= 25, `${onRocks.length} cushions on rocks`);
-  for (const c of onRocks) {
-    const rock = rocks.find(r => r.type === 'boulder' && boulderTop(r, c.x, c.z) !== null && Math.abs(boulderTop(r, c.x, c.z) - c.y) < 0.4);
-    assert.ok(rock, 'a cushion with no stone under it');
-    for (const [dx, dz] of [[0.3, 0], [-0.3, 0], [0, 0.3], [0, -0.3]]) assert.ok(boulderTop(rock, c.x + dx * c.scale, c.z + dz * c.scale) !== null, 'the cushion hangs over the stone\'s edge');
-    assert.ok(c.y > waterY + 0.4 || lake.signed(c.x, c.z) < -0.5, `a cushion ${(c.y - waterY).toFixed(2)} m above the water, in it`);
-  }
-});
-
-test('logs and driftwood lie along the ground, tilted to meet it at both ends, not too steep', () => {
-  for (const item of items.filter(i => /^(log|fungusLog|driftwood)/.test(i.type))) {
-    assert.ok(Math.abs(item.tiltZ) <= 0.42 + 1e-6, `${item.type} tilted ${item.tiltZ.toFixed(2)}`);
-    const half = (item.type.startsWith('driftwood') ? 3.4 : 4.5) * item.scale / 2;
-    const dx = Math.cos(item.yaw) * half, dz = -Math.sin(item.yaw) * half;
-    const a = drawn(item.x - dx, item.z - dz), b = drawn(item.x + dx, item.z + dz);
-    assert.ok(a !== null && b !== null, `${item.type} hangs off the island`);
-    assert.ok(Math.abs((a + b) / 2 - item.y) < 0.2, 'a log in the air');
-  }
+test('little mushrooms grow in small groups: round the arch, under the palms, at the hollow, along the lake and at the foot of the rise', () => {
+  const m = of('mushrooms');
+  assert.ok(m.length >= 40);
+  for (const place of ['grove', 'hollow', 'lake']) assert.ok(where('mushrooms', place).length >= 3, `mushrooms in the ${place}`);
+  // groups, not an even sprinkle: most have another within 3 m
+  const paired = m.filter(a => m.some(b => b !== a && Math.hypot(a.x - b.x, a.z - b.z) < 3)).length;
+  assert.ok(paired >= m.length * 0.7, `${paired} of ${m.length} have a neighbour`);
 });
 
 test('the whole layout takes well under a second', () => {

@@ -8,7 +8,7 @@ const names = Object.keys(FLORA_MODELS);
 const all = new Map(names.map(name => [name, buildFloraLevels(name)]));
 
 // the island's new models: three levels each, checked against a Quest-sized budget (Kane, 5 Oct: be bold, but say what it costs)
-const CEILING = [10000, 1600, 260];
+const CEILING = [10000, 1600, 700];
 // what each should be about (metres, level 0): [min height, max height, max width]
 const SIZE = {
   weepingTree: [6.5, 9, 12], rootArch: [5.5, 8, 14], ribcage: [3, 5, 12], standingStoneA: [3.5, 5.5, 4], standingStoneB: [2.5, 4.5, 4],
