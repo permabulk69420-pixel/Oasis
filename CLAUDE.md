@@ -14,7 +14,9 @@ the moment", so keep it loose: he said not to get into too much of the specifics
 - My read, which he liked: the hardest part and the biggest risk is the climb (gripping something huge and moving by hand). A rough prototype of that comes
   before more survival or world detail. How a colossus is beaten, the glider's feel, what dying means and water/stamina pressure are HIS calls: do not
   invent them.
-- Dropped or parked so they stop competing: base building and shelters, co-op, cold nights and fuel as a survival system, and water as a hard leash.
+- Dropped or parked so they stop competing: co-op, cold nights and fuel as a survival system, and water as a hard leash. Base building is parked for now but likely comes back later as **foundation-and-house building, Ark style** (Kane, 5 Oct): you would spend a lot of the night inside, which gives a reason to go out for resources, and you might set up camps along the way. Not now, not designed.
+- **Later ideas, not decisions (Kane, 5 Oct):** a head-mounted light you tap on, maybe night vision (he is not sure). The darkness is liked: do not go crazy brightening the night.
+- **New models get UVs (Kane, 5 Oct).** He plans a bigger PBR texture pass later, so every new model needs proper non-overlapping UVs at a steady texel density, not vertex colours only. Textures stay 1k unless something is super important up close.
 - The setting is a desert moon with a ringed planet in the sky and giant bones in the dunes: atmosphere only, with no story attached. Do not invent a plot.
 - **The look is a twilight planet (Kane, 5 Oct, still loose).** His words, roughly: the sun should come up lower and the days be darker, with similar hours of night or even
   more, because the game is "still a little bit too bright", it "has a better vibe at night", the darkness hides a lot of flaws, and the game leans on bioluminescence. So lean
@@ -204,6 +206,10 @@ scale. The materials carry a small flat emissive floor in the model so the shade
 Kane: the look is mine (a palm, not the old tiered tree); thin leaflets may shimmer in the headset (if so, widen them in
 `feather()` or lower `pairs`); a felled palm still drops its logs and sticks at the old distances along the fall
 line, so the sticks land a little past where the crown ends.
+
+Glow plants (my call on the look, done; README "The glow plants", `src/glow-garden.js`, `tools/glow-plants/`, `tests/glow-garden.test.js`): glow reeds round the water and lantern blooms on the banks and in a grove round the hero tree, in the hero tree's cyan, three levels each, with UVs for the later PBR pass.
+Kane saw the first renders and said "I like what you're doing too, don't worry about needing to show me", so these were merged without waiting for his OK on the models (that waiver is for this pass; new models still wait by default). Oddities to tell Kane: bulb brightness and halo size are my numbers (`glow`, `halo` in `GLOW_GARDEN`);
+no collision and nothing to harvest; the lantern has no violet; the stems go dark at night so the bulbs seem to float; the models carry vertex colours plus UVs but no textures yet; the plants add a few draw calls (one per material per level).
 
 ## Overnight progress log (3 to 4 Oct 2026)
 
