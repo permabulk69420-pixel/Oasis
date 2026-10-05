@@ -478,3 +478,15 @@ To get past a cached page, open the URL with any extra query, such as `?x=1`. So
 ### Night light on the wider ground
 
 The torch and campfire light the ground by patching the sand shader once they find it (`findTerrainMesh` in `src/night-fill.js`: any mesh named `sand-...`; tile names come from `tileName` in `src/terrain-tiles.js`). Gravel, bedrock and salt are darker than sand, so the sand shader lifts their faint moonlit fill halfway to `ZONE_NIGHT_FLOOR` in `src/materials.js`, which brings them to about the sand's moonlit level and no more.
+
+### The sky island (first pass, 5 Oct)
+
+A floating island hangs 250 m above the dunes south-west of the pond, at (-150, 700): about 500 m across and 190 m thick, so the lowest point is roughly 100 m above the desert. It is on the far side of the oasis from the colossus plain (about 2 km from it). Kane's idea is a lush, dense home up there to start on and glide down from; nothing about how you get up or down is decided or built, and there is no way up yet.
+
+- `src/sky-island-shape.js` (pure, tested in `tests/sky-island.test.js`): one surface of revolution bent out of true by noise. A grassy top with hills (`topOffset`, so walking on it later can use `topGround(x, z)`), a rounded lip, then an upside-down mountain of rock: ledges that step in at different heights round the island, fins, and lumps cut in with 3D noise. About 107,000 triangles, one draw call, a closed solid with outward faces. `SKY_ISLAND` holds every size.
+- `src/sky-island.js` makes the mesh with the terrain's own material, so sun, haze, strata, moonlit fill and the torch and fire light all work with no extra code. The top is grass with a few rock patches (vertex colour and `zone`), the sides and underside are the rock zone.
+- The terrain shader lights anything facing down with warm light bounced up from the sand (`dayAmbient` in `src/materials.js`); only the island has such faces.
+- `src/sky-island-layout.js` and `src/sky-island-trees.js`: up to 90 of the oasis's blue palms (same three models, nothing new to download), in groves, clear of a 38 m open space in the middle. They load when you come within 700 m. Scenery only: not choppable, no projected shadow.
+- Dev: `window.__skyIsland`. To stand on top in a screenshot use `?at=-150,700&eye=256&yaw=180` (`eye` is metres above the ground below, so the top is about 256 up there); some spots are inside the rock, check `groundHeight(x, z)`.
+- Not done on purpose: any way up, walking on it (the player's ground is still the desert), grass blades (the top has the shader's grass texture only), caves, rocks or water on top, shadows cast on the desert, smaller islands above, levels of detail (it is one 107k mesh).
+

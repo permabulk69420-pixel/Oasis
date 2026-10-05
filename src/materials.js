@@ -401,6 +401,8 @@ export function createMaterials(renderer, field) {
         roughness = mix(roughness, 0.30, wet * 0.70);
 
         vec3 dayAmbient = mix(vec3(0.13, 0.14, 0.21), vec3(0.17, 0.21, 0.31), max(n.y, 0.0));
+        // Light bounced up from the sand reaches the undersides of overhangs and of the floating island (nothing else on the ground faces down).
+        dayAmbient += vec3(0.30, 0.19, 0.10) * max(-n.y, 0.0) * 0.5;
         vec3 nightAmbient = mix(vec3(0.006, 0.009, 0.015), vec3(0.012, 0.018, 0.029), max(n.y, 0.0));
         vec3 ambient = mix(nightAmbient, dayAmbient, environmentDay);
         vec3 light = ambient + sunColour() * sun;
