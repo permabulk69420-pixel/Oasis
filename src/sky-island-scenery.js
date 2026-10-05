@@ -5,11 +5,14 @@ import { layoutRocks, createRockMeshes } from './sky-island-rocks.js';
 import { layoutSkyTrees, SKY_TREES } from './sky-island-layout.js';
 import { createSkyIslandTrees } from './sky-island-trees.js';
 import { layoutIslandGlow } from './sky-island-glow.js';
+import { layoutIslandFlora } from './island-flora-layout.js';
+import { createIslandFlora } from './island-flora.js';
 
 // Everything that makes the island a place rather than a lawn (Kane, 5 Oct: it is the player's home base): the lake and the waterfall, the paths, the
 // stone, the palm grove. It is all set dressing, nothing in play touches it. The layouts are pure and seeded (so the island is the same every time),
-// worked out in the order that lets each avoid the one before: paths first, then the palms, then the stone, which keeps off both.
-export function createIslandScenery({ island, materials }) {
+// worked out in the order that lets each avoid the one before: paths first, then the palms, then the stone, which keeps off both, then the glow plants,
+// then the new plants and landmarks (src/island-flora-layout.js), which keep off everything.
+export function createIslandScenery({ island, materials, getExposure = () => 1 }) {
   const group = new THREE.Group();
   group.name = 'Sky island scenery';
 
@@ -41,10 +44,26 @@ export function createIslandScenery({ island, materials }) {
     anchor: { x: island.config.x, z: island.config.z, distance: 700 },
   };
 
+  // the island's own plants and landmarks: the weeping glow-trees, the root arch, the standing stones, the ribcage, ferns, night flowers, cushions, logs, mushrooms, vines
+  const floraItems = layoutIslandFlora({
+    ground: island.groundHeight, features: island.features, pathIndex, paths: pathData, config: island.config, rocks: rockItems,
+    obstacles: [
+      ...palmLayout.map(p => ({ x: p.x, z: p.z, r: 0.7 * p.scale })),
+      ...glowItems.map(item => ({ x: item.x, z: item.z, r: 0.5 * item.scale, soft: true })),
+    ],
+  });
+  const flora = createIslandFlora({
+    items: floraItems, getExposure, sunDirection: materials.sand.uniforms.uSun.value, anchor: { x: island.config.x, z: island.config.z, distance: 700 },
+    onError: message => console.warn(message),
+  });
+  group.add(flora.group);
+
   return {
-    group, lake, spill, paths, palms, rocks, pathIndex, palmLayout, rockItems, glow,
+    group, lake, spill, paths, palms, rocks, pathIndex, palmLayout, rockItems, glow, flora, floraItems,
     triangles: lake.triangles + spill.triangles + paths.triangles + rocks.triangles,
     // every frame (cheap): loads the palms when you are near the island
     update(x, z) { palms.update(x, z); },
+    // every frame: the plants' glow follows the light, and the nearest ones are drawn in detail
+    updateFlora(head, dt) { flora.update(head, dt); },
   };
 }
