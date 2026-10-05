@@ -44,9 +44,6 @@ function mulberry32(seed) {
   };
 }
 
-// The four reed patches of the existing water reeds (src/water-reeds.js): kept clear so the two do not pile up.
-const EXISTING_REEDS = Object.freeze({ x: WATER.x - 8.0, z: WATER.z + WATER.radiusZ * 0.92, clear: 7 });
-
 // Where every glow plant goes: [{ kind, x, z, yaw, scale }]. `heightAt(x, z)` is the ground the player sees.
 export function layoutGlowGarden(heightAt, config = GLOW_GARDEN) {
   const rng = mulberry32(config.seed);
@@ -75,7 +72,6 @@ export function layoutGlowGarden(heightAt, config = GLOW_GARDEN) {
   }, (x, z) => {
     const ground = heightAt(x, z), basin = basinRadius(x, z);
     return basin > 0.9 && basin < 1.12 && ground > WATER.y - 0.32 && ground < WATER.y + 0.8
-      && Math.hypot(x - EXISTING_REEDS.x, z - EXISTING_REEDS.z) > EXISTING_REEDS.clear
       && heroDistance(x, z) > config.grove.near && slope(x, z) < config.slopeLimit;
   });
 

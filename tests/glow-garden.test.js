@@ -29,7 +29,7 @@ test('reeds stand at the water, lantern blooms on dry ground, nothing in the pon
   }
 });
 
-test('plants keep their distance from each other, from the hero tree and from the existing reed patches', () => {
+test('plants keep their distance from each other, and from the hero tree', () => {
   for (let i = 0; i < items.length; i++) {
     for (let j = i + 1; j < items.length; j++) {
       const gap = Math.hypot(items[i].x - items[j].x, items[i].z - items[j].z);
