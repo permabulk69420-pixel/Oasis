@@ -23,7 +23,7 @@ the moment", so keep it loose: he said not to get into too much of the specifics
 - **The look is a twilight planet (Kane, 5 Oct, still loose).** His words, roughly: the sun should come up lower and the days be darker, with similar hours of night or even
   more, because the game is "still a little bit too bright", it "has a better vibe at night", the darkness hides a lot of flaws, and the game leans on bioluminescence. So lean
   darker and moodier, with the glow carrying the scene. **First pass done (5 Oct, #97): the sun now tops out at 14 degrees and slides round the horizon, dusky sky, darker days; he said "we'll work that out later" for how it changes by area.** Day length and the exact balance are not decided ("I don't know yet"), so do not change the day/night timing without
-  asking. Lighting and exposure are art, so those are mine to try and show (current: 3 minutes day, 3 minutes night, `src/day-night.js`; day exposure about 0.62, night about 0.035; since 5 Oct the sun never climbs past 14 degrees, see README "The ringed planet and the sun's path").
+  asking (he set 5 and 5 himself on 5 Oct). Lighting and exposure are art, so those are mine to try and show (current: 5 minutes day, 5 minutes night, `src/day-night.js`: Kane asked for 5 and 5 on 5 Oct, "I need more time"; it was 3 and 3; day exposure about 0.62, night about 0.035; since 5 Oct the sun never climbs past 14 degrees, see README "The ringed planet and the sun's path").
 - **Climbing is in, and gliding too (Kane, 5 Oct).** Both tie into stamina, which already exists (`src/survival.js`). It is the colossus climb above and probably a general
   ability as well. What each costs in stamina and how they feel are his calls, not mine to invent.
 - **The world is 4 km now (Kane, 5 Oct):** the oasis is the start, with a gravel plain (the colossus's likely home), ridges, mesas, a canyon, badlands and a salt pan, one biome, no new crystals. See "The wider world" below.
@@ -167,6 +167,7 @@ work. What he has told me, or shown he wants, across sessions:
   plants, the first trees) multiply the texture by about 0.1. Either turn `vertexColors` off (the palms) or keep only the variation:
   `normaliseVertexColours` in `src/plant-colours.js` divides each channel by its average (the desert plants, #53). Read the accessor
   in the .glb with a few lines of Python before guessing at lights or emissive.
+- **The torch and campfire find the terrain material through `findTerrainMesh` (`src/night-fill.js`, any tile named `sand-...`), never by an exact tile name.** The 4 km rewrite (#107) renamed the tiles and silently broke both lights on every bit of ground, the oasis included (Kane noticed on 5 Oct; fixed with a test). If you rename tiles, use `tileName` in `src/terrain-tiles.js`.
 - **The torch light hooks into the terrain and water shaders by matching exact lines** (`TORCH_SHADER_MARKERS` in `src/night-fill.js`, used by `src/torch.js`). Editing one of those lines in `src/materials.js` makes the torch silently stop lighting the sand (it happened in #99; fixed in the next PR). A test now fails if they drift: change the marker and the shader together.
 - Tests live in `tests/`. Add tests for game logic. Keep constants in one table at the top of a module.
 

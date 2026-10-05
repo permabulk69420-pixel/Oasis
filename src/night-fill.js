@@ -24,6 +24,18 @@ export const TORCH_SHADER_MARKERS = Object.freeze({
   }),
 });
 
+// The terrain's shader material, found through the scene. Every sand tile and the distant mountains share one material, so any of them will do.
+// The torch and the campfire both used to look for a tile called 'sand-0-0'; the 4 km quadtree (#107) names tiles by size and place, so that
+// lookup came back empty and neither light reached the ground (Kane noticed on 5 Oct). Never look a tile up by its exact name.
+export function findTerrainMesh(scene) {
+  let found = null;
+  scene.traverse(object => {
+    if (!found && object.isMesh && object.material && typeof object.name === 'string'
+      && (object.name.startsWith('sand-') || object.name === 'Distant mountains')) found = object;
+  });
+  return found;
+}
+
 // The lit torch, shared by everything that lights itself from it: the terrain and water shaders (src/torch.js injects
 // their own loop) and, through this file, every standard material (grass, ferns, palms, hands, tools). The torch
 // updates both fields every frame; strength 0 means no lit torch. World-space position, in metres.
