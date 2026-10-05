@@ -50,9 +50,10 @@ test('restoreFood and restoreWater clamp and ignore junk', () => {
 test('sprinting drains stamina; running dry blocks sprinting until it recovers', () => {
   resetSurvival();
   assert.ok(canSprint());
-  run(10, { sprinting: true });
+  const full = STAT_MAX / SURVIVAL_RATES.staminaSprintPerSecond; // seconds of sprinting from full to empty
+  run(full / 2, { sprinting: true });
   assert.ok(getSurvivalStats().stamina < 60);
-  run(10.2, { sprinting: true });
+  run(full / 2 + 0.2, { sprinting: true });
   assert.equal(getSurvivalStats().stamina, 0);
   assert.equal(canSprint(), false);
   // still no sprinting right after: it must climb back above the threshold first
