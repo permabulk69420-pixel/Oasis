@@ -3,6 +3,7 @@ import { SPAWN } from './world.js';
 import { pulseHaptics } from './haptics.js';
 import { setGripSurface } from './grip-contact.js';
 import { createLoop } from './audio.js';
+import { torchGlow } from './night-fill.js';
 
 const TORCH_URL = `${import.meta.env?.BASE_URL ?? '/'}models/torch/handheld_fire_torch.glb`;
 const TORCH_AUDIO_URL = `${import.meta.env?.BASE_URL ?? '/'}audio/fire/torch_fire_crackle_loop.mp3`;
@@ -106,7 +107,7 @@ function installTerrainTorchLight(material, positionUniform, strengthUniform) {
   );
   material.fragmentShader = material.fragmentShader.replace(
     lightMarker,
-    `${lightMarker}\n        if (uTorchStrength > 0.001) {\n          vec3 torchVector = uTorchPosition - vWorld;\n          float torchDistance = length(torchVector);\n          vec3 torchDirection = torchVector / max(torchDistance, 0.001);\n          float torchFade = 1.0 - smoothstep(0.8, 13.5, torchDistance);\n          torchFade *= 0.55 + 0.45 * torchFade;\n          float torchDiffuse = max(dot(n, torchDirection), 0.0);\n          float torchAmount = uTorchStrength * torchFade * (0.35 + 0.65 * torchDiffuse);\n          light += vec3(11.0, 4.6, 1.3) * torchAmount;\n        }`
+    `${lightMarker}\n        if (uTorchStrength > 0.001) {\n          vec3 torchVector = uTorchPosition - vWorld;\n          float torchDistance = length(torchVector);\n          vec3 torchDirection = torchVector / max(torchDistance, 0.001);\n          float torchFade = 1.0 - smoothstep(0.8, 13.5, torchDistance);\n          torchFade *= 0.55 + 0.45 * torchFade;\n          float torchDiffuse = max(dot(n, torchDirection), 0.0);\n          float torchAmount = uTorchStrength * torchFade * (0.35 + 0.65 * torchDiffuse);\n          light += vec3(11.0, 4.6, 1.3) * torchAmount * (1.0 + 3.0 * grass);\n        }`
   );
   material.userData.torchLightInstalled = true;
   material.needsUpdate = true;
@@ -141,9 +142,10 @@ function makeFireAudio(onError) {
 }
 
 export function createTorchKind({ scene, onError = console.warn }) {
-  // Terrain and water get one shared torch light, driven by the brightest lit torch.
-  const terrainTorchPosition = { value: new THREE.Vector3(0, -1000, 0) };
-  const terrainTorchStrength = { value: 0 };
+  // Terrain and water get one shared torch light, driven by the brightest lit torch. The same two uniforms feed the
+  // torch glow on every lit material (src/night-fill.js), so grass, palms, hands and tools light up with the sand.
+  const terrainTorchPosition = torchGlow.position;
+  const terrainTorchStrength = torchGlow.strength;
   let terrainLightingReady = false;
   let waterLightingReady = false;
   let elapsed = 0;

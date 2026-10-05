@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { nightFill, NIGHT_FILL, patchNightFill, installNightFill } from '../src/night-fill.js';
+import { nightFill, NIGHT_FILL, TORCH_GLOW, torchGlow, patchNightFill, installNightFill } from '../src/night-fill.js';
 
 const fakeShader = fragmentShader => ({ fragmentShader, uniforms: {} });
 
@@ -44,6 +44,29 @@ test('the fill is faint: dimmer than the terrain uses for a surface facing the m
   const [rr, rg, rb] = NIGHT_FILL.rim;
   assert.ok(rb > rg && rg > rr);
   assert.ok(Math.max(...NIGHT_FILL.rim) < 0.03);
+});
+
+test('patching also shares the torch uniforms, and the torch glow only shows at night', () => {
+  for (const name of ['standard', 'lambert']) {
+    const shader = fakeShader(THREE.ShaderLib[name].fragmentShader);
+    assert.equal(patchNightFill(shader), true);
+    assert.equal(shader.uniforms.uTorchPosition, torchGlow.position, `${name}: one shared torch position`);
+    assert.equal(shader.uniforms.uTorchStrength, torchGlow.strength, `${name}: one shared torch strength`);
+    assert.match(shader.fragmentShader, /uniform vec3 uTorchPosition;/);
+    assert.match(shader.fragmentShader, /if \(uTorchStrength > 0\.001\)/, 'skipped entirely when no torch is lit');
+    assert.match(shader.fragmentShader, /uTorchStrength \* uNightFill/, 'fades out by day with the night fill');
+    // inverseTransformDirection normalises, which would put every pixel about a metre from the camera
+    assert.doesNotMatch(shader.fragmentShader, /inverseTransformDirection\(-vViewPosition/);
+  }
+});
+
+test('the torch glow is warm, reaches a sensible distance, and starts with no torch lit', () => {
+  const [r, g, b] = TORCH_GLOW.colour;
+  assert.ok(r > g && g > b, 'orange');
+  assert.ok(TORCH_GLOW.near < TORCH_GLOW.far && TORCH_GLOW.far <= 20);
+  assert.ok(TORCH_GLOW.floor > 0 && TORCH_GLOW.floor < 0.2, 'lights a dark surface a little, not a lot');
+  assert.equal(torchGlow.strength.value, 0);
+  assert.ok(torchGlow.position.value.y < -100, 'parked far below the world until a torch is lit');
 });
 
 test('installNightFill hooks each material type once and keeps an existing hook', () => {
