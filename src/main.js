@@ -27,6 +27,7 @@ import { createWeaponHits } from './weapon-hits.js';
 import { createMining } from './mining.js';
 import { createCrystalMotes } from './crystal-motes.js';
 import { createGiantBones } from './giant-bones.js';
+import { createColossus } from './colossus.js';
 import { registerLooseFindDrops } from './loose-finds.js';
 import { createBackpack, PACK } from './backpack.js';
 import { SPEAR } from './spear.js';
@@ -367,6 +368,20 @@ const crystalMotes = createCrystalMotes({ scene, nodes: mining.nodes, getExposur
 // affects play (you can walk through them, and they make no sound). Only the smallest model is fetched at first, the rest as you near.
 const giantBones = createGiantBones({ scene, camera, heightAt: field.sample, onError: message => console.warn(message) });
 if (import.meta.env.DEV) window.__bones = giantBones; // dev only: for screenshots
+// Colossus 01: a 55 m walker on the gravel plain north of the oasis. Passive: it paces, stands, breathes and looks about (src/colossus.js). Its feet raise
+// dust and leave prints, and a footfall near you is felt in the controllers (the only thing it does to you).
+const COLOSSUS_STEP_HAPTIC = Object.freeze({ range: 160, strength: 0.7, floor: 0.12, ms: 170 });
+const colossus = createColossus({
+  scene, renderer, camera, field, sun: materials.sand.uniforms.uSun, puffs: sandPuffs, prints: footprints,
+  getExposure: () => renderer.toneMappingExposure,
+  onError: message => console.warn(message),
+  onFootfall: step => {
+    const near = 1 - Math.hypot(head.x - step.x, head.z - step.z) / COLOSSUS_STEP_HAPTIC.range;
+    if (near <= 0) return;
+    for (const state of hands.states) pulseHaptics(state, COLOSSUS_STEP_HAPTIC.floor + COLOSSUS_STEP_HAPTIC.strength * near * near * step.power, COLOSSUS_STEP_HAPTIC.ms);
+  },
+});
+if (import.meta.env.DEV) window.__colossus = colossus; // dev only: pose it for a screenshot (colossus.debug)
 if (import.meta.env.DEV) window.__mining = mining; // dev only: lets a test strike a node without swinging a tool
 if (import.meta.env.DEV) { window.__stinger = duneStinger; window.__sandPuffs = sandPuffs; window.__prints = footprints; window.__terrain = terrain; } // dev only: lets a screenshot script read or hurt the stinger and throw dust
 const weaponHits = createWeaponHits({ tools: hands.tools, rig, targets: [duneStinger, mining] });
@@ -723,6 +738,7 @@ function frame(time) {
   sandPuffs.update(dt);
   footprints.update(time * 0.001);
   giantBones.update(head);
+  colossus.update(dt, head);
   if (devBird && alienBirds.ready) {
     const params = devBirdParams;
     const spot = Number(params.get('birdd')) || (devBird === 'perch' ? 9 : 20);
@@ -880,6 +896,7 @@ function frame(time) {
     canvas.dataset.birds = JSON.stringify(alienBirds.list());
     canvas.dataset.stinger = JSON.stringify(duneStinger.list());
     canvas.dataset.bones = JSON.stringify(giantBones.list());
+    canvas.dataset.colossus = JSON.stringify(colossus.list());
     canvas.dataset.save = JSON.stringify(autosave.status());
     canvas.dataset.finds = JSON.stringify({ stats: mining.stats(), near: mining.list(head, 60) });
     canvas.dataset.pack = JSON.stringify(backpack.list());

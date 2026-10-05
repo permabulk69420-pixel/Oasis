@@ -26,9 +26,11 @@ def acc(js, bin_, i):
     dt = np.dtype(COMP[a['componentType']]); n = NUM[a['type']]
     start = v.get('byteOffset', 0) + a.get('byteOffset', 0)
     stride = v.get('byteStride') or dt.itemsize * n
-    raw = np.frombuffer(bin_, dtype=np.uint8, count=a['count'] * stride, offset=start) if stride != dt.itemsize * n else None
-    if raw is not None:
-        out = np.stack([np.frombuffer(bin_, dtype=dt, count=n, offset=start + k * stride) for k in range(a['count'])])
+    if stride != dt.itemsize * n:
+        # interleaved buffer view: read each element at its own stride (the last element needs only itemsize * n bytes, not a whole stride)
+        base = np.frombuffer(bin_, dtype=np.uint8)[start:]
+        elems = np.lib.stride_tricks.as_strided(base, shape=(a['count'], dt.itemsize * n), strides=(stride, 1))
+        out = np.ascontiguousarray(elems).view(dt).reshape(a['count'], n)
     else:
         out = np.frombuffer(bin_, dtype=dt, count=a['count'] * n, offset=start).reshape(a['count'], n)
     return out
