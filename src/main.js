@@ -4,6 +4,7 @@ import { installAssetVersioning } from './asset-version.js';
 import { createHeightField, clamp, stickAxis, stickVector, pivotRig, isInPond, SPAWN, WATER, HERO_TREE } from './world.js';
 import { createTerrain } from './terrain.js';
 import { WALK } from './zones.js';
+import { TURBO, createTurboChord } from './turbo.js';
 import { createMaterials, createWater } from './materials.js';
 import { createVRHands } from './hands.js';
 import { createDayNightCycle } from './day-night.js';
@@ -274,6 +275,12 @@ const direction = new THREE.Vector3(0, 0, -1), movementForward = new THREE.Vecto
 const target = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
 const lastDirection = new THREE.Vector3(0, 0, -1);
 const WALK_SPEED = 2.6, FAST_SPEED = 5.2, TURN_SPEED = 1.4;
+let turboActive = false;
+const turboChord = createTurboChord();
+function toggleTurbo() {
+  turboActive = !turboActive;
+  for (const state of hands.states) pulseHaptics(state, 0.45, 90);
+}
 const STANDING_EYE_HEIGHT = 1.68, JUMP_SPEED = 4.4, GRAVITY = 12.0;
 const CROUCH_DEPTH = 0.58, CROUCH_RESPONSE = 12.0, LEFT_STICK_BUTTON = 3, RIGHT_STICK_BUTTON = 3;
 let groundY = rig.position.y;
@@ -473,6 +480,7 @@ document.addEventListener('pointerlockchange', () => {
   if (!document.pointerLockElement && !touchDevice && !renderer.xr.isPresenting && !survivorMenu.isOpen()) setPlaying(false);
 });
 window.addEventListener('keydown', e => {
+  if (e.code === 'KeyT' && !e.repeat && playing && !renderer.xr.isPresenting) { toggleTurbo(); return; }
   if (placement.isActive() && e.code === 'Enter' && !e.repeat && playing && !renderer.xr.isPresenting) { e.preventDefault(); placement.confirm(); return; }
   if (playing && !renderer.xr.isPresenting && (e.code === 'KeyY' || (e.code === 'Escape' && survivorMenu.isOpen()))) {
     e.preventDefault(); if (!e.repeat) survivorMenu.toggle(); return;
@@ -730,6 +738,11 @@ function frame(time) {
 
   if (playing) {
     const input = readInput();
+    if (renderer.xr.isPresenting) { // both thumbstick clicks at once toggle ultra-fast movement (src/turbo.js)
+      const clicks = turboChord.apply(input.sprintPressed, input.crouchPressed, time);
+      input.sprintPressed = clicks.sprint; input.crouchPressed = clicks.crouch;
+      if (clicks.toggled) toggleTurbo();
+    }
 
     if (renderer.xr.isPresenting) {
       if (input.sprintPressed && !sprintButtonDown) sprintActive = !sprintActive;
@@ -780,7 +793,7 @@ function frame(time) {
     // Out of stamina cancels the sprint toggle; it returns once stamina has recovered a little.
     if (sprintActive && !canSprint()) sprintActive = false;
     const sprinting = (renderer.xr.isPresenting ? sprintActive : input.fast) && canSprint();
-    target.multiplyScalar((sprinting ? FAST_SPEED : WALK_SPEED) * carrySpeedMultiplier);
+    target.multiplyScalar((sprinting ? FAST_SPEED : WALK_SPEED) * carrySpeedMultiplier * (turboActive ? TURBO.multiplier : 1));
     velocity.lerp(target, 1 - Math.exp(-dt * (target.lengthSq() ? 18 : 28)));
     const dx = velocity.x * dt, dz = velocity.z * dt;
     const nextX = clamp(head.x + dx, WALK.minX, WALK.maxX), nextZ = clamp(head.z + dz, WALK.minZ, WALK.maxZ);
@@ -818,7 +831,7 @@ function frame(time) {
     });
     footprints.walk(head.x, head.z, { onGround: jumpHeight <= 0.001, speed: Math.hypot(velocity.x, velocity.z) });
   }
-  if (time - lodTime > 100) { terrain.update(head.x, head.z); lodTime = time; }
+  if (time - lodTime > 100) { terrain.update(head.x, head.z, velocity.length()); lodTime = time; }
   materials.water.uniforms.uTime.value = time * 0.001;
   renderer.render(scene, camera);
   if (import.meta.env.DEV && time - telemetryTime > 1000) {
