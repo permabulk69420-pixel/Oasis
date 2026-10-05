@@ -5,6 +5,8 @@ import { createHeightField, clamp, stickAxis, stickVector, pivotRig, isInPond, S
 import { createTerrain } from './terrain.js';
 import { createSkyIsland } from './sky-island.js';
 import { createSkyIslandTrees } from './sky-island-trees.js';
+import { ISLAND_START } from './sky-island-ground.js';
+import { startPlace } from './start-place.js';
 import { WALK } from './zones.js';
 import { TURBO, createTurboChord } from './turbo.js';
 import { createMaterials, createWater } from './materials.js';
@@ -79,13 +81,18 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.07, 6500);
 const rig = new THREE.Group();
 rig.add(camera); scene.add(rig);
+// Where a new game starts (src/start-place.js): the floating island by default, or the oasis with ?start=oasis. While you are on the
+// island, `groundAt` gives the island's top; everything else in the world stays on the desert's ground.
+const startsOnIsland = startPlace(location.search, import.meta.env.DEV) === 'island';
+let onIsland = startsOnIsland;
 const hands = createVRHands({
   renderer,
   scene,
   camera,
   gripDebug: import.meta.env.DEV && new URLSearchParams(location.search).get('gripDebug') === '1',
   onEat: ({ food, water }) => { restoreFood(food); restoreWater(water); },
-  heightAt: (x, z) => field.sample(x, z), // the mesh-accurate sand, for tools that fall (the field is made a few lines below)
+  heightAt: (x, z) => groundAt(x, z), // the mesh-accurate ground, for tools that fall (the field and the island are made a few lines below)
+  copyStart: startsOnIsland ? { from: SPAWN, to: ISLAND_START } : null, // a second set of the starting tools on the island (the oasis keeps its own)
   onError: (message) => console.warn('[Oasis hands]', message)
 });
 const footsteps = createSandFootsteps({
@@ -107,6 +114,15 @@ scene.add(skyIsland.group);
 const skyIslandTrees = createSkyIslandTrees({ island: skyIsland });
 scene.add(skyIslandTrees.group);
 if (import.meta.env.DEV) window.__skyIsland = skyIsland; // dev only: for screenshots
+// The ground under (x, z) for the player and what they carry: the island's top while you are on the island (and the point is over it),
+// the desert's ground otherwise. Desert systems (rocks, grass, the creatures) keep reading `field` directly.
+function groundAt(x, z) {
+  if (onIsland) {
+    const height = skyIsland.groundHeight(x, z);
+    if (height !== null) return height;
+  }
+  return field.sample(x, z);
+}
 scene.add(createWater(field, materials.water));
 const sticksGroup = createGroundSticks({
   field,
@@ -146,7 +162,9 @@ if (import.meta.env.DEV) {
   if (gain > 0) windSand.uniforms.uGain.value = gain; // dev only: exaggerate the sand to check it
 }
 const drawingSize = new THREE.Vector2();
-rig.position.set(SPAWN.x, field.sample(SPAWN.x, SPAWN.z), SPAWN.z);
+const firstSpot = startsOnIsland ? ISLAND_START : SPAWN;
+rig.position.set(firstSpot.x, groundAt(firstSpot.x, firstSpot.z), firstSpot.z);
+if (startsOnIsland) rig.rotation.y = ISLAND_START.yaw;
 
 let devWindTime = null; // dev only: set by ?windtime=
 let devThrows = null; // dev only: ?view=throws, a function called every frame until it has thrown its tools
@@ -171,7 +189,7 @@ if (import.meta.env.DEV) {
   }
   // Aim the camera at a point: rig turns to face it, the camera tilts up or down to meet it.
   const aimAt = (px, pz, target, eye = 1.68) => {
-    const groundY = field.sample(px, pz);
+    const groundY = groundAt(px, pz);
     rig.position.set(px, groundY, pz);
     const dx = target.x - px, dz = target.z - pz;
     rig.rotation.y = Math.atan2(-dx, -dz);
@@ -257,8 +275,8 @@ if (import.meta.env.DEV) {
     return v.length >= 2 && v.every(Number.isFinite) ? v : null;
   };
   const at = point('at'), look = point('look');
-  if (at && look) aimAt(at[0], at[1], { x: look[0], y: field.sample(look[0], look[1]) + (look[2] ?? 1.5), z: look[1] }, 1.7);
-  else if (at) rig.position.set(at[0], field.sample(at[0], at[1]), at[1]);
+  if (at && look) aimAt(at[0], at[1], { x: look[0], y: groundAt(look[0], look[1]) + (look[2] ?? 1.5), z: look[1] }, 1.7);
+  else if (at) rig.position.set(at[0], groundAt(at[0], at[1]), at[1]);
   // Look direction, in degrees: yaw turns the rig (0 faces -z, positive turns left), pitch tilts up.
   if (params.has('yaw') && Number.isFinite(Number(params.get('yaw')))) rig.rotation.y = Number(params.get('yaw')) * Math.PI / 180;
   if (params.has('pitch') && Number.isFinite(Number(params.get('pitch')))) camera.rotation.x = Number(params.get('pitch')) * Math.PI / 180;
@@ -300,7 +318,7 @@ let drinkTick = 0;
 // Campfires: crafted, placed from the menu, lit by touching a lit torch to the logs.
 const campfires = createCampfires({
   scene,
-  heightAt: field.sample,
+  heightAt: groundAt,
   getExposure: () => renderer.toneMappingExposure,
   onError: message => console.warn(message),
   getFlames: () => hands.tools.getInstances('torch')
@@ -321,9 +339,9 @@ const alienBirds = createAlienBirds({
 // tail (a warning first, and it lands where you were standing). Your spear and axe hurt it; a few good blows kill it.
 const STINGER_HIT_HAPTIC = [1, 220];
 // Puffs of sand and dust for anything heavy that lands on the dunes (the sting, a falling body), one draw call for all of them.
-const sandPuffs = createSandPuffs({ scene, sun: materials.sand.uniforms.uSun, heightAt: field.sample });
+const sandPuffs = createSandPuffs({ scene, sun: materials.sand.uniforms.uSun, heightAt: groundAt });
 // Footprints in the sand: yours as you walk, and the stinger's. The wind fills them in over a few minutes. One draw call.
-const footprints = createFootprints({ scene, sun: materials.sand.uniforms.uSun, heightAt: field.sample });
+const footprints = createFootprints({ scene, sun: materials.sand.uniforms.uSun, heightAt: groundAt });
 const duneStinger = createDuneStinger({
   scene, renderer, camera, field, puffs: sandPuffs, prints: footprints,
   getExposure: () => renderer.toneMappingExposure,
@@ -359,7 +377,7 @@ if (devBirdParams?.has('birdseed')) alienBirds.debug.seed(Number(devBirdParams.g
 if (devBirdParams?.has('birdwait')) alienBirds.debug.wait(Number(devBirdParams.get('birdwait')) || 0);
 // Placing a campfire: the menu's Place button starts a ghost that follows your aim (src/placement.js); the item is only spent when you confirm.
 const placement = createPlacement({
-  scene, renderer, camera, states: hands.states, heightAt: field.sample,
+  scene, renderer, camera, states: hands.states, heightAt: groundAt,
   check: (x, z) => campfires.canPlace(x, z),
   siteAt: campfires.siteAt,
   makePreview: campfires.createPreview,
@@ -381,11 +399,16 @@ function placeFromMenu(type, { hand = null } = {}) {
   placement.start({ hand });
   return { ok: true, message: '' };
 }
+// On the island start the one pack stands by the island's tools instead (the oasis keeps no pack then: there is only one).
+const packSpawn = startsOnIsland
+  ? Object.freeze({ x: ISLAND_START.x + (PACK.spawn.x - SPAWN.x), z: ISLAND_START.z + (PACK.spawn.z - SPAWN.z), yaw: PACK.spawn.yaw })
+  : PACK.spawn;
 // The backpack: lies on the sand by the starting tools. Grab it by the handle and let go behind your shoulder to put it on;
 // it then adds to how much you can carry (and is taken off again from the menu's Back slot).
 const backpack = createBackpack({
   scene, states: hands.states, renderer, camera, rig, tools: hands.tools,
-  heightAt: field.sample,
+  heightAt: groundAt,
+  spawn: packSpawn,
   getExposure: () => renderer.toneMappingExposure,
   onError: message => console.warn(message),
 });
@@ -406,11 +429,12 @@ if (askedFresh) { // so reloading the page does not start another new game
   try { const clean = new URL(location.href); clean.searchParams.delete('fresh'); history.replaceState(null, '', clean.href); } catch { /* the address stays as it is */ }
 }
 // Where a VR session starts: the start of the world, or where the saved game left you (and from then on, where you left VR).
-let startPoint = { x: SPAWN.x, z: SPAWN.z, yaw: 0 };
+let startPoint = { x: firstSpot.x, z: firstSpot.z, yaw: startsOnIsland ? ISLAND_START.yaw : 0 };
 function placePlayer({ x, z, yaw }) {
   footprints.reset();
   startPoint = { x, z, yaw };
-  groundY = field.sample(x, z);
+  onIsland = startsOnIsland && skyIsland.groundHeight(x, z) !== null; // a saved game from the oasis puts you back in the oasis
+  groundY = groundAt(x, z);
   rig.position.set(x, groundY, z);
   rig.rotation.y = yaw;
 }
@@ -572,7 +596,7 @@ renderer.xr.addEventListener('sessionstart', () => {
 
   // Match dumbgame's XR start state: no hidden world yaw or desktop camera transform.
   footprints.reset();
-  groundY = field.sample(startPoint.x, startPoint.z);
+  groundY = groundAt(startPoint.x, startPoint.z);
   rig.position.set(startPoint.x, groundY, startPoint.z);
   rig.rotation.set(0, startPoint.yaw, 0);
   rig.scale.set(1, 1, 1);
@@ -595,9 +619,9 @@ renderer.xr.addEventListener('sessionstart', () => {
 renderer.xr.addEventListener('sessionend', () => {
   autosave.flush();
   if (savingEnabled) startPoint = { x: head.x, z: head.z, yaw: rig.rotation.y }; // the next session picks up from here, not from the start
-  groundY = field.sample(head.x, head.z);
+  groundY = groundAt(head.x, head.z);
   rig.position.set(head.x, groundY, head.z);
-  rig.rotation.y = -Math.atan2(WATER.x, -WATER.z);
+  rig.rotation.y = onIsland ? ISLAND_START.yaw : -Math.atan2(WATER.x, -WATER.z);
   camera.position.set(0, 1.68, 0); camera.rotation.set(-0.045, 0, 0);
   camera.scale.set(1, 1, 1);
   camera.fov = 72; camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
@@ -808,14 +832,15 @@ function frame(time) {
     rig.position.x += movedX; rig.position.z += movedZ;
     head.x = nextX; head.z = nextZ;
     // rocks are solid: walk out of any you have walked into
-    const clear = mining.pushOut(head.x, head.z);
+    const clear = onIsland ? null : mining.pushOut(head.x, head.z); // (the rocks are in the desert, 250 m below the island)
     if (clear) {
       rig.position.x += clear[0] - head.x; rig.position.z += clear[1] - head.z;
       head.x = clear[0]; head.z = clear[1];
     }
 
     // Smooth the terrain-following base separately from seated height, crouch and jump height.
-    const ground = field.sample(head.x, head.z);
+    if (onIsland && skyIsland.groundHeight(head.x, head.z) === null) onIsland = false; // walked off the edge: the desert's ground is 250 m down
+    const ground = groundAt(head.x, head.z);
     groundY += (ground - groundY) * (1 - Math.exp(-dt * 24));
     rig.position.y = groundY + seatedOffset + crouchOffset + jumpHeight;
 
@@ -842,7 +867,7 @@ function frame(time) {
   materials.water.uniforms.uTime.value = time * 0.001;
   renderer.render(scene, camera);
   if (import.meta.env.DEV && time - telemetryTime > 1000) {
-    canvas.dataset.position = JSON.stringify({ x: +head.x.toFixed(2), z: +head.z.toFixed(2), ground: +field.sample(head.x, head.z).toFixed(2), yaw: +rig.rotation.y.toFixed(3) });
+    canvas.dataset.position = JSON.stringify({ x: +head.x.toFixed(2), z: +head.z.toFixed(2), ground: +groundAt(head.x, head.z).toFixed(2), onIsland, yaw: +rig.rotation.y.toFixed(3) });
     canvas.dataset.render = JSON.stringify({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures });
     canvas.dataset.birds = JSON.stringify(alienBirds.list());
     canvas.dataset.stinger = JSON.stringify(duneStinger.list());

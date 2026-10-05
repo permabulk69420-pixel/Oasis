@@ -244,7 +244,7 @@ function toolModel(meshName) {
   return scene;
 }
 
-function world(t, { heightAt = () => 20 } = {}) {
+function world(t, { heightAt = () => 20, spawn = undefined } = {}) {
   t.mock.method(GLTFLoader.prototype, 'load', (url, onLoad) => {
     if (url.includes('/backpack/')) onLoad({ scene: packAsset.scene.clone(true), animations: [] });
     else onLoad({ scene: toolModel(url.includes('/axe/') ? 'WoodenHandle' : 'WoodenShaft'), animations: [] });
@@ -277,7 +277,7 @@ function world(t, { heightAt = () => 20 } = {}) {
   tools.update(0.016); // places the belt and the body
   const exposure = { value: 1 };
   const backpack = createBackpack({
-    scene, states, renderer, camera: xrCamera, rig, tools, heightAt, getExposure: () => exposure.value, onError: () => {},
+    scene, states, renderer, camera: xrCamera, rig, tools, heightAt, spawn, getExposure: () => exposure.value, onError: () => {},
   });
   backpack.update(0.016); // finds the body, so the back zone exists from the start
   const handTo = (state, point) => {
@@ -309,6 +309,16 @@ test('the pack lies upright on the sand by the starting tools, facing the way yo
   assert.equal(backpack.isWorn(), false);
   assert.equal(isPackWorn(), false);
   assert.ok(Math.hypot(PACK.spawn.x - 319, PACK.spawn.z + 292) < 3, 'a couple of metres from where you start');
+});
+
+test('the pack can be told to lie somewhere else at the start (the island start)', t => {
+  reset();
+  const spot = { x: -100, z: 586, yaw: 0.5 };
+  const { backpack } = world(t, { heightAt: () => 277, spawn: spot });
+  const pack = backpack.debug.getObject();
+  assert.ok(Math.abs(pack.position.x - spot.x) < 1e-9 && Math.abs(pack.position.z - spot.z) < 1e-9);
+  assert.ok(Math.abs(pack.position.y - (277 - PACK.settle)) < 1e-9);
+  assert.deepEqual(backpack.snapshot(), { status: 'ground', x: spot.x, z: spot.z, yaw: 0.5 });
 });
 
 test('grip near the handle picks it up; from further away, or with a full hand, it does nothing', t => {
