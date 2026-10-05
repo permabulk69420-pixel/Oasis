@@ -344,6 +344,13 @@ The oasis was barren and nothing echoed the hero tree's glow, so the pond now ha
 - **UVs on purpose** (Kane plans a PBR texture pass, 1k): every material has proper non-overlapping UVs and the meshes also carry a vertex colour for the look today. The materials are named `Glow plant stem`, `Glow plant leaf`, `Glow` and `Glow violet`, which is what the game finds them by.
 - Tests: `tests/glow-garden.test.js` (layout rules, level choice, the six model files exist and are small).
 
+## Plants that give way to you
+
+Walk through the grass or brush a plant with a hand and it bends away (Kane's idea, 5 Oct; `src/wind.js` `PUSH`, `src/plant-push.js`, `tests/plant-push.test.js`). It is one more term in the shared sway shader: three points (your feet, on the floor under your head, and each tracked hand) in a
+uniform array, and every plant vertex within the point's radius (0.62 m feet, 0.42 m hands) is shoved away horizontally, more the higher up the plant it is, with a smooth falloff and a little droop so the tip arcs down instead of stretching. It uses each vertex's own place in the world, so a patch of grass parts blade by blade.
+Which plants: grass, ferns, the glow reeds and lantern blooms fully, the desert plants a third as much (`push` in the profile, `SWAY` in `wind.js`); trunks and palm crowns not at all. No draw calls, no per-plant JavaScript, no memory: a plant springs back the moment you move off it (a trampled trail would need a texture or CPU state).
+`?push=0` switches it off in any build (to compare on the headset), `?push=1` forces it on; the radii, reach and the master switch are in `PUSH`. Cost is vertex work only (a distance test per plant vertex, three at most); the grass is nearly all of it.
+
 ## The backpack
 
 A rucksack you pick up and put on, which raises how much you can carry before it slows you down. It lies in the sand a couple of
