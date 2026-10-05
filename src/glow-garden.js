@@ -113,19 +113,24 @@ const LEVELS = 3;
 
 const isGlow = material => material?.name === 'Glow' || material?.name === 'Glow violet';
 
-export function createGlowGarden({ field, getExposure = () => 1, sunDirection = null, onError = console.warn } = {}) {
+// `extra` (optional) is more plants somewhere else in the world, standing on ground that is not the desert's: { items: [{ kind, x, z, y, yaw, scale }], anchor:
+// { x, z, distance } }. The floating island uses it (src/sky-island-glow.js): its plants share the oasis's models, instanced meshes and halos, and are
+// fetched when you come within `anchor.distance` of its middle.
+export function createGlowGarden({ field, getExposure = () => 1, sunDirection = null, onError = console.warn, extra = null } = {}) {
   const group = new THREE.Group();
   group.name = 'Oasis glow plants';
   const items = layoutGlowGarden(field.sample);
+  const oasisCount = items.length;
+  if (extra) items.push(...extra.items.map(item => ({ ...item })));
   const matrix = new THREE.Matrix4(), position = new THREE.Vector3(), scale = new THREE.Vector3(), quaternion = new THREE.Quaternion();
   const up = new THREE.Vector3(0, 1, 0);
-  for (const item of items) {
-    item.y = field.sample(item.x, item.z) - 0.04;
+  items.forEach((item, index) => {
+    item.y = index < oasisCount ? field.sample(item.x, item.z) - 0.04 : item.y - 0.04;
     item.matrix = new THREE.Matrix4().compose(
       position.set(item.x, item.y, item.z), quaternion.setFromAxisAngle(up, item.yaw), scale.setScalar(item.scale),
     );
     item.lod = -1;
-  }
+  });
   const byKind = Object.fromEntries(KINDS.map(kind => [kind, items.filter(item => item.kind === kind)]));
 
   const cyanHalos = createHaloInstances(GLOW_GARDEN.halo.cyanSlots, { name: 'Glow plant halos', color: 0x25d0ff, maxIntensity: 0.7 });
@@ -220,7 +225,8 @@ export function createGlowGarden({ field, getExposure = () => 1, sunDirection = 
   // Every frame: the glow follows the exposure (so it looks the same whatever the light does) and the halos follow the night.
   // Now and then (when you have moved, or half a second has passed): which level of detail each plant is at.
   function update(head, dt = 0) {
-    if (Math.hypot(head.x - WATER.x, head.z - WATER.z) < GLOW_GARDEN.loadDistance) load();
+    if (Math.hypot(head.x - WATER.x, head.z - WATER.z) < GLOW_GARDEN.loadDistance
+      || (extra && Math.hypot(head.x - extra.anchor.x, head.z - extra.anchor.z) < extra.anchor.distance)) load();
     if (!ready) return;
     const intensity = exposureGlow(getExposure(), GLOW_GARDEN.glow);
     for (const material of glowMaterials) material.emissiveIntensity = intensity;
