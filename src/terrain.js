@@ -3,7 +3,6 @@ import { HALF_WORLD, GRID_STEP, WATER, SPAWN, clamp, noise, terrainHeight, grass
 import { createPickupRocks } from './rocks.js';
 import { createOasisVegetation } from './oasis-vegetation.js';
 import { createOasisGrassRing } from './oasis-grass-ring.js';
-import { createWaterReeds } from './water-reeds.js';
 import { createAlienDesertPlants } from './alien-desert-plants.js';
 import { createGreenFerns } from './green-ferns.js';
 
@@ -110,11 +109,6 @@ export function createTerrain(field, material) {
   });
   group.add(vegetation.group);
 
-  // A small near-shore clump of four reed patches. The reeds use their own two-level LOD and
-  // vertex-shader sway so the motion stays cheap on Quest.
-  const waterReeds = createWaterReeds({ field });
-  group.add(waterReeds.group);
-
   // Four sparse alien plants around the oasis shelf. Their authored high model is used inside
   // 30 m, then swapped to the supplied lower LOD; very distant plants are culled entirely.
   const alienPlants = createAlienDesertPlants({ field });
@@ -140,11 +134,10 @@ export function createTerrain(field, material) {
     pickupRocks.update(x, z);
     grassRing.update(x, z);
     vegetation.update(x, z);
-    waterReeds.update(x, z);
     alienPlants.update(x, z);
     greenFerns.update(x, z);
   }
   // Initialise LOD and nearby assets around the real player start, not the old world origin.
   update(SPAWN.x, SPAWN.z);
-  return { group, update, chunks, pickupRocks, grassRing, vegetation, waterReeds, alienPlants, greenFerns };
+  return { group, update, chunks, pickupRocks, grassRing, vegetation, alienPlants, greenFerns };
 }
