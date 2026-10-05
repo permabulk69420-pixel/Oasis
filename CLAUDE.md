@@ -133,7 +133,7 @@ work. What he has told me, or shown he wants, across sessions:
 - Long procedures live in project skills (`.claude/skills/`): `ship-a-change`, `grip-debug`, `perf-triangles`. Load one when the job matches; add a new
   skill when a procedure needs more than a few lines here (Kane gave me full authority over this file and the skills).
 - `gh pr create` fails here (GraphQL is blocked): use the REST API. Commands, merge routine and stop-hook notes are in the `ship-a-change` skill.
-- `?fresh=1` starts a new game (works in production; the old save is kept aside, see "Saving" below). A dev build saves nothing unless the address has `?save=1`, so none of the fixtures below meet a save.
+- `?fresh=1` starts a new game (only matters with `?save=1`; the old save is kept aside, see "Saving" below). Saving is off unless the address has `?save=1` (any build), so the fixtures below never meet a save.
 - Dev-only URL fixtures (stripped from production): `?view=...`, `?hour=N` (0 night, 14 day),
   `?camp=lit|unlit`, `?campd=<metres>`, `?bird=perch|fly|flare`, `?view=pack`, `?pack=worn`, `?view=spear`, `?treelod=0|1|2` (every tree at
   one level of detail). `?trees=old` also works in production (the first blue trees, for comparison). Add one when a new
@@ -309,7 +309,7 @@ lands, chitin chips (the mining's `bursts.js` pool) and a puff when a blow conne
 over 2.6 s at its home. No sound and no screen effect when you are hit (haptics only, still). Oddities to tell Kane: the dust is pale and soft on purpose, so look for it at the sting's landing and when it falls; at night it is a faint
 moonlit smudge; the dead body is under the sand by about 38 s, which is just before the 40 s it lingers.
 
-Saving (my call, done; README "Saving", `src/save-game.js`): a silent autosave in local storage every 10 s and when the page is hidden, the headset comes off, a VR session ends or the menu closes. Saved: inventory,
+Saving (my call, done; **switched off on 5 Oct at Kane's word: he is testing and wants a fresh world each time, and would rather the player chooses to save later; `?save=1` turns it on in any build, everything below is how it behaves then**; README "Saving", `src/save-game.js`): a silent autosave in local storage every 10 s and when the page is hidden, the headset comes off, a VR session ends or the menu closes. Saved: inventory,
 health/food/water/stamina, time of day, where you stand and face (a VR session starts there too, not at the world's start), every tool (hip, lying, planted, a burning torch), campfires and whether lit, the backpack, the rocks you have
 broken (mining already had `serialize()/restore()`). Not saved on purpose: trees (they regrow in 3 minutes), loose sticks, stones and fruit (scattered again), the creatures. Rules that keep it safe: nothing is written until every saved
 part has been put back and the models (tools, fire, pack) have loaded; every number in a save is checked on the way in (`cleanSave`), a damaged part is dropped and the rest kept; a save the game cannot read, or that has been through two
@@ -344,3 +344,5 @@ lit by the sun so it has phases, with ring shadows both ways; all in the sky sha
 start time, more near noon). If Kane preferred the old light, the quickest way back is `SUNRISE_BEARING`/`swing` in `sun-path.js` (a constant bearing gives the old morning), but the noon and midnight jump should not come back. Oddities to tell Kane: look up and to the right from the start; the planet is faint and ghostly by day;
 the rings are foreshortened so their outer edge can shimmer a little in the headset (if so, widen `edge` in `ringDensity`); a quick way to see it in a screenshot is `?hour=21&pitch=14` (night) or `?hour=7&yaw=-62&pitch=21`.
 
+
+- **Stamina is x20 for testing (Kane, 5 Oct)**: `staminaSprintPerSecond` 0.25 instead of 5 in `src/survival.js` (about 400 s of sprint). Put it back to 5 when he says, or when stamina starts to matter (climb, glide).

@@ -375,7 +375,8 @@ let devCamp = import.meta.env.DEV ? new URLSearchParams(location.search).get('ca
 // ?fresh=1 starts a new game. A dev build saves nothing unless the address has ?save=1, so the screenshot fixtures stay repeatable.
 const pageParams = new URLSearchParams(location.search);
 const saveStore = createSaveStore();
-const savingEnabled = (!import.meta.env.DEV || pageParams.get('save') === '1') && saveStore.available();
+// Off for now (Kane, 5 Oct: he is testing and wants a fresh world each time; a player-chosen save may come later). `?save=1` turns it on, in any build.
+const savingEnabled = pageParams.get('save') === '1' && saveStore.available();
 const askedFresh = wantsFresh(location.search);
 const saveStart = savingEnabled ? saveStore.begin({ fresh: askedFresh }) : { save: null, note: 'off' };
 if (askedFresh) { // so reloading the page does not start another new game
