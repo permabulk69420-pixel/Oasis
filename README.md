@@ -124,8 +124,11 @@ after the headset has been off), and with this a reload puts you back where you 
 
 ## Campfire
 
-Craft a campfire, select it in the menu and press **Place campfire**: it goes down about 1.6 m in
-front of you. It refuses water, steep dune slopes and anywhere within 2.5 m of another fire, and you
+Craft a campfire, select it in the menu and press **Place campfire**: the menu closes and a see-through ghost of the fire follows where
+you aim (`src/placement.js`), green where it can go and red where it can't, with a line of text above it (what to press, or why not).
+In VR the hand that pressed Place aims (a faint line runs from it) and its trigger places it; opening the menu (Y) backs out.
+On a monitor you aim with the view centre and click or press Enter; on a touch screen, tap. It sits within 0.9 to 6 m of you and
+snaps to a 0.2 m grid (a steady hand, and a fixed turn for each spot). The campfire is only used up when you place it. It refuses water, steep dune slopes and anywhere within 2.5 m of another fire, and you
 can have up to three. Hold a lit torch to the fire (within about half a metre) to light it. A lit
 fire has billboarded flames, sparks, a plume of smoke that leans downwind (grey by day, glowing orange near the fire at night), a crackle that fades with distance, and lights the ground and
 water around it (`src/campfire.js`, `src/fire-effect.js`). By day the light fades out so the stones
