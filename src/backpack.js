@@ -89,6 +89,7 @@ export function packGroundHeight(heightAt, x, z, yaw, { halfWidth, halfDepth } =
 export function createBackpack({
   scene, states, renderer = null, camera = null, rig = null, tools = null,
   heightAt = () => 0, getExposure = () => 1, onError = console.warn,
+  spawn = PACK.spawn, // where it lies at the start (the island start moves it)
 }) {
   if (!scene || !Array.isArray(states)) throw new Error('The backpack needs the scene and the VR hand states.');
 
@@ -96,7 +97,7 @@ export function createBackpack({
   let glow = null;
   let status = 'ground'; // 'ground', 'held' or 'worn'
   let heldBy = null;
-  let yaw = PACK.spawn.yaw;
+  let yaw = spawn.yaw;
   let appliedGlow = -1;
   const gripDown = new Map();
   const inZone = new Map();
@@ -126,7 +127,7 @@ export function createBackpack({
       object.receiveShadow = false;
       if (object.material?.name === 'Glow') glow = object.material;
     });
-    if (status === 'ground') toGround(PACK.spawn.x, PACK.spawn.z, PACK.spawn.yaw);
+    if (status === 'ground') toGround(spawn.x, spawn.z, spawn.yaw);
     else if (status === 'worn') pack.removeFromParent();
   }, undefined, error => {
     onError(`[Oasis backpack] The backpack model failed to load: ${error?.message || error}`);
@@ -310,7 +311,7 @@ export function createBackpack({
       if (data.status === 'worn') { if (status !== 'worn') wear(null); return true; }
       if (data.status !== 'ground') return false;
       if (status === 'worn') setPackWorn(false);
-      toGround(data.x, data.z, data.yaw ?? PACK.spawn.yaw);
+      toGround(data.x, data.z, data.yaw ?? spawn.yaw);
       return true;
     },
     list: () => {

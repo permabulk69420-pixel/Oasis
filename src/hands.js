@@ -66,7 +66,7 @@ function setPose(state, name, amount) {
   action.time = THREE.MathUtils.clamp(amount, 0, 1);
 }
 
-export function createVRHands({ renderer, scene, parent = null, camera = null, gripDebug = false, onEat = null, heightAt = undefined, onError = console.warn }) {
+export function createVRHands({ renderer, scene, parent = null, camera = null, gripDebug = false, onEat = null, heightAt = undefined, copyStart = null, onError = console.warn }) {
   // Oasis moves/turns a camera rig through the world. Match dumbgame by putting
   // WebXR controller and grip nodes under that rig rather than directly in scene space.
   const controllerParent = parent
@@ -209,7 +209,7 @@ export function createVRHands({ renderer, scene, parent = null, camera = null, g
 
   // Torch first so overlapping pickups keep their old priority.
   const tools = createTools({
-    scene, rig: controllerParent, states, renderer, camera, heightAt, onError,
+    scene, rig: controllerParent, states, renderer, camera, heightAt, copyStart, onError,
     kinds: [
       createTorchKind({ scene, onError }), createAxeKind({ scene, onError }),
       createSpearKind({ getExposure: () => renderer.toneMappingExposure }),
