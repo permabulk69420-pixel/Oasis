@@ -4,9 +4,9 @@ A VR desert game: a four kilometre desert with an oasis to start at and other pl
 
 ## Explore
 
-Open the published page in Meta Quest Browser and choose **Enter VR**. Use the left thumbstick to walk and the right thumbstick to turn smoothly. Hold the left stick down to move faster. Movement follows the ground; physical leaning and walking remain tracked. There is no teleportation or snap turning.
+Open the published page in Meta Quest Browser and choose **Enter VR**. Use the left thumbstick to walk and the right thumbstick to turn smoothly. Hold the left stick down to move faster. Testing aid: click both thumbsticks together to toggle turbo, 10 times your usual speed (`src/turbo.js`), so the 4 km world can be crossed in a minute. Movement follows the ground; physical leaning and walking remain tracked. There is no teleportation or snap turning.
 
-Desktop: **Explore**, WASD / arrow up and down to walk, mouse to look, Shift to move faster. Q/E or the left/right arrow keys also turn smoothly. Escape opens the controls. Touch screens have a movement pad and drag-to-look.
+Desktop: **Explore**, WASD / arrow up and down to walk, **T** to toggle turbo, mouse to look, Shift to move faster. Q/E or the left/right arrow keys also turn smoothly. Escape opens the controls. Touch screens have a movement pad and drag-to-look.
 
 ## World
 
