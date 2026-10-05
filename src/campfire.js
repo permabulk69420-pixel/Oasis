@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { terrainHeight, isInPond } from './world.js';
 import { createFireEffect } from './fire-effect.js';
 import { createLoop } from './audio.js';
-import { findTerrainMesh } from './night-fill.js';
+import { findTerrainMesh, TORCH_SHADER_MARKERS } from './night-fill.js';
 import { pulseHaptics } from './haptics.js';
 
 // Campfires: a placed structure (stone ring and logs) that you light with a burning torch.
@@ -90,10 +90,13 @@ export function crackleVolume(distance, range = CAMPFIRE.audioRange, volume = CA
 
 // ---- lighting the ground and water around a fire (custom shaders, like the torch) ----
 
-const TERRAIN_UNIFORM = 'uniform float uGrassTileMetres;';
-const TERRAIN_LIGHT = 'vec3 light = ambient + vec3(1.23, 1.09, 0.86) * sun;';
-const WATER_UNIFORM = 'uniform sampler2D uElevation;';
-const WATER_COLOR = 'vec3 color = mix(transmission, reflectedColor, fresnel);';
+// The lines of the terrain and water shaders the fire light hooks into are the torch's (src/night-fill.js TORCH_SHADER_MARKERS): one list, one test
+// (tests/night-fill.test.js) that src/materials.js still has them. The campfire kept its own copy of the terrain's light line, the sun's colour
+// became `sunColour()` in the twilight change (#97), and from then on no fire lit the ground and nothing said so but one console warning.
+const TERRAIN_UNIFORM = TORCH_SHADER_MARKERS.terrain.uniform;
+const TERRAIN_LIGHT = TORCH_SHADER_MARKERS.terrain.light;
+const WATER_UNIFORM = TORCH_SHADER_MARKERS.water.uniform;
+const WATER_COLOR = TORCH_SHADER_MARKERS.water.colour;
 
 const FIRE_UNIFORMS = `uniform vec3 uFirePositions[${FIRE_LIGHT_SLOTS}];\n      uniform float uFireStrengths[${FIRE_LIGHT_SLOTS}];`;
 

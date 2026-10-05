@@ -64,7 +64,7 @@ test('the crackle fades with distance', () => {
 });
 
 function fakeShader(kind) {
-  const terrain = 'uniform float uGrassTileMetres;\nvoid main() {\n  vec3 light = ambient + vec3(1.23, 1.09, 0.86) * sun;\n}';
+  const terrain = 'uniform float uGrassTileMetres;\nvoid main() {\n  vec3 light = ambient + sunColour() * sun;\n}';
   const water = 'uniform sampler2D uElevation;\nvoid main() {\n  vec3 color = mix(transmission, reflectedColor, fresnel);\n}';
   const material = new THREE.ShaderMaterial({ fragmentShader: kind === 'water' ? water : terrain, uniforms: {} });
   return material;
@@ -93,6 +93,17 @@ test('terrain and water shaders get the fire light once, and unknown shaders are
   const other = new THREE.ShaderMaterial({ fragmentShader: 'void main() {}' });
   assert.equal(installFireLights(other, 'terrain', uniforms), false);
   assert.equal(installFireLights(new THREE.MeshBasicMaterial(), 'terrain', uniforms), false);
+});
+
+test('the fire light patches the REAL terrain and water shaders (the sun colour line it hooks into drifted once and no fire lit the ground for a day)', async () => {
+  const fs = await import('node:fs');
+  const materials = fs.readFileSync(new URL('../src/materials.js', import.meta.url), 'utf8');
+  const water = fs.readFileSync(new URL('../src/oasis-water.js', import.meta.url), 'utf8');
+  const uniforms = { uFirePositions: { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] }, uFireStrengths: { value: [0, 0, 0] } };
+  // the terrain shader's fragment source as materials.js writes it, the water's as oasis-water.js rewrites it
+  const terrainSource = materials.slice(materials.indexOf('fragmentShader: /* glsl */`', materials.indexOf('uGrassTileMetres')));
+  assert.equal(installFireLights(new THREE.ShaderMaterial({ fragmentShader: terrainSource, uniforms: {} }), 'terrain', uniforms), true, 'the terrain shader no longer has the line the campfire light hooks into');
+  assert.equal(installFireLights(new THREE.ShaderMaterial({ fragmentShader: water, uniforms: {} }), 'water', uniforms), true, 'the water shader no longer has the line the campfire light hooks into');
 });
 
 function makeTemplate() {
