@@ -3,7 +3,7 @@ import { SPAWN } from './world.js';
 import { pulseHaptics } from './haptics.js';
 import { setGripSurface } from './grip-contact.js';
 import { createLoop } from './audio.js';
-import { torchGlow, TORCH_SHADER_MARKERS } from './night-fill.js';
+import { torchGlow, TORCH_SHADER_MARKERS, findTerrainMesh } from './night-fill.js';
 
 const TORCH_URL = `${import.meta.env?.BASE_URL ?? '/'}models/torch/handheld_fire_torch.glb`;
 const TORCH_AUDIO_URL = `${import.meta.env?.BASE_URL ?? '/'}audio/fire/torch_fire_crackle_loop.mp3`;
@@ -152,7 +152,7 @@ export function createTorchKind({ scene, onError = console.warn }) {
 
   function ensureEnvironmentLighting() {
     if (!terrainLightingReady) {
-      const terrainMesh = scene.getObjectByName('sand-0-0');
+      const terrainMesh = findTerrainMesh(scene);
       if (terrainMesh?.material) {
         terrainLightingReady = installTerrainTorchLight(terrainMesh.material, terrainTorchPosition, terrainTorchStrength);
         if (!terrainLightingReady) onError('[Oasis torch] Could not inject torch lighting into terrain shader.');

@@ -355,7 +355,7 @@ are in `planetLight` in the same file.
 The sun's path is in `src/sun-path.js`, one smooth arc shared by the sky, the lights and the tests. **It is a twilight planet** (Kane, 5 Oct): the sun comes up over the horizon, slides round it
 and sets, never climbing past `SUN_PEAK_DEGREES` (14), so the whole day is a long low golden hour with long dark shadows; the moon is opposite it, so as low by night. The swing round the sky is half a turn per half cycle, eased so it is slowest at the horizons and quickest at the
 top (an old bug had the sun jump 63 degrees across the sky at noon and midnight). The game starts at `INITIAL_PHASE` 0.14 (a little after sunrise), the sun on the side it always started on. The look follows the sun's height: `sunHigh()` and `sunColour()` in `src/materials.js` blend the sky (teal-indigo
-up high, dusty rose at the horizon, a wide warm glow round the sun), the clouds (slate on the far side, coral toward the sun) and the sun's colour on the sand and water from red (sun on the horizon) to gold (top of its arc); `DAY_EXPOSURE` is 0.62 (it was 0.82) in `src/day-night.js`. The day and night lengths are unchanged (3 minutes each). Tests: `tests/sun-path.test.js`, `tests/night-sky.test.js`.
+up high, dusty rose at the horizon, a wide warm glow round the sun), the clouds (slate on the far side, coral toward the sun) and the sun's colour on the sand and water from red (sun on the horizon) to gold (top of its arc); `DAY_EXPOSURE` is 0.62 (it was 0.82) in `src/day-night.js`. The day and night lengths were 3 minutes each then; Kane asked for 5 and 5 on 5 Oct (`DAY_SECONDS`, `NIGHT_SECONDS`). Tests: `tests/sun-path.test.js`, `tests/night-sky.test.js`.
 
 ## The glow plants
 
@@ -474,3 +474,7 @@ To get past a cached page, open the URL with any extra query, such as `?x=1`. So
   public/models/vegetation/alien-tree`, then `python3 tools/alien-tree/check_mesh.py` (bark is closed solids facing outward, leaves are sheets
   with no loose or degenerate faces, names, materials, budgets, height, a straight trunk in the axe's chop zone, clearance under the fronds) and
   `python3 tools/alien-tree/render_preview.py` for Cycles previews (`--views lods,lodsabove,threeq,side,below,crown,base`).
+
+### Night light on the wider ground
+
+The torch and campfire light the ground by patching the sand shader once they find it (`findTerrainMesh` in `src/night-fill.js`: any mesh named `sand-...`; tile names come from `tileName` in `src/terrain-tiles.js`). Gravel, bedrock and salt are darker than sand, so the sand shader lifts their faint moonlit fill halfway to `ZONE_NIGHT_FLOOR` in `src/materials.js`, which brings them to about the sand's moonlit level and no more.

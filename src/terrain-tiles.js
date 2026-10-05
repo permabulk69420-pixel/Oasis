@@ -36,6 +36,9 @@ const POND = {
 // Which tiles to draw for a player at (px, pz): { tiles, state }, tiles being a list of { key, size, x, z, segments, near } that covers the
 // whole root range exactly once. `scale` stretches every distance (a little over 1 picks the tiles about to be needed). `state` is what was
 // split or fine last time, so a tile keeps its state until the player is well past the threshold (pass the previous result's state, or null).
+// The mesh name of a tile. The torch and fire lighting find the terrain material through names starting 'sand-' (night-fill.js findTerrainMesh).
+export function tileName(leaf) { return `sand-${leaf.size}-${leaf.x}-${leaf.z}`; }
+
 export function chooseTiles(px, pz, scale = 1, state = null) {
   const out = [], split = new Set(), fine = new Set();
   const rootR = TERRAIN.rootRange;

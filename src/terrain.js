@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GRID_STEP, HALF_WORLD, TILE, SPAWN, noise, terrainSurface, grassCover } from './world.js';
 import { AREA } from './zones.js';
-import { TERRAIN, chooseTiles } from './terrain-tiles.js';
+import { TERRAIN, chooseTiles, tileName } from './terrain-tiles.js';
 export { TERRAIN };
 import { createPickupRocks } from './rocks.js';
 import { createOasisVegetation } from './oasis-vegetation.js';
@@ -119,7 +119,7 @@ export function createTerrain(field, material) {
       if (shown.has(leaf.key)) { cache.get(leaf.key).used = clock; continue; }
       const mesh = spare.pop() ?? new THREE.Mesh(undefined, material);
       mesh.geometry = geometryOf(leaf);
-      mesh.name = `sand-${leaf.size}-${leaf.x}-${leaf.z}`;
+      mesh.name = tileName(leaf);
       group.add(mesh); shown.set(leaf.key, mesh);
     }
     stats.leaves = show.length;
