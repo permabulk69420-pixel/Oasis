@@ -179,7 +179,8 @@ export const atmosphere = /* glsl */`
   }
 
   vec3 air(vec3 color, vec3 ray, float distance) {
-    float haze = 1.0 - exp(-distance * 0.00078);
+    // Out to 600 m the haze is what it always was; beyond that it thickens more slowly, so mesas a kilometre or two off still read.
+    float haze = 1.0 - exp(-(min(distance, 600.0) * 0.00078 + max(distance - 600.0, 0.0) * 0.00030));
     return mix(color, skyColor(ray), haze);
   }
 `;
@@ -194,8 +195,9 @@ export function createMaterials(renderer, field) {
   // Packed 16-bit height samples support cheap dune reflections in the small pool.
   // RGBA8 keeps filtering portable on mobile GPUs; no float-texture extension is required.
   const elevationData = new Uint8Array(513 * 513 * 4);
-  for (let i = 0; i < field.heights.length; i++) {
-    const value = Math.round(field.heights[i] / 64 * 65535);
+  const homeHeights = field.homeHeights();
+  for (let i = 0; i < homeHeights.length; i++) {
+    const value = Math.round(homeHeights[i] / 64 * 65535);
     elevationData[i * 4] = value >> 8;
     elevationData[i * 4 + 1] = value & 255;
     elevationData[i * 4 + 3] = 255;
@@ -238,13 +240,16 @@ export function createMaterials(renderer, field) {
     },
     vertexColors: true,
     vertexShader: /* glsl */`
+      attribute vec3 zone; // rock, salt, gravel (0 to 1): what the ground is made of beyond the oasis (src/zones.js)
       varying vec3 vWorld;
       varying vec3 vNormal;
       varying vec3 vData;
+      varying vec3 vZone;
       void main() {
         vWorld = position;
         vNormal = normal;
         vData = color;
+        vZone = zone;
         gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0);
       }
     `,
@@ -274,6 +279,7 @@ export function createMaterials(renderer, field) {
       varying vec3 vWorld;
       varying vec3 vNormal;
       varying vec3 vData;
+      varying vec3 vZone;
       ${atmosphere}
       void main() {
         vec3 toEye = cameraPosition - vWorld;
@@ -284,6 +290,9 @@ export function createMaterials(renderer, field) {
         vec2 grassUv = vWorld.xz / uGrassTileMetres;
         vec3 baseNormal = normalize(vNormal);
         float grass = clamp(vData.b, 0.0, 1.0);
+        float rockAmt = clamp(vZone.x, 0.0, 1.0);
+        float saltAmt = clamp(vZone.y, 0.0, 1.0);
+        float gravelAmt = clamp(vZone.z, 0.0, 1.0);
 
         // World-projected tangent basis keeps the sand texture aligned across all terrain LODs.
         vec3 tangentSeed = vec3(0.84, 0.0, 0.54);
@@ -321,7 +330,7 @@ export function createMaterials(renderer, field) {
         vec3 mapNormal = texture2D(uPbrNormal, pbrUv).xyz * 2.0 - 1.0;
         vec3 mappedNormal = normalize(tangent * mapNormal.x + bitangent * mapNormal.y + baseNormal * max(mapNormal.z, 0.05));
         float normalFade = 1.0 - smoothstep(20.0, 70.0, distance);
-        vec3 sandNormal = normalize(mix(baseNormal, mappedNormal, uHasPbrNormal * normalFade * (1.0 - grass)));
+        vec3 sandNormal = normalize(mix(baseNormal, mappedNormal, uHasPbrNormal * normalFade * (1.0 - grass) * (1.0 - max(max(rockAmt, saltAmt), gravelAmt))));
         vec3 grassNormal = baseNormal;
         if (grass > 0.001 && uHasGrassNormal > 0.5 && normalFade > 0.001) {
           vec3 grassMapNormal = texture2D(uGrassNormal, grassUv).xyz * 2.0 - 1.0;
@@ -352,11 +361,38 @@ export function createMaterials(renderer, field) {
           base = mix(base, grassBase, smoothstep(0.08, 0.65, grass));
         }
 
+        // Bedrock, salt and gravel (the zones beyond the oasis). Inside the oasis square all three are zero, so nothing there changes.
+        if (rockAmt + saltAmt + gravelAmt > 0.002) {
+          float grain = dot(textureBase, vec3(0.299, 0.587, 0.114));
+          float steep = 1.0 - clamp(baseNormal.y, 0.0, 1.0);
+          // Strata: soft bands of colour by height (one cycle about 6 m), wobbled so the layers do not run level. The bands fade
+          // out with distance, or they would shimmer into stripes on far mountains; the broad colour by height stays.
+          float wobble = sin(vWorld.x * 0.021 + vWorld.z * 0.017) * 1.6 + sin(vWorld.x * 0.063 - vWorld.z * 0.051) * 0.5;
+          float strataNoise = (texture2D(uPbrBase, vWorld.xz * 0.011).r - 0.5) * 7.0 + (texture2D(uPbrBase, vWorld.xz * 0.0043 + 0.3).g - 0.5) * 10.0;
+          float band = (vWorld.y + wobble + strataNoise) * 0.16;
+          float bandFade = 1.0 - smoothstep(50.0, 400.0, distance);
+          float b1 = mix(0.5, 0.5 + 0.5 * sin(band * 6.2832), bandFade);
+          float b2 = mix(0.5, 0.5 + 0.5 * sin(band * 17.0 + 1.3), bandFade);
+          float high = smoothstep(15.0, 130.0, vWorld.y);
+          vec3 rockColour = mix(vec3(0.50, 0.22, 0.12), vec3(0.70, 0.52, 0.33), clamp(b1 * 0.7 + high * 0.45, 0.0, 1.0));
+          rockColour = mix(rockColour, vec3(0.26, 0.16, 0.13), b2 * 0.30 * bandFade + steep * 0.22);
+          rockColour *= 0.62 + 0.75 * grain;
+          base = mix(base, rockColour, rockAmt);
+          vec3 saltColour = vec3(0.80, 0.78, 0.72) * (0.90 + 0.20 * grain);
+          base = mix(base, saltColour, saltAmt);
+          // Pebbly mottling from the sand photo at another scale and angle (no hard cells), fading to its average with distance.
+          float pebbles = dot(texture2D(uPbrBase, pbrUv * 2.9 + vec2(0.37, 0.61)).rgb, vec3(0.299, 0.587, 0.114));
+          float speckFade = 1.0 - smoothstep(10.0, 90.0, distance);
+          vec3 gravelColour = mix(vec3(0.46, 0.34, 0.24), vec3(0.64, 0.52, 0.38), vData.g) * (0.55 + 0.9 * grain) * mix(1.0, 0.45 + 1.1 * pebbles, speckFade);
+          base = mix(base, gravelColour, gravelAmt);
+        }
+
         float roughnessMap = texture2D(uPbrRoughness, pbrUv).r;
         float roughness = mix(0.88, roughnessMap, uHasPbrRoughness);
         float grassRoughness = 0.95;
         if (grass > 0.001 && uHasGrassRoughness > 0.5) grassRoughness = texture2D(uGrassRoughness, grassUv).r;
         roughness = mix(roughness, grassRoughness, grass);
+        roughness = mix(roughness, 0.95, max(rockAmt, gravelAmt));
         float poolDistance = length((vWorld.xz - uWater.xz) / uWaterRadii);
         float wet = (1.0 - smoothstep(uWater.y + 0.05, uWater.y + 0.60, vWorld.y)) * (1.0 - smoothstep(1.1, 1.6, poolDistance));
         base = mix(base, base * vec3(0.49, 0.48, 0.43), wet * 0.80);

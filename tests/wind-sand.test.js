@@ -2,12 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { WIND_SAND, createWindSand, createWindSandSeeds } from '../src/wind-sand.js';
+import { createHeightField } from '../src/world.js';
+
+const field = createHeightField();
 
 const uniforms = () => ({
   uSun: { value: new THREE.Vector3(0, 1, 0) },
   uWater: { value: new THREE.Vector3(300, 3.1, -400) },
   uWaterRadii: { value: new THREE.Vector2(40, 34) },
-  uElevation: { value: new THREE.DataTexture(new Uint8Array(4), 1, 1) },
 });
 
 test('seeds are repeatable, in range, and differ by seed', () => {
@@ -50,7 +52,7 @@ test('the wind runs along the dunes, which is the direction terrainHeight stretc
 
 test('createWindSand builds one instanced quad mesh per layer and follows the player', () => {
   const scene = new THREE.Scene();
-  const sand = createWindSand({ scene, uniforms: uniforms() });
+  const sand = createWindSand({ scene, uniforms: uniforms(), field });
   assert.equal(sand.meshes.length, Object.keys(WIND_SAND.layers).length);
   assert.ok(scene.children.includes(sand.group));
   for (const mesh of sand.meshes) {
@@ -77,33 +79,34 @@ test('createWindSand builds one instanced quad mesh per layer and follows the pl
 
 test('the sun, pond and ground height are shared with the world, not copied', () => {
   const shared = uniforms();
-  const sand = createWindSand({ scene: new THREE.Scene(), uniforms: shared });
+  const sand = createWindSand({ scene: new THREE.Scene(), uniforms: shared, field });
   for (const mesh of sand.meshes) {
     assert.equal(mesh.material.uniforms.uSun, shared.uSun);
     assert.equal(mesh.material.uniforms.uWater, shared.uWater);
-    assert.equal(mesh.material.uniforms.uElevation, shared.uElevation);
+    assert.equal(mesh.material.uniforms.uGroundMap, sand.uniforms.uGroundMap, 'one ground window for every layer');
   }
 });
 
 test('the shaders read the world height and finish like the terrain does', () => {
-  const sand = createWindSand({ scene: new THREE.Scene(), uniforms: uniforms() });
+  const sand = createWindSand({ scene: new THREE.Scene(), uniforms: uniforms(), field });
   const { vertexShader, fragmentShader } = sand.meshes[0].material;
-  assert.match(vertexShader, /uElevation/);
+  assert.match(vertexShader, /uGroundMap/);
   assert.match(vertexShader, /groundAt/);
   assert.match(fragmentShader, /tonemapping_fragment/);
   assert.match(fragmentShader, /colorspace_fragment/);
 });
 
 test('createWindSand refuses to start without what it needs', () => {
-  assert.throws(() => createWindSand({ uniforms: uniforms() }), /scene/);
+  assert.throws(() => createWindSand({ uniforms: uniforms(), field }), /scene/);
+  assert.throws(() => createWindSand({ scene: new THREE.Scene(), uniforms: uniforms() }), /height field/);
   const missing = uniforms();
-  delete missing.uElevation;
-  assert.throws(() => createWindSand({ scene: new THREE.Scene(), uniforms: missing }), /uElevation/);
+  delete missing.uWater;
+  assert.throws(() => createWindSand({ scene: new THREE.Scene(), uniforms: missing, field }), /uWater/);
 });
 
 test('dispose removes the sand from the scene', () => {
   const scene = new THREE.Scene();
-  const sand = createWindSand({ scene, uniforms: uniforms() });
+  const sand = createWindSand({ scene, uniforms: uniforms(), field });
   sand.dispose();
   assert.ok(!scene.children.includes(sand.group));
 });
