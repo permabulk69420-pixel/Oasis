@@ -10,23 +10,24 @@ import { grassCover, isInPond } from './world.js';
 // is written into the slots when it is laid (a few times a second), and the rest is done by the vertex shader from the age.
 
 export const PRINTS = Object.freeze({
-  capacity: Object.freeze({ player: 480, stinger: 480 }),
-  life: Object.freeze({ player: 150, stinger: 220 }), // seconds until the wind has filled one in
+  capacity: Object.freeze({ player: 480, stinger: 480, colossus: 160 }),
+  life: Object.freeze({ player: 150, stinger: 220, colossus: 900 }), // seconds until the wind has filled one in
   hold: 0.18, // the first part of that life a print stays crisp
   stride: Object.freeze({ walk: 0.74, run: 1.05 }), // metres between one foot and the next
   runSpeed: 3.7, // m/s: faster than this and the stride is the long one
   half: 0.1, // each foot lands this far to the side of the line you walk
   turnOut: 0.12, // radians each foot points away from straight ahead
-  size: Object.freeze({ player: 0.7, stinger: 0.34 }), // the decal square in metres (a stinger's is multiplied by its own scale)
+  size: Object.freeze({ player: 0.7, stinger: 0.34, colossus: 17 }), // the decal square in metres (a stinger's is multiplied by its own scale)
   lift: 0.012, // metres above the sand, so the decal is never inside it...
   liftPerMetre: 0.00035, // ...and a little more the further away it is, as the depth buffer gets coarser
   fade: Object.freeze([34, 62]), // metres: prints thin out and are gone by the second number (nobody sees a footprint at 60 m)
+  fadeBig: Object.freeze([700, 1300]), // the same for a colossus's prints, which are 15 m across and seen from a long way off
   grassMax: 0.25, // no prints where the grass is thicker than this
   jump: 2.5, // a step bigger than this in one frame is a jump in position (a new session), not walking
   slope: 0.2, // metres either side of a print used to find which way the ground leans
 });
 
-const KIND = Object.freeze({ player: 0, stinger: 1 });
+const KIND = Object.freeze({ player: 0, stinger: 1, colossus: 2 });
 
 // How much of a print is left: 1 while it is fresh, easing to 0 as the wind fills it in. The shader does the same sum.
 export function printStrength(age, life, hold = PRINTS.hold) {
@@ -78,13 +79,16 @@ export function createPrintBook(capacity = PRINTS.capacity) {
   const names = Object.keys(KIND);
   const base = {}, size = {}, cursor = {};
   let total = 0;
-  for (const name of names) { base[name] = total; size[name] = capacity[name]; cursor[name] = 0; total += capacity[name]; }
+  for (const name of names) {
+    if (!(capacity[name] > 0)) continue; // a kind without slots is simply not laid (a test may give only two)
+    base[name] = total; size[name] = capacity[name]; cursor[name] = 0; total += capacity[name];
+  }
   const place = new Float32Array(total * 4); // x, y, z, the time it was laid
   const normal = new Float32Array(total * 4); // which way the ground leans (x, y, z) and the way the foot points
   const info = new Float32Array(total * 4); // size, side, kind, strength
   return {
     total, place, normal, info, base,
-    laid: { player: 0, stinger: 0 },
+    laid: Object.fromEntries(Object.keys(base).map(name => [name, 0])),
     add(kindName, { x, y, z, nx, ny, nz, yaw, size: width, side, born, strength = 1 }) {
       const slot = base[kindName] + cursor[kindName];
       cursor[kindName] = (cursor[kindName] + 1) % size[kindName];
@@ -104,9 +108,10 @@ const VERTEX = /* glsl */`
   attribute vec4 aNormal;  // the ground's normal, and the way the foot points (radians; 0 is +z)
   attribute vec4 aInfo;    // size, side (+1 or -1), kind (0 foot, 1 claw), strength
   uniform float uTime;
-  uniform vec2 uLife;      // seconds a foot's print and a claw's print last
+  uniform vec3 uLife;      // seconds a foot's print, a claw's print and a colossus's print last
   uniform float uHold;
   uniform vec2 uFade;
+  uniform vec2 uFadeBig;   // the same for the colossus's prints
   uniform vec2 uLift;
   uniform float uTurn;
   uniform vec3 uSun;
@@ -117,12 +122,13 @@ const VERTEX = /* glsl */`
   varying float vSide;
   varying float vAge;
   void main() {
-    float life = aInfo.z < 0.5 ? uLife.x : uLife.y;
+    float life = aInfo.z < 0.5 ? uLife.x : (aInfo.z < 1.5 ? uLife.y : uLife.z);
     float age = max(uTime - aPlace.w, 0.0) / life;
     float s = clamp((age - uHold) / (1.0 - uHold), 0.0, 1.0);
     float fill = age >= 1.0 ? 0.0 : 1.0 - s * s * (3.0 - 2.0 * s);
     float dist = distance(cameraPosition, aPlace.xyz);
-    float near = 1.0 - smoothstep(uFade.x, uFade.y, dist);
+    vec2 fade = aInfo.z > 1.5 ? uFadeBig : uFade;
+    float near = 1.0 - smoothstep(fade.x, fade.y, dist);
     vStrength = fill * near * aInfo.w;
     vKind = aInfo.z;
     vSide = aInfo.y;
@@ -172,6 +178,18 @@ const FRAGMENT = /* glsl */`
       float w = soleWidth(clamp(y, 0.0, 1.0));
       d = (y < 0.0 || y > 1.0) ? 9.0 : abs(p.x - 0.012 * (0.5 - y)) / max(w, 0.002) - 1.0;
       wall = 0.8;
+    } else if (vKind > 1.5) {
+      // a colossus's foot: a broad rounded pad with a row of four toes at the front (the pillar of a leg ends in a foot 10 m wide and 13 m long)
+      vec2 q = abs(vec2(p.x / 0.29, (p.y + 0.01) / 0.36));
+      float pad = pow(pow(q.x, 2.6) + pow(q.y, 2.6), 1.0 / 2.6) - 1.0;
+      float toes = 9.0;
+      for (int i = 0; i < 4; i++) {
+        float tx = (float(i) - 1.5) * 0.15;
+        float ty = 0.34 - 0.012 * abs(float(i) - 1.5);
+        toes = min(toes, length((p - vec2(tx, ty)) / vec2(0.062, 0.085)) - 1.0);
+      }
+      d = min(pad, toes);
+      wall = 0.45;
     } else {
       // a claw: three points in a fan and one behind
       float a = length(p - vec2(-0.17, 0.12)) / 0.13 - 1.0;
@@ -242,8 +260,9 @@ export function createFootprints({ scene = null, sun, heightAt = () => 0, capaci
   const material = new THREE.ShaderMaterial({
     uniforms: {
       uTime, uSun: sun, uHold: { value: PRINTS.hold },
-      uLife: { value: new THREE.Vector2(PRINTS.life.player, PRINTS.life.stinger) },
+      uLife: { value: new THREE.Vector3(PRINTS.life.player, PRINTS.life.stinger, PRINTS.life.colossus) },
       uFade: { value: new THREE.Vector2(...PRINTS.fade) },
+      uFadeBig: { value: new THREE.Vector2(...PRINTS.fadeBig) },
       uLift: { value: new THREE.Vector2(PRINTS.lift, PRINTS.liftPerMetre) },
       uTurn: { value: PRINTS.turnOut },
     },
@@ -273,7 +292,7 @@ export function createFootprints({ scene = null, sun, heightAt = () => 0, capaci
   function lay(kindName, x, z, yaw, side, size, strength = 1) {
     const y = heightAt(x, z);
     if (!onSand(x, z, y)) return false;
-    const d = PRINTS.slope;
+    const d = Math.max(PRINTS.slope, size * 0.12); // a big print reads the lean of the ground over its own width
     const gx = (heightAt(x + d, z) - heightAt(x - d, z)) / (2 * d);
     const gz = (heightAt(x, z + d) - heightAt(x, z - d)) / (2 * d);
     const length = Math.hypot(gx, 1, gz);
@@ -300,6 +319,10 @@ export function createFootprints({ scene = null, sun, heightAt = () => 0, capaci
     // a creature's foot has come down at (x, z), its body facing yaw; scale is the creature's size
     plant(x, z, yaw, scale = 1, side = 1) {
       return lay('stinger', x, z, yaw, side, PRINTS.size.stinger * scale);
+    },
+    // a colossus's foot has come down at (x, z) pointing along yaw: a print 15 m across (side is +1 for a left foot, -1 for a right)
+    plantColossus(x, z, yaw, side = 1) {
+      return lay('colossus', x, z, yaw, side, PRINTS.size.colossus);
     },
     update(seconds) { if (Number.isFinite(seconds)) uTime.value = seconds; },
     get laid() { return { ...book.laid }; },

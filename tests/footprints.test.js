@@ -180,7 +180,7 @@ test('prints are laid on sand, with the ground height and lean, and not on grass
   assert.equal(prints.mesh.visible, false);
   assert.equal(prints.plant(SAND.x, SAND.z, 0.7, 2.5, 1), true);
   assert.equal(prints.mesh.visible, true);
-  assert.deepEqual(prints.laid, { player: 0, stinger: 1 });
+  assert.deepEqual(prints.laid, { player: 0, stinger: 1, colossus: 0 });
   const book = prints.book;
   const slot = book.base.stinger * 4;
   assert.ok(Math.abs(book.place[slot] - SAND.x) < 1e-6 && Math.abs(book.place[slot + 2] - SAND.z) < 1e-6);
@@ -188,6 +188,26 @@ test('prints are laid on sand, with the ground height and lean, and not on grass
   const nx = book.normal[slot], ny = book.normal[slot + 1], nz = book.normal[slot + 2];
   assert.ok(Math.abs(Math.hypot(nx, ny, nz) - 1) < 1e-5 && ny > 0.5, 'a unit normal pointing up');
   assert.ok(Math.abs(book.info[slot] - PRINTS.size.stinger * 2.5) < 1e-6, 'sized by the creature');
+  prints.dispose();
+});
+
+test("a colossus's foot leaves one print as wide as the foot, that lasts longest and shows from far off", () => {
+  assert.ok(PRINTS.life.colossus > PRINTS.life.stinger, 'the wind takes longer to fill a print 15 m across');
+  assert.ok(PRINTS.size.colossus >= 15, 'the decal holds a foot 10 m wide and 13 m long');
+  assert.ok(PRINTS.fadeBig[0] > PRINTS.fade[1], 'seen from further away than a footprint of ours');
+  const prints = createFootprints({ sun: new THREE.Vector3(0, 1, 0), heightAt: terrainHeight });
+  assert.equal(prints.plantColossus(SAND.x, SAND.z, 1.2, -1), true);
+  assert.deepEqual(prints.laid, { player: 0, stinger: 0, colossus: 1 });
+  const book = prints.book;
+  const slot = book.base.colossus * 4;
+  assert.equal(book.info[slot], PRINTS.size.colossus);
+  assert.equal(book.info[slot + 1], -1, 'a right foot');
+  assert.equal(book.info[slot + 2], 2, 'the kind the shader draws as a colossus foot');
+  assert.ok(Math.abs(book.normal[slot + 3] - 1.2) < 1e-6, 'pointing the way it was walking');
+  // its own ring: a long walk never pushes your prints or the stinger's out
+  for (let i = 0; i < PRINTS.capacity.colossus * 2; i++) prints.plantColossus(SAND.x + i, SAND.z, 0, 1);
+  assert.equal(book.base.colossus, PRINTS.capacity.player + PRINTS.capacity.stinger);
+  assert.equal(prints.laid.player, 0);
   prints.dispose();
 });
 
@@ -212,7 +232,7 @@ test('the drawing is one call, laid flat over the ground and multiplied into it'
   const prints = createFootprints({ scene, sun: new THREE.Vector3(0, 1, 0), heightAt: terrainHeight });
   assert.ok(scene.children.includes(prints.mesh), 'added to the scene');
   assert.equal(prints.mesh.geometry.index.count, 6, 'a quad per print');
-  assert.equal(prints.book.total, PRINTS.capacity.player + PRINTS.capacity.stinger);
+  assert.equal(prints.book.total, PRINTS.capacity.player + PRINTS.capacity.stinger + PRINTS.capacity.colossus);
   assert.equal(prints.material.depthWrite, false);
   assert.equal(prints.material.side, THREE.DoubleSide, 'laid flat, the quad faces down: it must draw from both sides');
   assert.equal(prints.material.blendSrc, THREE.DstColorFactor, 'the ground is multiplied, not replaced');
