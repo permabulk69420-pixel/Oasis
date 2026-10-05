@@ -110,3 +110,16 @@ test('the terrain and water shaders still contain the lines the torch light hook
     }
   }
 });
+
+test('the terrain material is found through the real tile names (the torch and fire lighting depend on it)', async () => {
+  const { tileName } = await import('../src/terrain-tiles.js');
+  const { findTerrainMesh } = await import('../src/night-fill.js');
+  const material = new THREE.ShaderMaterial({ uniforms: {}, vertexShader: 'void main(){}', fragmentShader: 'void main(){}' });
+  const root = new THREE.Scene();
+  root.add(new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial())); // something else first
+  const tile = new THREE.Mesh(new THREE.BufferGeometry(), material);
+  tile.name = tileName({ size: 62.5, x: 3, z: -7 });
+  const group = new THREE.Group(); group.add(tile); root.add(group);
+  assert.equal(findTerrainMesh(root)?.material, material);
+  assert.equal(findTerrainMesh(new THREE.Scene()), null);
+});

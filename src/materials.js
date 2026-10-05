@@ -74,6 +74,8 @@ export const atmosphere = /* glsl */`
   // percent grey-blue under a moon: dark and tense, but not pitch black.
   const vec3 MOON_FILL = vec3(0.0026, 0.0039, 0.0070);
   const vec3 GRASS_NIGHT_FLOOR = vec3(0.12, 0.18, 0.24);
+  // Gravel, bedrock and salt are darker than the sand (gravel about a third as bright), so by moonlight they went to pure black. The floor brings them up to about the sand's moonlit level, no more (half floor, half their own colour, so the texture survives).
+  const vec3 ZONE_NIGHT_FLOOR = vec3(0.46, 0.36, 0.28);
   // Linear light added under the pods at peak (after tone mapping). Cyan, like the pods themselves.
   const vec3 POD_LIGHT_COLOR = vec3(0.030, 0.230, 0.380);
   const vec3 SKY_NIGHT_HORIZON = vec3(0.0030, 0.0046, 0.0085);
@@ -414,6 +416,7 @@ export function createMaterials(renderer, field) {
         // to pure black). It keeps dunes and shapes readable at night without touching the torch.
         // Turf is far darker than sand, so it gets a moonlit floor (cool blue-green) to stay readable.
         vec3 fillBase = mix(base, max(base, GRASS_NIGHT_FLOOR), grass);
+        fillBase = mix(fillBase, max(fillBase * 0.5 + ZONE_NIGHT_FLOOR * 0.5, fillBase), clamp(max(rockAmt, max(saltAmt, gravelAmt)), 0.0, 1.0)); // lifted toward the floor, keeping half the texture
         gl_FragColor.rgb += fillBase * MOON_FILL * mix(0.55, 1.0, max(n.y, 0.0)) * (1.0 - environmentDay);
         // Cyan pools under the veil tree's glowing pods. Only evaluated near the tree and at night.
         if (uPodLightArea.w > 0.001 && length(vWorld.xz - uPodLightArea.xy) < uPodLightArea.z) {

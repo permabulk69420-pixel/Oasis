@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { terrainHeight, isInPond } from './world.js';
 import { createFireEffect } from './fire-effect.js';
 import { createLoop } from './audio.js';
+import { findTerrainMesh } from './night-fill.js';
 import { pulseHaptics } from './haptics.js';
 
 // Campfires: a placed structure (stone ring and logs) that you light with a burning torch.
@@ -188,7 +189,7 @@ export function createCampfires({
 
   function ensureEnvironmentLighting() {
     if (!terrainReady) {
-      const terrain = scene.getObjectByName('sand-0-0');
+      const terrain = findTerrainMesh(scene);
       if (terrain?.material) {
         terrainReady = installFireLights(terrain.material, 'terrain', uniforms);
         if (!terrainReady) onError('[Oasis campfire] Could not add fire light to the terrain shader.');
