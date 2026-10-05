@@ -13,6 +13,7 @@ a game that does not start. It checks, by day and by night:
   - the giant bones (src/giant-bones.js) are laid out, three sites, and each one has a model on screen,
   - Colossus 01 (src/colossus.js) loads its far level (1.6 MB, fetched at once) and shows up in the telemetry,
   - the desert finds (src/mining.js) are laid out, and striking one with a pickaxe takes health off it and drops a stone,
+  - the sky island, which is the real start: the jungle is laid out (trees, undergrowth, vine curtains, grass), a tree is drawn, no errors, and once the forest has been made the scene is inside the budget,
   - saving (src/save-game.js): what you carry, a lit campfire and where you stand come back after a reload, and ?fresh=1 starts clean.
 Add a check here when a new system could silently fail to load. Exit code 0 is a pass.
 """
@@ -25,7 +26,8 @@ import time
 from playwright.sync_api import sync_playwright
 
 # Generous ceilings: they catch a mistake like drawing everything twice, not a few thousand triangles (see the perf-triangles skill for those).
-BUDGET = {"calls": 250, "triangles": 800_000, "geometries": 400, "textures": 120}
+# Kane, 6 Oct: "forget about triangles if you aren't hitting over a million, I would rather scale back than have weak results": so the ceiling at the spawn is a million.
+BUDGET = {"calls": 250, "triangles": 1_000_000, "geometries": 400, "textures": 120}
 LOAD_TIMEOUT_MS = 240_000
 IGNORED_CONSOLE = ("GL Driver Message", "GPU stall", "Automatic fallback to software WebGL", "WebGL", "AudioContext", "favicon")
 
@@ -125,6 +127,52 @@ def check_finds(page, hour):
     return problems
 
 
+def check_island(browser, base, shots):
+    """The game's real start: the sky island, no fixtures. It loads without errors, the jungle is laid out and drawn (trees, undergrowth, grass), the picture is not blank,
+    and once everything has been made the scene is inside the budget (the oasis views above are measured early, before the island's flora has been built)."""
+    problems = []
+    page = browser.new_page(viewport={"width": 960, "height": 540})
+    errors = []
+    page.on("pageerror", lambda e: errors.append("PAGEERROR " + str(e)))
+    page.on("console", lambda m: errors.append("console.error " + m.text) if m.type == "error" and not any(s in m.text for s in IGNORED_CONSOLE) else None)
+    page.goto(f"{base}/?hour=14&start=island")
+    try:
+        page.wait_for_function("document.querySelector('canvas') && document.querySelector('canvas').dataset.render", timeout=LOAD_TIMEOUT_MS)
+        # the trees are drawn from the first frames after the page has built their levels (slow in software): wait for one to show
+        built = False
+        for _ in range(240):
+            built = page.evaluate("Boolean(window.__skyIsland && window.__skyIsland.scenery.flora.group.children.some(c => c.name.startsWith('Island jungle') && c.count > 0))")
+            if built:
+                break
+            page.wait_for_timeout(1000)
+        page.wait_for_timeout(8000)
+        if not built:
+            problems.append("island: no jungle tree was ever drawn")
+        counts = page.evaluate("({ trees: window.__skyIsland.scenery.trees.length, undergrowth: window.__skyIsland.scenery.undergrowth.length, vines: window.__skyIsland.scenery.treeVines.length, grass: window.__skyIsland.scenery.grass.getStats().rich })")
+        if counts["trees"] < 150 or counts["undergrowth"] < 4000 or counts["vines"] < 100:
+            problems.append(f"island: the jungle is thin ({counts})")
+        if counts["grass"] < 100:
+            problems.append(f"island: no grass round the start ({counts})")
+        render = json.loads(page.evaluate("document.querySelector('canvas').dataset.render"))
+        for key, limit in BUDGET.items():
+            if render.get(key, 0) > limit:
+                problems.append(f"island: {key} {render[key]} is over the blow-out budget {limit}")
+        path = os.path.join(shots, "smoke_island.png") if shots else None
+        png = page.screenshot(path=path)
+        from io import BytesIO
+        from PIL import Image, ImageStat
+        spread = max(ImageStat.Stat(Image.open(BytesIO(png)).convert("L")).stddev)
+        if spread < 3:
+            problems.append(f"island: the picture is blank (pixel spread {spread:.1f})")
+        print(f"island: {json.dumps({'render': render, 'counts': counts, 'pixel_spread': round(spread, 1)})}")
+    except Exception as exc:  # a timeout waiting for the game, or a script error
+        problems.append(f"island: the check could not finish ({exc.__class__.__name__}: {str(exc)[:200]})")
+    for e in errors[:8]:
+        problems.append(f"island: {e}")
+    page.close()
+    return problems
+
+
 def check_save(browser, base):
     """Saving: carry something, light a fire and move, reload, and it is all still there; ?fresh=1 then starts a new game.
     The dev build only saves when the address says ?save=1, so the other checks never touch a save. This page has storage of its own."""
@@ -209,6 +257,9 @@ def main():
             found, info = check_view(browser, args.url.rstrip("/"), hour, args.shots)
             print(f"hour {hour}: {json.dumps(info)}")
             problems += found
+        found = check_island(browser, args.url.rstrip("/"), args.shots)
+        print(f"island: {'ok' if not found else 'PROBLEMS'}")
+        problems += found
         found = check_save(browser, args.url.rstrip("/"))
         print(f"save: {'ok' if not found else 'PROBLEMS'}")
         problems += found

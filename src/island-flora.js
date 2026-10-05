@@ -3,6 +3,7 @@ import { addWindSway, WIND_GLSL, WIND, windTime, windStrength } from './wind.js'
 import { exposureGlow } from './glow.js';
 import { createHaloInstances } from './glow-halos.js';
 import { buildFloraLevels } from './island-flora-models.js';
+import { buildFoliageLevels, UNDERGROWTH_MODELS } from './island-undergrowth-models.js';
 
 // Draws the island's new plants and landmarks (src/island-flora-models.js builds them, src/island-flora-layout.js says where). One instanced mesh per model and
 // level of detail, so a few dozen draw calls however many plants there are; each plant picks its level by distance and is left out past its draw distance. The
@@ -19,6 +20,9 @@ export const FLORA_LOOK = Object.freeze({
 });
 
 // How each model is drawn: the level boundaries (metres: level 0 up to the first, level 1 up to the second, level 2 beyond), the draw distance, the material.
+const JUNGLE_BARK = Object.freeze({ colour: 'jungle_bark_colour.jpg', normal: 'jungle_bark_normal.jpg' });
+export const LEAF_ALPHA_TEST = 0.42;
+
 export const FLORA_RENDER = Object.freeze({
   fern: { lod: [24, 64], draw: 150, double: true, sway: { name: 'island-fern', top: 0.85, reach: 0.10, lean: 0.25, bend: 1.5, radial: 0.45, rate: 0.9, flutter: 0.012, shade: 0, push: 1, pushPad: 0.4 } },
   cushion: { lod: [16, 46], draw: 110 },
@@ -37,6 +41,21 @@ export const FLORA_RENDER = Object.freeze({
   ribcage: { lod: [32, 95], draw: 300 },
   bonesA: { lod: [14, 40], draw: 120 },
   bonesB: { lod: [14, 40], draw: 120 },
+  // The textured undergrowth (src/island-undergrowth-models.js): cards of painted leaf (`map`: public/textures/island-leaves/<map>.png), cut out by alpha. `tint`: each copy
+  // may carry its own colour multiplier (item.tint). They are many (hundreds to thousands), so they are drawn only within `draw` metres and the coarse levels are cheap.
+  fernA: { lod: [13, 36], draw: 80, double: true, map: 'fern', tint: true, sway: { name: 'island-fernA', top: 0.95, reach: 0.10, lean: 0.25, bend: 1.5, radial: 0.45, rate: 0.9, flutter: 0.010, shade: 0, push: 1, pushPad: 0.45 } },
+  fernB: { lod: [13, 36], draw: 80, double: true, map: 'fern', tint: true, sway: { name: 'island-fernB', top: 1.05, reach: 0.10, lean: 0.25, bend: 1.5, radial: 0.45, rate: 0.85, flutter: 0.010, shade: 0, push: 1, pushPad: 0.45 } },
+  broadleafA: { lod: [13, 36], draw: 80, double: true, map: 'broadleaf', tint: true, sway: { name: 'island-broadleafA', top: 1.2, reach: 0.08, lean: 0.25, bend: 1.6, radial: 0.35, rate: 0.7, flutter: 0.008, shade: 0, push: 1, pushPad: 0.45 } },
+  broadleafB: { lod: [13, 36], draw: 80, double: true, map: 'broadleaf', tint: true, sway: { name: 'island-broadleafB', top: 1.3, reach: 0.08, lean: 0.25, bend: 1.6, radial: 0.35, rate: 0.7, flutter: 0.008, shade: 0, push: 1, pushPad: 0.45 } },
+  bushA: { lod: [14, 40], draw: 90, double: true, map: 'canopy', tint: true, sway: { name: 'island-bushA', top: 1.6, reach: 0.07, lean: 0.25, bend: 1.8, radial: 0.25, rate: 0.8, flutter: 0.014, shade: 0, push: 0.8, pushPad: 0.5 } },
+  bushB: { lod: [14, 40], draw: 90, double: true, map: 'canopy', tint: true, sway: { name: 'island-bushB', top: 1.9, reach: 0.07, lean: 0.25, bend: 1.8, radial: 0.25, rate: 0.8, flutter: 0.014, shade: 0, push: 0.8, pushPad: 0.5 } },
+  vineCurtain: { lod: [16, 44], draw: 130, double: true, map: 'vine', tint: true, hang: { reach: 0.3, rate: 0.7, flutter: 0.04 } },
+  // The tall growth (src/island-jungle-models.js): the trunk wears a tiling bark photo (a second material on the same mesh), the leaves are cards of the canopy and fern atlases.
+  treeFernA: { lod: [18, 50], draw: 130, double: true, map: 'fern', tint: true, bark: JUNGLE_BARK, sway: { name: 'island-treeFernA', top: 4.5, reach: 0.16, lean: 0.3, bend: 1.8, radial: 0.12, rate: 0.7, flutter: 0.014, shade: 0, push: 0 } },
+  treeFernB: { lod: [18, 50], draw: 130, double: true, map: 'fern', tint: true, bark: JUNGLE_BARK, sway: { name: 'island-treeFernB', top: 5.6, reach: 0.18, lean: 0.3, bend: 1.8, radial: 0.12, rate: 0.65, flutter: 0.014, shade: 0, push: 0 } },
+  jungleA: { lod: [40, 88], draw: 430, double: true, map: 'canopy', tint: true, bark: JUNGLE_BARK, sway: { name: 'island-jungleA', top: 30, reach: 0.5, lean: 0.3, bend: 2.0, radial: 0, rate: 0.4, flutter: 0.05, shade: 0, push: 0 } },
+  jungleB: { lod: [40, 88], draw: 430, double: true, map: 'canopy', tint: true, bark: JUNGLE_BARK, sway: { name: 'island-jungleB', top: 36, reach: 0.55, lean: 0.3, bend: 2.0, radial: 0, rate: 0.36, flutter: 0.05, shade: 0, push: 0 } },
+  jungleC: { lod: [40, 88], draw: 430, double: true, map: 'canopy', tint: true, bark: JUNGLE_BARK, sway: { name: 'island-jungleC', top: 25, reach: 0.45, lean: 0.3, bend: 2.0, radial: 0, rate: 0.45, flutter: 0.05, shade: 0, push: 0 } },
 });
 
 // ------------------------------------------------------------------------------------------------------------------------------ materials
@@ -95,16 +114,80 @@ function patchHangSway(material, { reach = 0.35, rate = 0.7, flutter = 0.03 } = 
   material.needsUpdate = true;
 }
 
+// Leaf cards are lit from the side they are seen on by their own (smooth, bushy) vertex normals: three flips the normal on a card's back face, which would make
+// the far side of every leaf dark. This takes the flip out, so both faces take the same light.
+function patchFoliage(material) {
+  const own = Object.prototype.hasOwnProperty.call(material, 'onBeforeCompile') ? material.onBeforeCompile : null;
+  material.onBeforeCompile = function onBeforeCompileFoliage(shader, renderer) {
+    (own ?? Object.getPrototypeOf(this).onBeforeCompile)?.call(this, shader, renderer);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('normal *= faceDirection;', ''));
+  };
+  const key = material.customProgramCacheKey?.bind(material);
+  material.customProgramCacheKey = () => `${key ? key() : ''}|island-foliage`;
+  material.needsUpdate = true;
+}
+
+// The painted leaf atlases, one texture each, shared by every material that wears it. (Not built where there is no document, so tests can make materials.)
+const leafTextures = new Map();
+function leafTexture(name) {
+  if (typeof document === 'undefined') return null;
+  if (!leafTextures.has(name)) {
+    const texture = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}textures/island-leaves/${name}.png`);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 4;
+    leafTextures.set(name, texture);
+  }
+  return leafTextures.get(name);
+}
+
 export function createFloraMaterial(name, render = {}) {
-  const material = new THREE.MeshStandardMaterial({
-    name: `Island ${name}`, vertexColors: true, roughness: render.roughness ?? 0.88, metalness: 0,
-    emissive: new THREE.Color(1, 1, 1), emissiveIntensity: 0, side: render.double ? THREE.DoubleSide : THREE.FrontSide,
-  });
+  // Painted leaf cards are matte (Lambert): a standard material's sheen caught the low warm sun at a glancing angle and turned green ferns tan.
+  const material = render.map
+    ? new THREE.MeshLambertMaterial({
+      name: `Island ${name}`, vertexColors: true, emissive: new THREE.Color(1, 1, 1), emissiveIntensity: 0, side: render.double ? THREE.DoubleSide : THREE.FrontSide,
+    })
+    : new THREE.MeshStandardMaterial({
+      name: `Island ${name}`, vertexColors: true, roughness: render.roughness ?? 0.88, metalness: 0,
+      emissive: new THREE.Color(1, 1, 1), emissiveIntensity: 0, side: render.double ? THREE.DoubleSide : THREE.FrontSide,
+    });
   patchEmit(material);
   if (render.sway) addWindSway(material, render.sway);
   if (render.hang) patchHangSway(material, render.hang);
+  if (render.map) {
+    const map = leafTexture(render.map);
+    // A plain alpha cut-out. (Alpha to coverage was tried first, for soft multisampled edges, and in the software renderer every leaf grew a pale web of one-pixel outlines at
+    // dusk and by day; the same scene with a cut-out is clean, so the cut-out it is. The cut-off sits a little under a half so far-off cards, whose mip levels average the
+    // cut-outs toward a faint alpha, keep most of their leaf.)
+    if (map) { material.map = map; material.alphaTest = LEAF_ALPHA_TEST; }
+    patchFoliage(material);
+  }
   return material;
 }
+
+// The tiling bark of the tall trees' trunks and limbs: the photo's colour and its normal map (Poly Haven Bark Brown 02, CC0), lit matte.
+const barkTextures = new Map();
+function barkTexture(file, colour) {
+  if (typeof document === 'undefined') return null;
+  if (!barkTextures.has(file)) {
+    const texture = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}textures/bark/${file}`);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.anisotropy = 4;
+    if (colour) texture.colorSpace = THREE.SRGBColorSpace;
+    barkTextures.set(file, texture);
+  }
+  return barkTextures.get(file);
+}
+
+export function createBarkMaterial(name, render) {
+  const material = new THREE.MeshLambertMaterial({ name: `Island ${name} bark`, vertexColors: true });
+  const map = barkTexture(render.bark.colour, true), normalMap = barkTexture(render.bark.normal, false);
+  if (map) { material.map = map; material.normalMap = normalMap; }
+  // the same lean as the leaves (the bark does not flutter), so a crown never comes away from its limbs
+  if (render.sway) addWindSway(material, { ...render.sway, name: `${render.sway.name}-bark`, flutter: 0 });
+  return material;
+}
+
+export const levelsFor = type => (UNDERGROWTH_MODELS[type] ? buildFoliageLevels(type) : buildFloraLevels(type));
 
 export function geometryFromLevel(level) {
   const geometry = new THREE.BufferGeometry();
@@ -115,6 +198,7 @@ export function geometryFromLevel(level) {
   geometry.setAttribute('sway', new THREE.BufferAttribute(level.sways, 1));
   geometry.setAttribute('uv', new THREE.BufferAttribute(level.uvs, 2));
   geometry.setIndex(new THREE.BufferAttribute(level.indices, 1));
+  if (level.groups) for (const g of level.groups) if (g.count > 0) geometry.addGroup(g.start, g.count, g.material);       // leaf cards, then bark
   geometry.computeBoundingSphere();
   geometry.computeBoundingBox();
   return geometry;
@@ -140,6 +224,7 @@ export function createIslandFlora({ items, getExposure = () => 1, sunDirection =
   group.name = 'Island flora';
   const position = new THREE.Vector3(), scale = new THREE.Vector3(), quaternion = new THREE.Quaternion(), euler = new THREE.Euler(0, 0, 0, 'YXZ');
   const local = new THREE.Vector3();
+  const tint = new THREE.Color();
   const byType = new Map();
   for (const item of items) {
     const sc = Array.isArray(item.scale) ? item.scale : [item.scale ?? 1, item.scale ?? 1, item.scale ?? 1];
@@ -166,17 +251,20 @@ export function createIslandFlora({ items, getExposure = () => 1, sunDirection =
     if (built.has(type)) return;
     const render = FLORA_RENDER[type];
     if (!render) throw new Error(`no render settings for island model ${type}`);
-    const levels = buildFloraLevels(type);
+    const levels = levelsFor(type);
     const list = byType.get(type);
     const material = createFloraMaterial(type, render);
     materials.push(material);
+    const bark = render.bark ? createBarkMaterial(type, render) : null;
+    if (bark) materials.push(bark);
     const meshes = levels.map((level, index) => {
-      const mesh = new THREE.InstancedMesh(geometryFromLevel(level), material, Math.max(list.length, 1));
+      const mesh = new THREE.InstancedMesh(geometryFromLevel(level), bark ? [material, bark] : material, Math.max(list.length, 1));
       mesh.name = `Island ${type} level ${index}`;
       mesh.frustumCulled = false;
       mesh.castShadow = mesh.receiveShadow = false;
       mesh.count = 0;
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      if (render.tint) mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(list.length, 1) * 3).fill(1), 3);   // each copy's own colour
       group.add(mesh);
       return mesh;
     });
@@ -190,14 +278,22 @@ export function createIslandFlora({ items, getExposure = () => 1, sunDirection =
     for (const [type, entry] of built) {
       const render = FLORA_RENDER[type];
       const counts = [0, 0, 0];
+      const drawSq = render.draw * render.draw;
       for (const item of byType.get(type)) {
-        const d = Math.hypot(item.x - x, item.z - z);
+        const dx = item.x - x, dz = item.z - z, dd = dx * dx + dz * dz;
+        if (forceLod === null && dd > drawSq) { item.lod = -1; continue; }      // (the many small plants: a squared distance first, a square root only for those in range)
+        const d = Math.sqrt(dd);
         item.lod = forceLod !== null ? forceLod : floraLodFor(d, render, item.lod);
         if (item.lod < 0) continue;
-        entry.meshes[item.lod].setMatrixAt(counts[item.lod]++, item.matrix);
+        const mesh = entry.meshes[item.lod], slot = counts[item.lod]++;
+        mesh.setMatrixAt(slot, item.matrix);
+        if (mesh.instanceColor) { const t = item.tint; tint.setRGB(t ? t[0] : 1, t ? t[1] : 1, t ? t[2] : 1); mesh.setColorAt(slot, tint); }
         if (item.lod === 0 && d < FLORA_LOOK.halo.distance && entry.halos.length) nearby.push({ item, entry, d });
       }
-      entry.meshes.forEach((mesh, index) => { mesh.count = counts[index]; mesh.visible = counts[index] > 0; mesh.instanceMatrix.needsUpdate = true; });
+      entry.meshes.forEach((mesh, index) => {
+        mesh.count = counts[index]; mesh.visible = counts[index] > 0; mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      });
     }
     nearby.sort((a, b) => a.d - b.d);
     for (const { item, entry } of nearby) {

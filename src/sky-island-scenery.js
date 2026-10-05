@@ -9,6 +9,8 @@ import { layoutIslandFlora } from './island-flora-layout.js';
 import { createIslandFlora } from './island-flora.js';
 import { createIslandMotes } from './island-motes.js';
 import { createIslandGroundGlow } from './island-ground-glow.js';
+import { createJungleField, layoutUndergrowth, layoutJungleTrees, layoutTreeVines } from './island-jungle-layout.js';
+import { createIslandGrass } from './island-grass.js';
 
 // Everything that makes the island a place rather than a lawn (Kane, 5 Oct: it is the player's home base): the lake and the waterfall, the paths, the
 // stone, the palm grove. It is all set dressing, nothing in play touches it. The layouts are pure and seeded (so the island is the same every time),
@@ -52,7 +54,7 @@ export function createIslandScenery({ island, materials, getExposure = () => 1 }
     anchor: { x: island.config.x, z: island.config.z, distance: 700 },
   };
 
-  // the island's own plants and landmarks: the weeping glow-trees, the root arch, the standing stones, the ribcage, ferns, night flowers, cushions, logs, mushrooms, vines
+  // the island's own plants and landmarks: the weeping glow-trees, the root arch, the standing stones, the ribcage, night flowers, cushions, logs, mushrooms, vines
   const floraItems = layoutIslandFlora({
     ground: island.groundHeight, features: island.features, pathIndex, paths: pathData, config: island.config, rocks: rockItems, waterY,
     obstacles: [
@@ -60,11 +62,38 @@ export function createIslandScenery({ island, materials, getExposure = () => 1 }
       ...glowItems.map(item => ({ x: item.x, z: item.z, r: 0.5 * item.scale, soft: true })),
     ],
   });
+
+  // how overgrown the island is, point by point (src/island-jungle-layout.js): the grass, the undergrowth and the tall trees all read this one field. The trees go first (they
+  // keep off the palms, the stone and the big landmarks), then the undergrowth fills in round them.
+  const jungleField = createJungleField({ features: island.features, config: island.config });
+  const BIG = { weepingTree: 5.5, rootArch: 6, standingStoneA: 3, standingStoneB: 3, ribcage: 9, log: 2.5, fungusLog: 2.5 };
+  const trees = layoutJungleTrees({
+    ground: island.groundHeight,
+    obstacles: [
+      ...palmLayout.map(p => ({ x: p.x, z: p.z, r: 2.4 * p.scale })),
+      ...rockItems.filter(item => item.r >= 0.3).map(item => ({ x: item.x, z: item.z, r: item.r + 1.6 })),
+      ...floraItems.filter(item => BIG[item.type]).map(item => ({ x: item.x, z: item.z, r: BIG[item.type] * (item.scale ?? 1) })),
+      ...glowItems.map(item => ({ x: item.x, z: item.z, r: 1.5 * item.scale })),
+    ],
+  }, jungleField);
+  const treeVines = layoutTreeVines(trees, island.groundHeight);
+  const undergrowth = layoutUndergrowth({
+    ground: island.groundHeight, features: island.features, config: island.config,
+    obstacles: [
+      ...palmLayout.map(p => ({ x: p.x, z: p.z, r: 0.5 * p.scale })),
+      ...rockItems.filter(item => item.r >= 0.3).map(item => ({ x: item.x, z: item.z, r: item.r * 0.9 })),
+      ...trees.map(t => ({ x: t.x, z: t.z, r: 1.3 * t.scale })),
+    ],
+  }, jungleField);
   const flora = createIslandFlora({
-    items: floraItems, getExposure, sunDirection: materials.sand.uniforms.uSun.value, anchor,
+    items: [...floraItems, ...undergrowth, ...trees, ...treeVines], getExposure, sunDirection: materials.sand.uniforms.uSun.value, anchor,
     onError: message => console.warn(message),
   });
   group.add(flora.group);
+
+  // grass blades (the oasis's) over the meadow and the floor, made in chunks round you as you walk (src/island-grass.js)
+  const grass = createIslandGrass({ ground: island.groundHeight, cover: jungleField.cover, thick: jungleField.thick });
+  group.add(grass.group);
 
   // light that drifts: seed puffs lifting off the big pale night flowers, and glow-flies over the lake at night (src/island-motes.js)
   const motes = createIslandMotes({ flowers: floraItems.filter(item => item.type === 'flower'), lake: island.features.lake, level: waterY, ground: island.groundHeight, getExposure, anchor });
@@ -74,12 +103,18 @@ export function createIslandScenery({ island, materials, getExposure = () => 1 }
   const groundGlow = createIslandGroundGlow({ flora: floraItems, glow: glowItems, ground: island.groundHeight, getExposure, anchor });
   group.add(groundGlow.group);
 
+  let grassStarted = false;
   return {
-    group, lake, spill, paths, palms, rocks, pathIndex, palmLayout, rockItems, glow, flora, floraItems, motes, groundGlow,
+    group, lake, spill, paths, palms, rocks, pathIndex, palmLayout, rockItems, glow, flora, floraItems, undergrowth, trees, treeVines, jungleField, grass, motes, groundGlow,
     triangles: lake.triangles + spill.triangles + paths.triangles + rocks.triangles + groundGlow.triangles,
     // every 100 ms (cheap): loads the palms when you are near the island, and picks the level of detail each is drawn at (y: the eye's height)
     update(x, z, y) { palms.update(x, z, y); },
     // every frame: the plants' glow follows the light, the nearest ones are drawn in detail, the motes drift and the ground takes the glow. viewHeight: pixels tall one eye's picture is
-    updateFlora(head, dt, viewHeight) { flora.update(head, dt); motes.update(head, dt, viewHeight); groundGlow.update(head); },
+    updateFlora(head, dt, viewHeight) {
+      flora.update(head, dt); motes.update(head, dt, viewHeight); groundGlow.update(head);
+      const near = Math.hypot(head.x - anchor.x, head.z - anchor.z) < anchor.distance;
+      grass.group.visible = near;
+      if (near) grass.update(head.x, head.z, !grassStarted && (grassStarted = true));
+    },
   };
 }

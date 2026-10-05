@@ -16,10 +16,10 @@ const MOVE_REBUILD_DISTANCE = 2.25;
 const LOCAL_DENSITY_FULL_DISTANCE = 14;
 const LOCAL_DENSITY_END_DISTANCE = 32;
 
-const RICH_BLADES = 12;
-const LITE_BLADES = 6;
-const RICH_TRIANGLES = RICH_BLADES * 4; // two ribbon segments per blade
-const LITE_TRIANGLES = LITE_BLADES * 2; // one ribbon segment per blade
+export const RICH_BLADES = 12;
+export const LITE_BLADES = 6;
+export const RICH_TRIANGLES = RICH_BLADES * 4; // two ribbon segments per blade
+export const LITE_TRIANGLES = LITE_BLADES * 2; // one ribbon segment per blade
 
 function seededRandom(seed = 0x8a51f2d3) {
   let state = seed >>> 0;
@@ -43,7 +43,7 @@ function smoothstep(a, b, value) {
 
 // One instance is a broad grass patch rather than a bouquet tuft. Roots are spread over roughly
 // one metre and the current blade-height test remains in place at about 34-54 cm.
-function createPatchGeometry(bladeCount, segments, rich) {
+export function createPatchGeometry(bladeCount, segments, rich) {
   const positions = [];
   const indices = [];
   let vertexIndex = 0;
