@@ -333,6 +333,17 @@ and sets, never climbing past `SUN_PEAK_DEGREES` (14), so the whole day is a lon
 top (an old bug had the sun jump 63 degrees across the sky at noon and midnight). The game starts at `INITIAL_PHASE` 0.14 (a little after sunrise), the sun on the side it always started on. The look follows the sun's height: `sunHigh()` and `sunColour()` in `src/materials.js` blend the sky (teal-indigo
 up high, dusty rose at the horizon, a wide warm glow round the sun), the clouds (slate on the far side, coral toward the sun) and the sun's colour on the sand and water from red (sun on the horizon) to gold (top of its arc); `DAY_EXPOSURE` is 0.62 (it was 0.82) in `src/day-night.js`. The day and night lengths are unchanged (3 minutes each). Tests: `tests/sun-path.test.js`, `tests/night-sky.test.js`.
 
+## The glow plants
+
+The oasis was barren and nothing echoed the hero tree's glow, so the pond now has two glow plants (my call on the look; Kane, 5 Oct: "don't go too crazy", he likes the darkness). Both are built in Blender (`tools/glow-plants/build_glow_plants.py`, checked by `check_mesh.py`: closed solids facing outward, triangle budgets, heights, UVs), live in
+`public/models/vegetation/glow-plants/` in three levels of detail and are placed by `src/glow-garden.js` (`GLOW_GARDEN` is the whole dial).
+- **Glow reeds** (`glow_reed_lod{0,1,2}.glb`): a clump of 13 slim stalks with leaf blades, each stalk ending in a cyan bulb, with the odd violet one. 22 clumps along the water's edge, spaced at least 5.5 m, scaled 0.85 to 1.3.
+- **Lantern blooms** (`lantern_bloom_lod{0,1,2}.glb`): a waist-high plant with a leafy base and drooping cyan pods on tendrils (cyan only, no violet). 12 on the banks and 12 in a loose grove 11 to 28 m round the hero tree.
+- Drawn as instanced meshes (one draw per material per level, however many plants), fetched when you come within 260 m of the pond, swapped at 28 m and 75 m, culled by distance (170 m reeds, 190 m lanterns), swaying with the same gusts as the grass (profiles `glow-reed` and `lantern-bloom` in `src/wind.js` terms).
+  The bulbs and pods hold the same displayed brightness day and night through `exposureGlow` (0.5 day, 0.95 night); at night each bulb also gets a soft additive halo (the sprites the hero tree's pods and the fruit use), only within 70 m.
+- **UVs on purpose** (Kane plans a PBR texture pass, 1k): every material has proper non-overlapping UVs and the meshes also carry a vertex colour for the look today. The materials are named `Glow plant stem`, `Glow plant leaf`, `Glow` and `Glow violet`, which is what the game finds them by.
+- Tests: `tests/glow-garden.test.js` (layout rules, level choice, the six model files exist and are small).
+
 ## The backpack
 
 A rucksack you pick up and put on, which raises how much you can carry before it slows you down. It lies in the sand a couple of
