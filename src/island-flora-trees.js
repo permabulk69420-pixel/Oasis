@@ -119,7 +119,7 @@ function buildWeepingTree(lod, plan) {
   // ---- the limbs, with a vein along each and a little give at the ends
   const limbSides = [8, 5, 3][lod];
   const tipSway = (t, a, i) => limbSway(t);
-  if (lod < 2) spec.limbs.forEach((limb, k) => {
+  spec.limbs.forEach((limb, k) => {
     const path = lod === 2 ? limb.ctl.filter((_, i) => i % 2 === 0 || i === limb.ctl.length - 1) : curve(limb.ctl, dens);
     const o = {
       radius: t => 0.2 * (1 - 0.8 * Math.pow(t, 0.85)) + 0.025, sides: limbSides, capStart: 'none', capEnd: 'round', capRings: 1, up: [0, 1, 0],
@@ -143,7 +143,7 @@ function buildWeepingTree(lod, plan) {
       });
     }
   });
-  // ---- leaves (level 0: every one; level 1: drapes; level 2: left to the skirt)
+  // ---- leaves (level 0: every one; levels 1 and 2: drapes of leaf hanging off the limbs)
   if (lod === 0) {
     spec.leaves.forEach((l, k) => {
       const mid = add(add(l.p, mul(l.dir, l.L * 0.5)), [0, -0.04, 0]);
@@ -154,9 +154,9 @@ function buildWeepingTree(lod, plan) {
         color: t => mix3(shade(LEAF, l.tone), shade(LEAF_LIGHT, l.tone), t), sway: (t, s) => l.w0 + 0.3 * t,
       });
     });
-  } else if (lod === 1) {
+  } else {
     spec.limbs.forEach((limb, k) => {
-      for (let j = 0; j < 4; j++) {
+      for (let j = 0; j < (lod === 1 ? 4 : 3); j++) {
         const t = 0.42 + j * 0.15;
         const { p, T } = along(limb.fine, t);
         const lateral = mul(normalize(cross(T, [0, 1, 0]), [1, 0, 0]), j % 2 ? -1 : 1);
@@ -168,20 +168,12 @@ function buildWeepingTree(lod, plan) {
       }
     });
   }
-  // ---- level 2: a bell of dark leaf that stands for the crown and the strands from far off
-  if (lod === 2) {
-    addLathe(m, 'crown', [[3.8, 1.7], [4.5, 2.5], [4.85, 3.5], [4.75, 4.7], [4.3, 5.8], [3.3, 6.8], [1.7, 7.5], [0.2, 7.8]], {
-      sides: 10, color: (t, a) => mix3(shade(LEAF, 0.85), LEAF_LIGHT, 0.35 * (1 - t)), emit: t => glow(CYAN, 0.05 * (1 - t)), sway: t => 0.22 * (1 - t),
-    });
-  }
   // ---- the strands
-  const strandCount = [spec.strands.length, 26, spec.strands.length][lod];
-  const stride = lod === 1 ? Math.max(1, Math.floor(spec.strands.length / strandCount)) : 1;
+  const strandCount = [spec.strands.length, 26, 22][lod];
+  const stride = lod > 0 ? Math.max(1, Math.floor(spec.strands.length / strandCount)) : 1;
   let podIndex = 0;
   for (let k = 0, used = 0; k < spec.strands.length && used < strandCount; k += stride, used++) {
-    if (lod === 2 && podIndex >= 8) break;
     const s = spec.strands[k];
-    if (lod === 2 && !s.pod) continue;
     const rows = [8, 4, 2][lod];
     const path = [];
     for (let i = 0; i < rows; i++) {
@@ -194,8 +186,8 @@ function buildWeepingTree(lod, plan) {
         radius: u => 0.0135 - 0.004 * u, sides: 3, capStart: 'none', capEnd: s.pod ? 'none' : 'round', capRings: 1, up: [1, 0, 0],
         color: u => mix3(BARK_DARK, shade(BARK, 1.4), u), emit: u => glow(CYAN, 0.22 * Math.pow(u, 2.5)), sway: u => weight(u),
       });
-    } else if (lod === 1) {
-      addRibbon(m, `strand${k}`, path, { width: 0.05, side: [1, 0, 0], color: () => BARK_DARK, emit: u => glow(CYAN, 0.18 * u * u), sway: (u) => weight(u) });
+    } else {
+      addRibbon(m, `strand${k}`, path, { width: lod === 1 ? 0.05 : 0.08, side: [1, 0, 0], color: () => BARK_DARK, emit: u => glow(CYAN, 0.18 * u * u), sway: (u) => weight(u) });
     }
     const tip = path[path.length - 1];
     if (s.pod) {
