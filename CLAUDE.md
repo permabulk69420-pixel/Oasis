@@ -369,4 +369,5 @@ the rings are foreshortened so their outer edge can shimmer a little in the head
 
 
 - **Stamina is x20 for testing (Kane, 5 Oct)**: `staminaSprintPerSecond` 0.25 instead of 5 in `src/survival.js` (about 400 s of sprint). Put it back to 5 when he says, or when stamina starts to matter (climb, glide).
+- **Turbo movement (Kane, 5 Oct, testing aid):** click both thumbsticks together in VR (T on a keyboard) to toggle 10x movement speed (`TURBO` in `src/turbo.js`; a lone stick click is sprint or crouch, a hair late so the two-stick click can be told apart). Not saved. He asked for it because the 4 km world is too slow to test on foot; a rough glider is the next idea he agreed to later, his call on the feel. The hero tree needs lower levels of detail, one cheap enough to be always drawn as a landmark (he agreed, 5 Oct), old model unchanged up close.
 - **Testing start kit (Kane, 5 Oct)**: a new game starts with one campfire in the pockets (`TESTING_START_KIT` in `src/main.js`), so he can test placing and lighting without gathering. Saving is off, so every page load is a new game. Empty the list when the real start is wanted.
