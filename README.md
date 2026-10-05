@@ -328,9 +328,10 @@ are switched off, so it is a dark disc against the stars where it is unlit); by 
 noise texture gives the bands their turbulence), so outside the few percent of the sky it covers it costs one dot product per sky pixel. Everything is in the `PLANET` table at the top of `night-sky.js` (direction, size, ring size and tilt); the colours
 are in `planetLight` in the same file.
 
-The sun's path is in `src/sun-path.js`, one smooth arc shared by the sky, the lights and the tests. It used to climb in one direction, flip to the opposite side at noon and flip back at midnight (the sun, the light on everything and the moon each jumped 63 degrees
-across the sky); now it rises and sets at the same two points as before, climbs the same heights at every hour (58.5 degrees at noon) and swings round the sky half a turn per half cycle, eased so it is slowest at the horizons and quickest at the top. At the starting time it is exactly
-where it always was, so the first picture does not change. The sun is behind you at noon (you start facing the pond), the moon is overhead behind you at midnight, and neither ever comes within 50 degrees of the planet. Tests: `tests/sun-path.test.js`, `tests/night-sky.test.js`.
+The sun's path is in `src/sun-path.js`, one smooth arc shared by the sky, the lights and the tests. **It is a twilight planet** (Kane, 5 Oct): the sun comes up over the horizon, slides round it
+and sets, never climbing past `SUN_PEAK_DEGREES` (14), so the whole day is a long low golden hour with long dark shadows; the moon is opposite it, so as low by night. The swing round the sky is half a turn per half cycle, eased so it is slowest at the horizons and quickest at the
+top (an old bug had the sun jump 63 degrees across the sky at noon and midnight). The game starts at `INITIAL_PHASE` 0.14 (a little after sunrise), the sun on the side it always started on. The look follows the sun's height: `sunHigh()` and `sunColour()` in `src/materials.js` blend the sky (teal-indigo
+up high, dusty rose at the horizon, a wide warm glow round the sun), the clouds (slate on the far side, coral toward the sun) and the sun's colour on the sand and water from red (sun on the horizon) to gold (top of its arc); `DAY_EXPOSURE` is 0.62 (it was 0.82) in `src/day-night.js`. The day and night lengths are unchanged (3 minutes each). Tests: `tests/sun-path.test.js`, `tests/night-sky.test.js`.
 
 ## The backpack
 

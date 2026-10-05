@@ -12,10 +12,10 @@ export const NIGHT_SECONDS = 3 * 60;
 export const CYCLE_SECONDS = DAY_SECONDS + NIGHT_SECONDS;
 
 const NIGHT_EXPOSURE = 0.035;
-const DAY_EXPOSURE = 0.82;
+const DAY_EXPOSURE = 0.62;
 
 const TAU = Math.PI * 2;
-// The sun's path (it never climbs past 58 degrees, and it swings smoothly round the sky) is in sun-path.js.
+// The sun's path (it never climbs past about 14 degrees: a twilight planet; it swings smoothly round the sky) is in sun-path.js.
 
 const DAY_SKY_LIGHT = new THREE.Color(0xc4ddf0);
 const NIGHT_SKY_LIGHT = new THREE.Color(0x02050a);
@@ -203,7 +203,7 @@ export function createDayNightCycle({ scene, renderer, materials }) {
     const daylight = smoothstep(-0.07, 0.14, sunHeight);
     const moonAmount = smoothstep(0.05, 0.30, -sunHeight);
     const twilight = 1 - smoothstep(0.0, 0.32, Math.abs(sunHeight));
-    const warmToWhite = smoothstep(0.03, 0.45, sunHeight);
+    const warmToWhite = 0.4 * smoothstep(0.02, 0.24, sunHeight); // the sun never gets high: it stays low and golden all day
 
     sunlight.position.copy(sunDirection).multiplyScalar(1000);
     sunlight.intensity = 3.0 * daylight;
@@ -216,7 +216,7 @@ export function createDayNightCycle({ scene, renderer, materials }) {
     tempGround.copy(NIGHT_GROUND_LIGHT).lerp(DAY_GROUND_LIGHT, daylight);
     hemisphere.color.copy(tempSky);
     hemisphere.groundColor.copy(tempGround);
-    hemisphere.intensity = 0.012 + daylight * 1.228 + twilight * 0.045;
+    hemisphere.intensity = 0.012 + daylight * 0.95 + twilight * 0.045;
 
     // Twilight remains readable, but once it has passed, unaided night vision should be poor.
     // This is intentional survival-game darkness: practical navigation should want a torch.
