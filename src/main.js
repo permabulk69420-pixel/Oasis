@@ -7,6 +7,7 @@ import { createSkyIsland } from './sky-island.js';
 import { createSkyIslandTrees } from './sky-island-trees.js';
 import { ISLAND_START } from './sky-island-ground.js';
 import { startPlace } from './start-place.js';
+import { createFall, stepFall, fallDamage } from './player-fall.js';
 import { WALK } from './zones.js';
 import { TURBO, createTurboChord } from './turbo.js';
 import { createMaterials, createWater } from './materials.js';
@@ -309,6 +310,7 @@ function toggleTurbo() {
 const STANDING_EYE_HEIGHT = 1.68, JUMP_SPEED = 4.4, GRAVITY = 12.0;
 const CROUCH_DEPTH = 0.58, CROUCH_RESPONSE = 12.0, LEFT_STICK_BUTTON = 3, RIGHT_STICK_BUTTON = 3;
 let groundY = rig.position.y;
+const fall = createFall();
 let seatedOffset = 0, seatedCalibrationPending = false;
 let jumpHeight = 0, jumpVelocity = 0, jumpHeld = false;
 let crouchOffset = 0, crouchActive = false, crouchButtonDown = false;
@@ -603,7 +605,7 @@ renderer.xr.addEventListener('sessionstart', () => {
   camera.position.set(0, 0, 0);
   camera.quaternion.identity();
 
-  jumpHeight = 0; jumpVelocity = 0; jumpHeld = false;
+  jumpHeight = 0; jumpVelocity = 0; jumpHeld = false; fall.active = false; fall.speed = 0;
   crouchOffset = 0; crouchActive = false; crouchButtonDown = false;
   sprintActive = false; sprintButtonDown = false;
   seatedOffset = 0;
@@ -841,7 +843,13 @@ function frame(time) {
     // Smooth the terrain-following base separately from seated height, crouch and jump height.
     if (onIsland && skyIsland.groundHeight(head.x, head.z) === null) onIsland = false; // walked off the edge: the desert's ground is 250 m down
     const ground = groundAt(head.x, head.z);
-    groundY += (ground - groundY) * (1 - Math.exp(-dt * 24));
+    const falling = stepFall(fall, groundY, ground, dt); // the ground dropped away (the island's edge, a cliff): fall, then land
+    if (falling === null) groundY += (ground - groundY) * (1 - Math.exp(-dt * 24));
+    else groundY = falling;
+    if (fall.landed) {
+      const hurt = fallDamage(fall.landed);
+      if (hurt > 0) { damagePlayer(hurt); for (const state of hands.states) pulseHaptics(state, 1, 250); }
+    }
     rig.position.y = groundY + seatedOffset + crouchOffset + jumpHeight;
 
     // Survival: slow drain, sprint costs stamina, wading into the pond refills water.
