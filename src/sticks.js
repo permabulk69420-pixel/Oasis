@@ -5,6 +5,7 @@ import { addInventoryItem, getInventoryCount } from './inventory.js';
 import { isHandAtChest } from './chest-storage.js';
 import { attachHeldObject, getGripMeshParts, setGripSurface } from './grip-contact.js';
 import { registerDropSpawner } from './resource-drops.js';
+import { skyLight } from './sky-environment.js';
 
 const STICK_URL = `${import.meta.env?.BASE_URL ?? '/'}models/stick/dead_ground_stick_vr_thin.glb`;
 const GRIP_BUTTON = 1;
@@ -181,6 +182,7 @@ export function createGroundSticks({ field, onError = console.warn }) {
   const loader = new GLTFLoader();
   loader.load(STICK_URL, gltf => {
     const source = gltf.scene;
+    skyLight(source);
     source.name = 'Dead ground stick source';
     source.updateMatrixWorld(true);
 

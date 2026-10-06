@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { HERO_TREE } from './world.js';
+import { skyLightMaterials } from './sky-environment.js';
 
 const ROCK_TEXTURE = `${import.meta.env.BASE_URL}textures/rocks/pickup-rock/pickup_rock_albedo.png`;
 const TOTAL_ROCKS = 128;
@@ -112,6 +113,7 @@ export function createPickupRocks({ field, renderer = null }) {
     metalness: 0,
   });
   material.name = 'Pickup rock';
+  skyLightMaterials([material]);
 
   new THREE.TextureLoader().load(
     ROCK_TEXTURE,
