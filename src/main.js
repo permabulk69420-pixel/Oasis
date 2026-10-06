@@ -738,7 +738,7 @@ function frame(time) {
     const kartToggle = !renderer.xr.isPresenting && keys.has('KeyF') && !kartKeyDown;
     kartKeyDown = keys.has('KeyF');
     const steer = renderer.xr.isPresenting ? 0 : Number(keys.has('KeyD')) - Number(keys.has('KeyA'));
-    kartRide = sandKart.update(dt, { rig, head, desktopToggle: kartToggle, desktopSteer: steer, presenting: renderer.xr.isPresenting, lift: seatedOffset });
+    kartRide = sandKart.update(dt, { rig, head, desktopToggle: kartToggle, desktopSteer: steer, presenting: renderer.xr.isPresenting });
     if (kartRide.stepOff) { groundY = groundAt(kartRide.stepOff.x, kartRide.stepOff.z); velocity.set(0, 0, 0); }
   } else kartRide = null;
   // One wind clock for the sand and the swaying plants, so their gusts line up.
@@ -837,7 +837,7 @@ function frame(time) {
       // seated in the sand kart: it carries the rig (src/sand-kart.js); no walking, turning or jumping, the floor lowered to a seated eye height
       velocity.set(0, 0, 0); jumpHeight = 0; jumpVelocity = 0;
       groundY = sandKart.rigFloorY() + KART.seatDrop;
-      // (the kart placed the rig this frame, in its own frame and tilted with it, the seated calibration included)
+      // (the kart placed the rig this frame: the eye pinned above the seat, the view tilted with a share of the kart's tilt)
       updateSurvival(dt, { sprinting: false, inWater: false });
     } else {
       const turn = -input.turn * TURN_SPEED * dt;
