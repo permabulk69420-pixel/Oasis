@@ -5,9 +5,15 @@ import {
   getInventoryItemWeight, getInventoryCount, isPackWorn,
 } from './inventory.js';
 import { pulseHaptics } from './haptics.js';
+import { statColour } from './watch.js';
+import { exposureGlow } from './glow.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { reflectMetal, gadgetReflection } from './gadget-env.js';
 
-// The watch menu (the owner, 6 Oct: the Ark-style menu was ugly; it now comes out of the survival watch). One panel of smoked glass, in the watch's
-// colours: two tabs (Pack: what you carry and what you wear; Craft: what you can make), a grid of big tiles on the left and a card for the chosen one
+// The watch menu (the owner, 6 Oct: the Ark-style menu was ugly; it now comes out of the survival watch; then: make it look part of the watch). It is
+// the watch, scaled up: the screen is drawn like the watch's (dark teal, a faint instrument grid, green for what is chosen and the button to press,
+// green to red for how full something is) inside a frame that is the watch's case (public/models/watch/watch_menu_frame.glb, built by
+// tools/watch/build_menu_frame.py: the same gunmetal bezel, grip teeth, cyan marks and crown). On the screen: two tabs (Pack: what you carry and what you wear; Craft: what you can make), a grid of big tiles on the left and a card for the chosen one
 // on the right with what you can do with it. Your health, food, water and stamina are on the watch, so they are not in here; the carried weight is in
 // the header.
 // VR: tap the watch (or press Y) and it grows out of the watch and hangs in front of you at about arm's length, a little below the eyes and tilted to
@@ -23,9 +29,11 @@ const C = {
   accentSoft: 'rgba(127, 230, 242, 0.16)',
   gold: '#f3c86e',
   warn: '#ef9079',
-  ok: '#66d98a',
+  ok: '#60d678',
+  green: '#50de8c',                          // the watch's full bar: what is chosen, and the button to press
+  greenGlow: 'rgba(80, 222, 140, 0.5)',
+  greenSoft: 'rgba(80, 222, 140, 0.18)',
 };
-const INSET = 14;                                           // the panel sits this far inside the canvas, so its glow fits
 const GRID = { x: 44, y: 128, cols: 5, rows: 3, size: 140, gap: 16 };
 const CARD = { x: 852, y: 124, w: 400, h: 652 };
 const SLOT = 104;
@@ -66,13 +74,24 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
   const PANEL_HEIGHT_METRES = PANEL_WIDTH_METRES * HEIGHT / WIDTH;
   const panel = new THREE.Mesh(
     new THREE.PlaneGeometry(PANEL_WIDTH_METRES, PANEL_HEIGHT_METRES),
-    new THREE.MeshBasicMaterial({ map: texture, toneMapped: false, transparent: true, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ map: texture, toneMapped: false }),
   );
   panel.name = 'Watch menu'; panel.visible = false; panel.renderOrder = 30;
   scene.add(panel);
+  // the watch's case round the screen (its opening is the panel less a lip, so the canvas's rim is under the bezel)
+  const frameTrim = [], frameMetal = [];
+  new GLTFLoader().load(`${import.meta.env?.BASE_URL ?? '/'}models/watch/watch_menu_frame.glb`, gltf => {
+    gltf.scene.traverse(o => {
+      if (!o.isMesh) return;
+      o.castShadow = o.receiveShadow = false;
+      if (o.material?.name?.startsWith('Menu_Glow')) frameTrim.push(o.material);
+    });
+    frameMetal.push(...reflectMetal(gltf.scene, renderer));
+    panel.add(gltf.scene);
+  }, undefined, error => console.warn(`[Watch menu] frame: ${error?.message || error}`));
   // a fingertip's mark on the glass while it is near: a ring that closes as the finger comes in
   const cursors = states.map(() => {
-    const ring = new THREE.Mesh(new THREE.RingGeometry(0.0055, 0.0075, 28), new THREE.MeshBasicMaterial({ color: C.accent, toneMapped: false, transparent: true, depthTest: false, opacity: 0.9 }));
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.0055, 0.0075, 28), new THREE.MeshBasicMaterial({ color: C.green, toneMapped: false, transparent: true, depthTest: false, opacity: 0.9 }));
     ring.renderOrder = 32; ring.visible = false; panel.add(ring); return ring;
   });
   const raycaster = new THREE.Raycaster();
@@ -127,15 +146,15 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
       ctx.strokeStyle = 'rgba(158, 194, 200, 0.16)'; ctx.lineWidth = 1.5; ctx.stroke();
     } else if (primary) {
       const g = ctx.createLinearGradient(0, y, 0, y + h);
-      g.addColorStop(0, hover ? '#a8f3fa' : '#8eecf6'); g.addColorStop(1, hover ? '#5fd3e2' : '#4fc2d2');
-      ctx.shadowColor = 'rgba(127, 230, 242, 0.55)'; ctx.shadowBlur = hover ? 26 : 14;
+      g.addColorStop(0, hover ? '#9cf2b8' : '#7fe6a2'); g.addColorStop(1, hover ? '#4fd685' : '#3cc474');
+      ctx.shadowColor = C.greenGlow; ctx.shadowBlur = hover ? 26 : 14;
       ctx.fillStyle = g; rounded(x, y, w, h, 18); ctx.fill();
     } else {
-      ctx.fillStyle = hover ? 'rgba(127, 230, 242, 0.16)' : 'rgba(255, 255, 255, 0.06)'; rounded(x, y, w, h, 18); ctx.fill();
-      ctx.strokeStyle = hover ? 'rgba(127, 230, 242, 0.7)' : 'rgba(127, 230, 242, 0.3)'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = hover ? C.greenSoft : 'rgba(255, 255, 255, 0.06)'; rounded(x, y, w, h, 18); ctx.fill();
+      ctx.strokeStyle = hover ? 'rgba(80, 222, 140, 0.75)' : 'rgba(80, 222, 140, 0.3)'; ctx.lineWidth = 2; ctx.stroke();
     }
     ctx.restore();
-    text(label, x + w / 2, y + h / 2 + size * 0.36, size, disabled ? C.dim : primary ? '#04181c' : C.ink, primary ? 700 : 600, 'center');
+    text(label, x + w / 2, y + h / 2 + size * 0.36, size, disabled ? C.dim : primary ? '#03170c' : C.ink, primary ? 700 : 600, 'center');
   }
 
   function icon(type, cx, cy, scale = 1) {
@@ -264,11 +283,11 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
     const lift = hover ? 0.06 : 0;
     g.addColorStop(0, `rgba(255, 255, 255, ${(type ? 0.075 : 0.03) + lift})`);
     g.addColorStop(1, `rgba(255, 255, 255, ${(type ? 0.025 : 0.012) + lift})`);
-    if (active) { ctx.shadowColor = 'rgba(127, 230, 242, 0.6)'; ctx.shadowBlur = 22; }
+    if (active) { ctx.shadowColor = C.greenGlow; ctx.shadowBlur = 22; }
     ctx.fillStyle = g; rounded(x, y, size, size, 20); ctx.fill();
     ctx.shadowBlur = 0;
     ctx.lineWidth = active ? 3 : 1.5;
-    ctx.strokeStyle = active ? C.accent : ready ? 'rgba(243, 200, 110, 0.75)' : hover ? 'rgba(127, 230, 242, 0.5)' : type ? 'rgba(127, 230, 242, 0.16)' : 'rgba(127, 230, 242, 0.06)';
+    ctx.strokeStyle = active ? C.green : ready ? 'rgba(243, 200, 110, 0.75)' : hover ? 'rgba(80, 222, 140, 0.55)' : type ? 'rgba(110, 222, 236, 0.16)' : 'rgba(110, 222, 236, 0.07)';
     ctx.stroke();
     ctx.restore();
     if (!type) return hover;
@@ -286,26 +305,17 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
     return hover;
   }
 
-  // ---- the panel
-  function drawGlass() {
-    const x = INSET, y = INSET, w = WIDTH - INSET * 2, h = HEIGHT - INSET * 2;
-    ctx.save();
-    ctx.shadowColor = 'rgba(127, 230, 242, 0.35)'; ctx.shadowBlur = 18;
-    const g = ctx.createLinearGradient(0, y, 0, y + h);
-    g.addColorStop(0, 'rgba(12, 34, 40, 0.93)'); g.addColorStop(1, 'rgba(4, 14, 18, 0.93)');
-    ctx.fillStyle = g; rounded(x, y, w, h, 40); ctx.fill();
-    ctx.restore();
-    ctx.save(); rounded(x, y, w, h, 40); ctx.clip();
-    // faint scan lines and a sheen across the top, like light on the glass
-    ctx.fillStyle = 'rgba(127, 230, 242, 0.022)';
-    for (let yy = y; yy < y + h; yy += 4) ctx.fillRect(x, yy, w, 1);
-    const sheen = ctx.createLinearGradient(0, y, 0, y + 140);
-    sheen.addColorStop(0, 'rgba(180, 245, 250, 0.08)'); sheen.addColorStop(1, 'rgba(180, 245, 250, 0)');
-    ctx.fillStyle = sheen; ctx.fillRect(x, y, w, 140);
-    ctx.restore();
-    ctx.strokeStyle = 'rgba(127, 230, 242, 0.55)'; ctx.lineWidth = 2.5; rounded(x + 1, y + 1, w - 2, h - 2, 39); ctx.stroke();
-    // the projector's mark at the bottom edge (where it came out of the watch)
-    ctx.fillStyle = C.accent; rounded(WIDTH / 2 - 46, HEIGHT - INSET - 4, 92, 4, 2); ctx.fill();
+  // ---- the screen: the watch's (a dark teal gradient, a faint instrument grid, a soft vignette), edge to edge (the frame's bezel covers its rim)
+  function drawScreen() {
+    const g = ctx.createLinearGradient(0, 0, 0, HEIGHT);
+    g.addColorStop(0, '#0b1d22'); g.addColorStop(1, '#050d10');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    ctx.strokeStyle = 'rgba(110, 222, 236, 0.06)'; ctx.lineWidth = 1.5;
+    for (let i = 40; i < WIDTH; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, HEIGHT); ctx.stroke(); }
+    for (let i = 40; i < HEIGHT; i += 40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(WIDTH, i); ctx.stroke(); }
+    const v = ctx.createRadialGradient(WIDTH / 2, HEIGHT / 2, HEIGHT * 0.35, WIDTH / 2, HEIGHT / 2, WIDTH * 0.62);
+    v.addColorStop(0, 'rgba(0, 0, 0, 0)'); v.addColorStop(1, 'rgba(0, 0, 0, 0.35)');
+    ctx.fillStyle = v; ctx.fillRect(0, 0, WIDTH, HEIGHT);
   }
 
   function drawHeader() {
@@ -318,10 +328,10 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
       const active = tab === id;
       if (active || hover) {
         ctx.save();
-        if (active) { ctx.shadowColor = 'rgba(127, 230, 242, 0.45)'; ctx.shadowBlur = 16; }
-        ctx.fillStyle = active ? 'rgba(127, 230, 242, 0.22)' : 'rgba(255, 255, 255, 0.05)'; rounded(tx, y + 4, tw, h - 8, 28); ctx.fill();
+        if (active) { ctx.shadowColor = C.greenGlow; ctx.shadowBlur = 16; }
+        ctx.fillStyle = active ? C.greenSoft : 'rgba(255, 255, 255, 0.05)'; rounded(tx, y + 4, tw, h - 8, 28); ctx.fill();
         ctx.restore();
-        if (active) { ctx.strokeStyle = 'rgba(127, 230, 242, 0.7)'; ctx.lineWidth = 2; rounded(tx, y + 4, tw, h - 8, 28); ctx.stroke(); }
+        if (active) { ctx.strokeStyle = 'rgba(80, 222, 140, 0.75)'; ctx.lineWidth = 2; rounded(tx, y + 4, tw, h - 8, 28); ctx.stroke(); }
       }
       ctx.globalAlpha = active ? 1 : 0.6;
       icon(glyph, tx + 46, y + h / 2 + 1, 0.42);
@@ -333,7 +343,8 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
     const mx = 724, mw = 400;
     text('Load', mx, 62, 22, C.muted, 600);
     text(`${weight} / ${capacity}`, mx + mw, 62, 22, heavy ? C.warn : C.ink, 700, 'right');
-    meter(mx, 76, mw, 10, weight / capacity, heavy ? C.warn : weight / capacity > 0.8 ? C.gold : C.accent);
+    if (heavy) text('Too heavy: you walk at half speed', mx, 112, 18, C.warn, 600);
+    meter(mx, 76, mw, 10, weight / capacity, statColour(1 - weight / capacity));
     // close
     const cx = WIDTH - 72, cy = 68, r = 30;
     const hover = addControl('close', 'Close', cx - r, cy - r, r * 2, r * 2);
@@ -406,7 +417,7 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
     const well = 132;
     ctx.save();
     const g = ctx.createRadialGradient(x + 24 + well / 2, y + 24 + well / 2, 10, x + 24 + well / 2, y + 24 + well / 2, well * 0.7);
-    g.addColorStop(0, 'rgba(127, 230, 242, 0.18)'); g.addColorStop(1, 'rgba(127, 230, 242, 0.03)');
+    g.addColorStop(0, 'rgba(80, 222, 140, 0.16)'); g.addColorStop(1, 'rgba(110, 222, 236, 0.03)');
     ctx.fillStyle = g; rounded(x + 24, y + 24, well, well, 24); ctx.fill();
     ctx.restore();
     if (type) { ctx.globalAlpha = faded ? 0.4 : 1; icon(type, x + 24 + well / 2, y + 24 + well / 2 + 3, 1.06); ctx.globalAlpha = 1; }
@@ -505,7 +516,7 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
   function draw() {
     dirty = false; controls = [];
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
-    drawGlass();
+    drawScreen();
     drawHeader();
     if (tab === 'pack') drawPack(); else drawCraft();
     drawCard();
@@ -638,6 +649,12 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
   }
 
   function update() {
+    if (open && renderer.xr.isPresenting) {
+      const exposure = renderer.toneMappingExposure ?? 1;
+      for (const m of frameTrim) m.emissiveIntensity = exposureGlow(exposure, { day: 0.35, night: 0.5 });
+      for (const m of frameMetal) m.envMapIntensity = gadgetReflection(exposure);
+      panel.material.color.setScalar(0.72 + 0.28 * THREE.MathUtils.smoothstep(exposure, 0.07, 0.5));   // a little dimmer at night, as the watch is
+    }
     if (open && popStart >= 0) {
       const t = Math.min(1, (performance.now() - popStart) / (PLACE.popSeconds * 1000));
       const e = 1 - Math.pow(1 - t, 3);
