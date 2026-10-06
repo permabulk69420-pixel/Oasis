@@ -1,16 +1,10 @@
-# Oasis grass texture
+# Grass ground
 
-The grass band around the water uses the turf set in this folder (`oasis-turf_*`), configured in
-`src/grass-texture.js`. `GRASS_TILE_METRES` there controls its repeat size in metres.
+The ground under the grass (the oasis's grass band and the floating island) is two real photo scans, both CC0, toned to the world's dark
+palette by `tools/textures/make_ground.py` (its header says where to download the sources):
 
-The set is procedural and seamless. Regenerate or retune it with:
+- `ground-grass_*` (albedo, normal, roughness): the grass, laid everywhere grass grows. The shader samples it at two scales and angles and
+  blends them with soft noise, so its repeat (`GRASS_TILE_METRES` in `src/grass-texture.js`) does not show.
+- `ground-litter_*` (albedo, normal): leaf litter and trampled ground, laid in big soft patches over the grass.
 
-    python3 tools/grass/make_turf.py            # needs numpy + Pillow
-    python3 tools/grass/make_turf.py --seed 7   # different pattern
-
-The palette lives at the top of `build()` in that script (deep / mid / tip, straw, soil).
-The previous arrow-blade `stylized-grass1_*` set is in git history if you ever want it back
-(`git log -- public/textures/grass`).
-
-To use any other seamless set instead, drop it in here and update the filenames in
-`src/grass-texture.js`. 1024 pixels is plenty on Quest 3.
+All 1024 px JPEG (about 2 MB together). The old generated "turf" set is in git history.
