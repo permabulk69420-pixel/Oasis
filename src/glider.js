@@ -7,8 +7,8 @@ import { createHandleHold, measureHandleRadius } from './handle-hold.js';
 // The glider (the owner's model, public/models/glider/oasis_glider.glb), from the owner's note on 6 Oct: while it is in the inventory, raise both hands
 // above your head and squeeze both grips and it appears over you and works. Let go with both hands and it folds back into the inventory.
 // It sits on your hands: its bar runs from the left hand to the right and both hands lock onto its grips (src/handle-hold.js, as on the sand kart). It flies once there is more than a metre of air under your feet: walk off the island's edge or a cliff with it open, or open it while you
-// fall and it catches you. Steering: lower one hand to bank and turn that way; push the bar out (away from you) to slow and float, pull it in to dive
-// faster. The bar's reach when you opened it is the rest position. You touch down without harm. Desktop: G opens or closes it, A and D bank, W and S pitch.
+// fall and it catches you. Steering: lower one hand to bank and turn that way; move your hands forward to point the nose down and dive faster, back to lift it and float.
+// The bar's reach when you opened it is the rest position. You touch down without harm. Desktop: G opens or closes it, A and D bank, W and S pitch.
 // The model's markers: grip_left / grip_right (the hand sockets, 0.64 m apart, the bar along +X), its origin midway between them, forward -Z, up +Y.
 // The bar's rubber grips are 3.8 cm across and run from 0.2 m to 0.44 m out from the middle.
 
@@ -18,7 +18,7 @@ export const GLIDER = Object.freeze({
   aboveHead: 0.05,            // metres: both hands must be at least this far above the eyes to open it
   takeOff: 1.2,               // metres of air under your feet before it flies
   cruise: 14,                 // m/s with the bar at rest
-  slow: 10, fast: 20,         // m/s with the bar pushed fully out / pulled fully in
+  slow: 10, fast: 20,         // m/s with the hands fully back (nose up) / fully forward (nose down)
   sink: 1.6,                  // m/s down at rest; more pulled in and in a bank
   diveSink: 3.6,
   bankSink: 0.8,
@@ -26,7 +26,7 @@ export const GLIDER = Object.freeze({
   bankDead: 3 * Math.PI / 180,  // hands this close to level fly straight
   speedResponse: 0.8, sinkResponse: 1.5,
   barReach: 0.22,             // metres the bar moves out or in from where you opened it, for full pitch
-  pitchShow: 0.25,            // radians the glider's nose lifts at full push (it dips as much pulled in)
+  pitchShow: 0.25,            // radians the glider's nose lifts with the hands fully back (it dips as much with them forward)
   grip: Object.freeze({ halfLength: 0.06 }),  // metres either side of a grip marker the hand may sit (inside the rubber, between its rings)
   desktop: Object.freeze({ above: 0.45, ahead: 0.25, bank: 30 * Math.PI / 180 }),
   stow: Object.freeze({ strength: 0.3, ms: 40 }),
@@ -92,7 +92,7 @@ export function createGlider({ scene, states, onError = console.warn }) {
   }
 
   // The glider over the hands: its bar from the left hand to the right, its nose the way you face (square to the bar), lifted by how far the bar is
-  // pushed out. Reads the bank and the push from the hands in VR.
+  // drawn back. Reads the bank and the pitch from the hands in VR (hands forward: nose down, owner's note 6 Oct).
   function pose(rig, head, presenting) {
     const yaw = rig.rotation.y;
     fwd.set(-Math.sin(yaw), 0, -Math.cos(yaw));
@@ -108,7 +108,7 @@ export function createGlider({ scene, states, onError = console.warn }) {
       const beyond = Math.max(0, Math.abs(tilt) - GLIDER.bankDead) * Math.sign(tilt);
       bank = THREE.MathUtils.clamp(beyond, -GLIDER.maxBank, GLIDER.maxBank);
       const reach = tmp.copy(mid).sub(head).dot(fwd);
-      pull = THREE.MathUtils.clamp((reach - reach0) / GLIDER.barReach, -1, 1);       // + pushed out (slow), - pulled in (dive)
+      pull = THREE.MathUtils.clamp((reach0 - reach) / GLIDER.barReach, -1, 1);       // hands back: + (nose up, slow); hands forward: - (nose down, dive)
     } else {
       mid.copy(head).addScaledVector(fwd, GLIDER.desktop.ahead); mid.y += GLIDER.desktop.above;
       xAxis.set(Math.cos(yaw), 0, -Math.sin(yaw)).applyAxisAngle(fwd, bank);
@@ -135,7 +135,7 @@ export function createGlider({ scene, states, onError = console.warn }) {
   //   groundAt(x, z, y): the ground under (x, z) for feet at height y (so the island counts only when you are above it)
   //   groundY: the feet's base height now; rigOffset: the rig's height over the feet (seated and crouch offsets)
   //   fallSpeed (m/s down, if falling), velocity (the walk, for the speed at take-off), bounds { minX, maxX, minZ, maxZ }
-  //   desktop { toggle, bank (-1..1, + right), pitch (-1..1, + push out) }, blocked (riding the kart, or not playing)
+  //   desktop { toggle, bank (-1..1, + right), pitch (-1..1, + nose up) }, blocked (riding the kart, or not playing)
   // Returns { flying, feetY, landed (true on the step you touch down) }. While flying it places the rig itself.
   function update(dt, { rig, head, presenting, groundAt, groundY, rigOffset = 0, fallSpeed = 0, velocity = null, bounds = null, desktop = {}, blocked = false }) {
     let landed = false;
