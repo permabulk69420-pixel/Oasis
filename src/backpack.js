@@ -5,6 +5,7 @@ import { attachHeldObject, setGripSurface } from './grip-contact.js';
 import { pulseHaptics } from './haptics.js';
 import { canTakeOffPack, isPackWorn, setPackWorn } from './inventory.js';
 import { exposureGlow } from './glow.js';
+import { skyLight } from './sky-environment.js';
 
 // The backpack: one physical pack. It lies on the sand near where you start. Grab it by its handle, reach behind your
 // shoulder and let go there, and you are wearing it: it vanishes from your hand and the menu inventory grows (see
@@ -117,6 +118,7 @@ export function createBackpack({
   const loader = new GLTFLoader();
   loader.load(PACK.url, gltf => {
     pack = gltf.scene;
+    skyLight(pack);
     pack.name = 'Backpack';
     pack.userData.backpack = true;
     pack.userData.gripProfile = 'medium';

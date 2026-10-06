@@ -12,6 +12,7 @@ import { createHeldFruit } from './glow-fruit.js';
 import { getHeldGripPose } from './grip-poses.js';
 import { createAdaptiveGrip } from './adaptive-grip.js';
 import { pulseHaptics } from './haptics.js';
+import { skyLight } from './sky-environment.js';
 
 // The exact pinned dumbgame rigs, stored locally so contact geometry and tests
 // use the same bones/skin without depending on a second host during VR startup.
@@ -146,6 +147,7 @@ export function createVRHands({ renderer, scene, parent = null, camera = null, g
 
     detach(state);
     const root = prepareModel(clone(gltf.scene));
+    skyLight(root, { strength: 0.5 }); // skin: a little of the sky's colour, no shine to speak of
     root.name = `${handedness}-vr-hand`;
 
     const offset = HAND_GRIP_OFFSETS[handedness];

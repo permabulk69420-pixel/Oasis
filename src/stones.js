@@ -5,6 +5,7 @@ import { addInventoryItem, getInventoryCount } from './inventory.js';
 import { isHandAtChest } from './chest-storage.js';
 import { attachHeldObject, setGripSurface } from './grip-contact.js';
 import { registerDropSpawner } from './resource-drops.js';
+import { skyLightMaterials } from './sky-environment.js';
 
 const STONE_URL = `${import.meta.env?.BASE_URL ?? '/'}models/stone/vr_pickup_stone_uv_200.glb`;
 const ROCK_TEXTURE = `${import.meta.env?.BASE_URL ?? '/'}textures/rocks/pickup-rock/pickup_rock_albedo.png`;
@@ -69,6 +70,7 @@ export function createGroundStones({ field, renderer = null, onError = console.w
     source.updateMatrixWorld(true);
 
     const material = makeStoneMaterial(renderer);
+    skyLightMaterials([material]);
     source.traverse(object => {
       if (!object.isMesh) return;
       object.material = material;
