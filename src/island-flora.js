@@ -4,6 +4,7 @@ import { exposureGlow } from './glow.js';
 import { createHaloInstances } from './glow-halos.js';
 import { buildFloraLevels } from './island-flora-models.js';
 import { buildFoliageLevels, UNDERGROWTH_MODELS } from './island-undergrowth-models.js';
+import { GLB_MODELS, glbLevelsFor, loadGlbLevels } from './island-glb.js';
 
 // Draws the island's new plants and landmarks (src/island-flora-models.js builds them, src/island-flora-layout.js says where). One instanced mesh per model and
 // level of detail, so a few dozen draw calls however many plants there are; each plant picks its level by distance and is left out past its draw distance. The
@@ -191,7 +192,7 @@ export function createBarkMaterial(name, render) {
   return material;
 }
 
-export const levelsFor = type => (UNDERGROWTH_MODELS[type] ? buildFoliageLevels(type) : buildFloraLevels(type));
+export const levelsFor = type => glbLevelsFor(type) ?? (UNDERGROWTH_MODELS[type] ? buildFoliageLevels(type) : buildFloraLevels(type));
 
 export function geometryFromLevel(level) {
   const geometry = new THREE.BufferGeometry();
@@ -317,6 +318,7 @@ export function createIslandFlora({ items, getExposure = () => 1, sunDirection =
 
   // Every frame: the glow follows the exposure. Now and then: levels of detail and halos. One model is built per call until all are (a few milliseconds each).
   let away = false;
+  const requested = new Set(), failed = new Set();
   function update(head, dt = 0) {
     if (anchor && Math.hypot(head.x - anchor.x, head.z - anchor.z) > anchor.distance) {
       if (!away) { away = true; group.visible = false; }      // far from the island: nothing is drawn (the instanced meshes are never culled by the camera)
@@ -324,7 +326,10 @@ export function createIslandFlora({ items, getExposure = () => 1, sunDirection =
     }
     if (away) { away = false; group.visible = true; sinceRefresh = Infinity; }
     if (queue.length) {
-      try { build(queue.shift()); } catch (error) { onError(`[Island flora] ${error?.message || error}`); }
+      // a model that is a .glb file is fetched first (one at a time is fine: it is a few hundred KB); the others are built meanwhile. A file that will not load falls back to the built model.
+      for (const type of queue) if (GLB_MODELS.has(type) && !requested.has(type)) { requested.add(type); loadGlbLevels(type).catch(error => { failed.add(type); onError(`[Island flora] ${type}.glb: ${error?.message || error}`); }); }
+      const index = queue.findIndex(type => !GLB_MODELS.has(type) || glbLevelsFor(type) || failed.has(type));
+      if (index >= 0) { const [type] = queue.splice(index, 1); try { build(type); } catch (error) { onError(`[Island flora] ${error?.message || error}`); } }
     }
     if (!built.size) return;
     const intensity = exposureGlow(getExposure(), FLORA_LOOK.glow);
