@@ -32,6 +32,7 @@ export function levelFromScene(scene, name) {
   for (const { geometry, bark } of parts) {
     const a = geometry.attributes, n = a.position.count, start = indices.length;
     copy(a.position, positions, 3, offset); copy(a.normal, normals, 3, offset); copy(a.uv, uvs, 2, offset); copy(a.color, colors, 3, offset);
+    for (let i = offset; i < offset + n; i++) uvs[i * 2 + 1] = 1 - uvs[i * 2 + 1];                 // glTF's v runs down the picture, the game's runs up
     copy(a._emit, emits, 3, offset); copy(a._sway, sways, 1, offset);
     const source = geometry.index ? geometry.index.array : Uint32Array.from({ length: n }, (_, i) => i);
     for (const v of source) indices.push(v + offset);
