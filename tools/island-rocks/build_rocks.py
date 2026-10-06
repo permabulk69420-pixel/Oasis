@@ -11,7 +11,7 @@ Writes rocks_lod0.glb, rocks_lod1.glb, rocks_lod2.glb, each holding every piece 
   slab          a closed, flattened block (its underside shows): the lookout ledge and the hollow's overhang
   column        a tapering, twisting blade of faceted stone with banded strata and a broken top: the spire's five blades (the game leans each one)
 Every piece is unit sized round its middle (a ball of radius 1; the column 1 high on a base of radius 1, buried 0.12 under its foot), so the layout's
-half sizes scale it straight. Shaded smooth by angle: the rounded body is smooth, the fracture edges stay crisp (Kane wanted smoother stone than the
+half sizes scale it straight. Shaded smooth by angle: the rounded body is smooth, the fracture edges stay crisp (the owner wanted smoother stone than the
 old faceted blocks).
 
 The three levels are the same stone: lod0 is the full shape, lod1 and lod2 are Blender's Decimate of it (about a quarter and a sixteenth). The game picks

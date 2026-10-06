@@ -12,12 +12,12 @@ import { createIslandGroundGlow } from './island-ground-glow.js';
 import { createJungleField, layoutUndergrowth, layoutJungleTrees, layoutTreeVines } from './island-jungle-layout.js';
 import { createIslandGrass } from './island-grass.js';
 
-// Everything that makes the island a place rather than a lawn (Kane, 5 Oct: it is the player's home base): the lake and the waterfall, the paths, the
+// Everything that makes the island a place rather than a lawn (the owner, 5 Oct: it is the player's home base): the lake and the waterfall, the paths, the
 // stone, the palm grove. It is all set dressing, nothing in play touches it. The layouts are pure and seeded (so the island is the same every time),
 // worked out in the order that lets each avoid the one before: paths first, then the palms, then the stone, which keeps off both, then the glow plants,
 // then the new plants and landmarks (src/island-flora-layout.js), which keep off everything.
 export const ISLAND_SCENERY = Object.freeze({
-  paths: false,   // Kane, 6 Oct: "we shouldn't have paths... it's not great if you follow paths and can see everything". The code stays (src/sky-island-paths.js), nothing is laid.
+  paths: false,   // The owner, 6 Oct: "we shouldn't have paths... it's not great if you follow paths and can see everything". The code stays (src/sky-island-paths.js), nothing is laid.
 });
 
 export function createIslandScenery({ island, materials, getExposure = () => 1 }) {

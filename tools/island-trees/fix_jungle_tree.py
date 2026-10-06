@@ -4,7 +4,7 @@
 
 Writes <name>_lod0.glb, _lod1.glb, _lod2.glb.
 
-The trunk and limbs are kept as they were (Kane liked the root flare: it is the trunk's own, no loose fins). They live in
+The trunk and limbs are kept as they were (the owner liked the root flare: it is the trunk's own, no loose fins). They live in
 tools/island-trees/source/<name>_bark.glb, saved from the game's file the first time this runs: open that in Blender to change a trunk, then run this.
   lod0   the trunk as it is                       lod1   Blender's Decimate (collapse) of it to about 450 triangles
   lod2   the far trunk the old file had (64 triangles: a straight taper reads fine past 150 m)

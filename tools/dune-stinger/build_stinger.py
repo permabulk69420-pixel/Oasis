@@ -32,7 +32,7 @@ def tp(p):
 TAIL = [tp(p) for p in [(0,.50,.155),(0,.635,.255),(0,.660,.422),
         (0,.560,.555),(0,.407,.577)]]
 STING_TIP = tp((0,.263,.420))
-# Triangle ceilings per level (Kane, 4 Oct: the close-up level may go up to about 50,000; build rich, cut down).
+# Triangle ceilings per level (the owner, 4 Oct: the close-up level may go up to about 50,000; build rich, cut down).
 BUDGET = [50000, 12000, 3000]
 FILE_BUDGET = 2_000_000
 

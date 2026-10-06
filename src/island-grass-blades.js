@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-// The island's own grass blade patch (Kane, 6 Oct: the grass "looks trash": lime, rigid, every blade the same). The oasis keeps its blade patch (oasis-grass-ring.js, the look he
+// The island's own grass blade patch (the owner, 6 Oct: the grass "looks trash": lime, rigid, every blade the same). The oasis keeps its blade patch (oasis-grass-ring.js, the look he
 // accepted there); the island gets this one: the same number of blades and the same triangle count, but blades of three kinds (short wide ground cover, ordinary, tall and
 // drooping), tapering to a true point, arching over at the tip, and a colour that runs dark at the root to lighter at the tip (a vertex colour, multiplied by the instance's
 // tint), so a patch has a body and the tips are not all lit the same lime.

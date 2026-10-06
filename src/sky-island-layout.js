@@ -3,7 +3,7 @@ import { SKY_ISLAND, outlineRadius, topGround } from './sky-island-shape.js';
 import { createIslandFeatures } from './sky-island-places.js';
 import { layoutPaths, createPathIndex } from './sky-island-paths.js';
 
-// Where the palms go on the island's top (Kane, 5 Oct: the palm grove is a shaded stand of the oasis's own palms, grouped, not spread evenly over the
+// Where the palms go on the island's top (the owner, 5 Oct: the palm grove is a shaded stand of the oasis's own palms, grouped, not spread evenly over the
 // island). Pure and seeded, so the same island grows the same grove every time. Most of the palms are in the grove, between the meadow and the lake,
 // close enough that their crowns overlap; a few lean over the lake, a loose broken ring stands round the meadow, a few are alone on the rim against the
 // sky, a few flank the hollow, and a handful stand about on their own. None is on the meadow, a path, the water, the rise or the hollow's bowl.

@@ -1,7 +1,7 @@
 import { SKY_ISLAND, outlineRadius, undersidePoint } from './sky-island-shape.js';
 
 // The island's water: the lake, the short channel that carries it to the rim, and the thin waterfall that spills over the edge and thins to mist long
-// before it could reach the desert (Kane, 5 Oct: a real lake about 100 m by 50 m, "reuse the oasis pond's water look", no rivers). The lake is the
+// before it could reach the desert (the owner, 5 Oct: a real lake about 100 m by 50 m, "reuse the oasis pond's water look", no rivers). The lake is the
 // pond's own water material (src/oasis-water.js) on a grid laid over the basin; the channel and the fall are ribbons with their own small shader.
 // The builders here are pure (arrays only, no three.js) so tests can check them; the meshes are made in sky-island-lake.js.
 

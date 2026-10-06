@@ -87,7 +87,7 @@ export function holsterPose(holster = {}, side = 'right') {
 }
 
 // `copyStart` ({ from: {x, z}, to: {x, z} }) stands a second set of the starting tools at another start point: each kind's `spawns` moved
-// from `from` to `to` (Kane, 5 Oct: an extra copy of his tools on the floating island). The first set stays where it is.
+// from `from` to `to` (the owner, 5 Oct: an extra copy of his tools on the floating island). The first set stays where it is.
 export function createTools({ scene, states, kinds, renderer = null, camera = null, rig = null, heightAt = terrainHeight, copyStart = null, onError = console.warn }) {
   if (!scene || !Array.isArray(states) || !Array.isArray(kinds)) throw new Error('Tools require the scene, VR hand states and tool kinds.');
 

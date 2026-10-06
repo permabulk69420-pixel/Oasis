@@ -3,7 +3,7 @@ import { SKY_ISLAND, outlineRadius, topPaint } from './sky-island-shape.js';
 import { mulberry32 } from './find-shapes.js';
 import { VINE_ANCHORS } from './island-model-data.js';
 
-// How overgrown the island is, and where the undergrowth goes (Kane, 6 Oct: "it's meant to be like a dense island area to explore, it's not great if you follow paths and
+// How overgrown the island is, and where the undergrowth goes (the owner, 6 Oct: "it's meant to be like a dense island area to explore, it's not great if you follow paths and
 // can see everything"). One field says how thick the growth is at every point; the grass, the ferns, the big-leaf plants and the shrubs all read it, so the thickets and the
 // glades are the same places for all of them. Pure and seeded. The start meadow is a clearing (open lawn, nothing tall), thinning into jungle over a few tens of metres;
 // the grove and the hollow are thickest; the rocky rise, the rim's lip and the lake's edge are thin; bare stone has nothing on it.

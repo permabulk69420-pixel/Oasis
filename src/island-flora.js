@@ -19,7 +19,7 @@ export const FLORA_LOOK = Object.freeze({
   lodHysteresis: 3,
 });
 
-// ONE level rule for everything but the hero objects (Kane, 6 Oct): close level to 30 m, middle level to 70 m, the far level beyond. Do not give a plant its own numbers.
+// ONE level rule for everything but the hero objects (the owner, 6 Oct): close level to 30 m, middle level to 70 m, the far level beyond. Do not give a plant its own numbers.
 const STANDARD_LOD = Object.freeze([30, 70]);
 // The heroes (the giant trees, the weeping tree, the root arch) keep their own, further out.
 
@@ -34,7 +34,7 @@ export const FLORA_RENDER = Object.freeze({
   weepingTree: { lod: [30, 80], draw: 300, double: true, hang: { reach: 0.42, rate: 0.55, flutter: 0.03 } },
   vines: { lod: STANDARD_LOD, draw: 130, double: true, hang: { reach: 0.3, rate: 0.7, flutter: 0.04 } },
   rootArch: { lod: [45, 120], draw: 360 },
-  // (Retired by Kane on 6 Oct as low quality, so not placed and not made: the mossy cushions, the logs and driftwood, the bones, the ribcage and the standing
+  // (Retired by the owner on 6 Oct as low quality, so not placed and not made: the mossy cushions, the logs and driftwood, the bones, the ribcage and the standing
   // stones. A better version comes back as a new model in tools/island-models/ with its line here.)
   // The textured undergrowth (public/models/island/): cards of painted leaf (`map`: public/textures/island-leaves/<map>.png), cut out by alpha. `tint`: each copy
   // may carry its own colour multiplier (item.tint). They are many (hundreds to thousands), so they are drawn only within `draw` metres and the coarse levels are cheap.

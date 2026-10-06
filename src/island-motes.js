@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mulberry32 } from './find-shapes.js';
 import { WIND, WIND_GLSL, windTime, windStrength } from './wind.js';
 
-// Two kinds of drifting light for the island (Kane's brief for the overnight run: "seed puffs drifting near the meadow", and a passive glow-fly or two at the lake).
+// Two kinds of drifting light for the island (the owner's brief for the overnight run: "seed puffs drifting near the meadow", and a passive glow-fly or two at the lake).
 //   seed puffs  soft, pale, fine-rayed puffs that lift off the big pale night flowers, rise a little and drift downwind across the open ground, then fade; by day
 //               they are pale ivory, at night they glow the oasis's pale cyan
 //   glow-flies  a couple of dozen cyan-white lights that hover and loop over the lake's shallows at night, each pulsing slowly like a firefly

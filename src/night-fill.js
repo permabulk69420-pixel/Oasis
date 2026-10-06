@@ -26,7 +26,7 @@ export const TORCH_SHADER_MARKERS = Object.freeze({
 
 // The terrain's shader material, found through the scene. Every sand tile and the distant mountains share one material, so any of them will do.
 // The torch and the campfire both used to look for a tile called 'sand-0-0'; the 4 km quadtree (#107) names tiles by size and place, so that
-// lookup came back empty and neither light reached the ground (Kane noticed on 5 Oct). Never look a tile up by its exact name.
+// lookup came back empty and neither light reached the ground (the owner noticed on 5 Oct). Never look a tile up by its exact name.
 export function findTerrainMesh(scene) {
   let found = null;
   scene.traverse(object => {

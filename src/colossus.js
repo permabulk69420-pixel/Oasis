@@ -9,7 +9,7 @@ import { levelToShow } from './giant-bones.js';
 import { exposureGlow } from './glow.js';
 
 // Colossus 01 in the game: a 55 m four-legged walker that paces the gravel plain north of the oasis. It is passive: it walks, stands, breathes and looks
-// about, and nothing it does affects play. The model is Kane's (public/models/colossus/, built in Blender: see tools/colossus/BRIEF.md and the check report
+// about, and nothing it does affects play. The model is the owner's (public/models/colossus/, built in Blender: see tools/colossus/BRIEF.md and the check report
 // beside it); the walk is entirely code (src/colossus-brain.js decides where it goes, src/colossus-gait.js where each foot is, src/colossus-pose.js turns
 // that into bones). This file loads the three levels of detail, lights and hazes them like the rest of the world, puts a soft shadow on the ground
 // under the body and each foot, and kicks up dust and footprints where a foot comes down.

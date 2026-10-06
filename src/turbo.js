@@ -1,4 +1,4 @@
-// Testing aid (Kane, 5 Oct: the world is too big to test on foot): click both thumbsticks together in VR (T on a keyboard) to toggle
+// Testing aid (the owner, 5 Oct: the world is too big to test on foot): click both thumbsticks together in VR (T on a keyboard) to toggle
 // ultra-fast movement, `multiplier` times your usual speed (walk or sprint). Each stick click alone keeps its old job (left: sprint
 // toggle, right: crouch toggle), a hair late (`chordMs`) so a click of both at once can be told apart from two single clicks.
 export const TURBO = Object.freeze({ multiplier: 10, chordMs: 130 });

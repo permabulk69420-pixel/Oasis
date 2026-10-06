@@ -13,7 +13,7 @@ Skeleton (55 joints, every rest rotation identity so a bone rotation is a rotati
   Body > Claw_{L,R}_Arm > _Fore > _Finger                 the shoulder, the elbow, the movable finger
 
 Usage (needs bpy 4.5, numpy, Pillow, trimesh):  python3 build_stinger_v3.py --out-dir OUT [--lod 0|1|2] [--no-render] [--no-audit]
-Triangle ceilings per level are BUDGET (Kane, 4 Oct: the close-up level may go up to about 50,000; build rich, cut down).
+Triangle ceilings per level are BUDGET (the owner, 4 Oct: the close-up level may go up to about 50,000; build rich, cut down).
 """
 import argparse, json, math, os, sys
 from pathlib import Path

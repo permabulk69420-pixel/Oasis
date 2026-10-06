@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-// The island's ground takes the plants' light at night (Kane's brief for the overnight run: the glow carries the scene, and the darkness is liked, so this is
+// The island's ground takes the plants' light at night (the owner's brief for the overnight run: the glow carries the scene, and the darkness is liked, so this is
 // light where there are lights, never a general brightening). Under each weeping glow-tree, standing stone, the root arch, the little mushroom patches and every
 // group of glow plants there is a soft pool of the oasis tree's cyan on the ground, so the plants stand IN their light instead of floating over black.
 //

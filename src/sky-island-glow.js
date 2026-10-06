@@ -2,7 +2,7 @@ import { noise, clamp } from './world-math.js';
 import { SKY_ISLAND, outlineRadius } from './sky-island-shape.js';
 import { mulberry32 } from './find-shapes.js';
 
-// Where the glow plants grow on the island (Kane, 5 Oct: the glow is what carries the island at night, and it marks each place so you can find your way
+// Where the glow plants grow on the island (the owner, 5 Oct: the glow is what carries the island at night, and it marks each place so you can find your way
 // in the dark). These are the oasis's own two plants, the glow reeds and the lantern blooms (src/glow-garden.js draws them: this file only says where).
 // The lake is ringed with reeds in the shallows and blooms on its banks; each other place has a glow of its own: a loose ring of blooms round the meadow's
 // edge (never on it), blooms among the grove's palms, at the foot of the rise and at the hollow's mouth, a few along the rim, and a pair here and there

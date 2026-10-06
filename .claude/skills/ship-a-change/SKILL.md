@@ -5,7 +5,7 @@ description: Use when a change is ready to commit: opening the PR without gh pr 
 
 # Shipping a change
 
-Moved out of CLAUDE.md so it only loads when needed. Kane's standing rules are still in CLAUDE.md.
+A project skill, loaded only when the job needs it. The owner's standing rules are kept outside this public repo.
 
 - `gh pr create` fails here (GraphQL is blocked). Use the REST API:
   `gh api repos/permabulk69420-pixel/oasis/pulls -X POST -f title=... -f head=BRANCH -f base=main -F body=@file`
@@ -23,9 +23,9 @@ Moved out of CLAUDE.md so it only loads when needed. Kane's standing rules are s
   a pushed feature branch never gets that ref and always looks unpushed. At the start of a session run
   `git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*' && git fetch origin`; after that a push updates the ref and the hook
   stays quiet. If it still fires, compare `git ls-remote --heads origin BRANCH` with `git rev-parse HEAD`: if they match, nothing is unpushed.
-  Never re-push or re-do work because of it, and it is not Kane asking for anything.
+  Never re-push or re-do work because of it, and it is not the owner asking for anything.
 
 Verified means `npm test` passes, `npx vite build` works, and for visual changes you looked at screenshots. Then: branch, commit, push,
 open the PR with the REST call above, squash merge, wait for the Pages workflow on the merge sha (`gh api "repos/permabulk69420-pixel/oasis/actions/runs?head_sha=<sha>"`),
 `git checkout -B main origin/main`, delete the branch. New hand-built models are the exception: send the .glb and renders and leave the PR open
-unless Kane has handed over the keys for that session.
+unless the owner has handed over the keys for that session.

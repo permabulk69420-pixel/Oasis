@@ -2,7 +2,7 @@ import { noise, clamp } from './world-math.js';
 import { SKY_ISLAND, outlineRadius, undersidePoint } from './sky-island-shape.js';
 import { mulberry32 } from './find-shapes.js';
 
-// Where the island's new plants and landmarks go (Kane, 5 Oct: it is the player's home base, so each place has its own plants and the layout stays loose enough to
+// Where the island's new plants and landmarks go (the owner, 5 Oct: it is the player's home base, so each place has its own plants and the layout stays loose enough to
 // build over later). Every plant type has its own spot:
 //   meadow   (the start, kept clear)  big pale night flowers in drifts round its edge, one weeping glow-tree standing sentinel on the way to the lake
 //   grove    the palms' shade: ferns, fungus logs, little glowing mushrooms, and the twisted root arch where the path goes in
@@ -14,7 +14,7 @@ import { mulberry32 } from './find-shapes.js';
 // which stands over one), the rocks, the palms and glow plants already placed, the water and the spill channel, and stands on the drawn ground.
 export const ISLAND_FLORA = Object.freeze({
   seed: 0x7f10a3,
-  // Kane, 6 Oct: "the log and some things are low quality assets... focus on good quality". These are not placed (their models stay in the code for a later,
+  // The owner, 6 Oct: "the log and some things are low quality assets... focus on good quality". These are not placed (their models stay in the code for a later,
   // better version): the mossy cushions, both logs, the driftwood, the bones, the ribcage and the standing stones.
   retired: Object.freeze(['cushion', 'fungusLog', 'log', 'driftwoodA', 'driftwoodB', 'driftwoodC', 'bonesA', 'bonesB', 'ribcage', 'standingStoneA', 'standingStoneB']),
   slopeLimit: 0.9,

@@ -29,4 +29,4 @@ WebXR needs HTTPS, or localhost in development. Pushing to `main` builds and dep
 - Creatures: the dune stinger (`src/dune-stinger.js`, `stinger-*.js`) and Colossus 01 (`src/colossus*.js`).
 - The sky island and its jungle: `src/sky-island-*.js`, `src/island-*.js` (every plant and landmark a `.glb` in `public/models/island/` built in headless Blender, loaded by `island-glb.js`, drawn by `island-flora.js`; grass `island-grass*.js`).
 - Models are in `public/models/`, textures in `public/textures/`, build tools and labs in `tools/`, notes in `docs/`.
-- Dev-only URL fixtures for screenshots (`?at=x,z&look=x,z,h`, `?hour=N`, `?start=oasis`, and so on) are listed in `CLAUDE.md`.
+- Saving is off unless the address has `?save=1`; `?fresh=1` starts a new game. Dev-only URL fixtures for screenshots (stripped from production): `?at=x,z&look=x,z,h&eye=metres&pitch=deg`, `?view=...`, `?hour=N` (0 night, 14 day), `?camp=lit|unlit`, `?bird=perch|fly|flare`, `?treelod=0|1|2`, `?start=oasis`.

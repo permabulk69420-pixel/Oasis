@@ -5,7 +5,7 @@ description: Use when a held object (fruit, pack, spear, torch, axe) clips throu
 
 # Held objects and the hold lab
 
-Moved out of CLAUDE.md so it only loads when needed. Kane's standing rules are still in CLAUDE.md.
+A project skill, loaded only when the job needs it. The owner's standing rules are kept outside this public repo.
 
 - `tools/hold-lab/hold-lab.html` (with `npm run dev`; `?item=pack|spear|torch|axe&side=right&player=1`) shows how a hand takes a held
   thing. Probing the real hands in a headless page needs a temporary `window.__oasis` hook in `src/main.js` (fake controllers,
