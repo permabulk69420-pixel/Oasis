@@ -31,6 +31,7 @@ import { createGiantBones } from './giant-bones.js';
 import { createColossus } from './colossus.js';
 import { createSandKart, KART } from './sand-kart.js';
 import { createGlider } from './glider.js';
+import { createWatch } from './watch.js';
 import { registerLooseFindDrops } from './loose-finds.js';
 import { createBackpack, PACK } from './backpack.js';
 import { SPEAR } from './spear.js';
@@ -503,6 +504,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) autos
 window.addEventListener('pagehide', () => autosave.flush());
 
 const survivorMenu = createSurvivorMenu({
+  popOrigin: target => watch.facePosition(target), // (the watch, below)
   scene, renderer, states: hands.states, tools: hands.tools, backpack, onPlace: placeFromMenu,
   onToggle(open) {
     keys.clear(); touchMove = { x: 0, z: 0 }; touchMoveId = null; touchLookId = null; mouseDragging = false;
@@ -517,6 +519,16 @@ const survivorMenu = createSurvivorMenu({
     }
   },
 });
+// The survival watch on the left wrist (src/watch.js): glance at it for your stats and the time; tap it with your right index finger to open the menu.
+const watch = createWatch({
+  states: hands.states,
+  getDay: () => dayNight.getState(),
+  getExposure: () => renderer.toneMappingExposure,
+  getHead: () => head,
+  onTap: from => survivorMenu.toggle(from),
+  onError: message => console.warn(message),
+});
+if (import.meta.env.DEV) window.__watch = watch; // dev only: for screenshots
 inventoryToggle.addEventListener('click', () => survivorMenu.toggle());
 
 function clearInput() {
@@ -825,6 +837,7 @@ function frame(time) {
     if (params.get('birdfreeze') !== '0') alienBirds.debug.freeze(true);
     devBird = null;
   }
+  watch.update(dt, { presenting: renderer.xr.isPresenting });
   survivorMenu.update();
 
   // local-floor still reports the real headset height while sitting. In seated mode,
