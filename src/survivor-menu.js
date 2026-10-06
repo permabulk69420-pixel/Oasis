@@ -204,6 +204,17 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
       handle(-24, 22, 18, -2, 8); handle(24, 22, -18, -2, 8);
       ctx.fillStyle = C.gold; ctx.beginPath(); ctx.moveTo(-10, 0); ctx.quadraticCurveTo(-18, -22, 0, -44); ctx.quadraticCurveTo(0, -26, 14, -22); ctx.quadraticCurveTo(20, -8, 10, 0); ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#fff1c4'; ctx.beginPath(); ctx.moveTo(-3, -1); ctx.quadraticCurveTo(-7, -14, 1, -24); ctx.quadraticCurveTo(3, -14, 7, -10); ctx.quadraticCurveTo(6, -2, -3, -1); ctx.fill();
+    } else if (type === 'glider') {
+      // a hang glider from the front: a wide swept wing with a coral leading edge and a cyan stripe, the kingpost and the A-frame with its bar below
+      ctx.fillStyle = '#2f7c78'; ctx.strokeStyle = '#143a3b'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(0, -30); ctx.quadraticCurveTo(-26, -24, -46, -6); ctx.lineTo(-38, -2); ctx.quadraticCurveTo(-18, -12, 0, -14);
+      ctx.quadraticCurveTo(18, -12, 38, -2); ctx.lineTo(46, -6); ctx.quadraticCurveTo(26, -24, 0, -30); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = '#e5603b'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-45, -7); ctx.quadraticCurveTo(-26, -25, 0, -31); ctx.quadraticCurveTo(26, -25, 45, -7); ctx.stroke();
+      ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-30, -11); ctx.quadraticCurveTo(0, -24, 30, -11); ctx.stroke();
+      ctx.strokeStyle = '#cbbfa6'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(0, -14); ctx.lineTo(-16, 26); ctx.moveTo(0, -14); ctx.lineTo(16, 26); ctx.moveTo(-20, 26); ctx.lineTo(20, 26); ctx.stroke();
+      ctx.strokeStyle = '#4c301f'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(-17, 26); ctx.lineTo(-9, 26); ctx.moveTo(9, 26); ctx.lineTo(17, 26); ctx.stroke();
+      ctx.strokeStyle = 'rgba(203, 191, 166, 0.6)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-18, 26); ctx.lineTo(-38, -2); ctx.moveTo(18, 26); ctx.lineTo(38, -2); ctx.stroke();
     } else if (type === 'backpack') {
       // a rucksack: carry handle, body, flap with a coral band and a cyan edge, a rolled mat on two leather straps
       ctx.strokeStyle = '#8a5a35'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(0, -28, 11, Math.PI, 0); ctx.stroke();

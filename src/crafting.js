@@ -10,6 +10,7 @@ export const ITEMS = Object.freeze({
   torch: { name: 'Torch', category: 'TOOL', description: 'Light it with B (right hand) or X (left). Put it on a hip to carry it.', equippable: true },
   spear: { name: 'Stone-tipped spear', category: 'TOOL', description: 'A straight shaft, a stone point and a tassel of feathers. Put it on a hip to carry it.', equippable: true },
   pickaxe: { name: 'Stone pickaxe', category: 'TOOL', description: 'Breaks sandstone and crystal in the dunes. Swing it at a rock. Put it on a hip to carry it.', equippable: true },
+  glider: { name: 'Glider', category: 'TOOL', description: 'A hang glider. Raise both hands above your head and squeeze both grips to open it, then step off a height. Lower a hand to turn, push the bar out to float, pull it in to dive. Let go to fold it away.' },
   campfire: { name: 'Campfire', category: 'STRUCTURE', description: 'A ring of stones around a stack of logs. Place it on the ground, then touch a lit torch to the logs to light it.', placeable: true },
 });
 
