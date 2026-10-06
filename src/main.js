@@ -526,6 +526,7 @@ const watch = createWatch({
   getExposure: () => renderer.toneMappingExposure,
   getHead: () => head,
   onTap: from => survivorMenu.toggle(from),
+  renderer,
   onError: message => console.warn(message),
 });
 if (import.meta.env.DEV) window.__watch = watch; // dev only: for screenshots
