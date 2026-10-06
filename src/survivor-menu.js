@@ -8,6 +8,7 @@ import { getSurvivalStats } from './survival.js';
 
 // Ark-style survivor menu: three floating glass panels (inventory/crafting, you, details)
 // drawn into one canvas. The same canvas is a texture in VR and an overlay on desktop.
+// In VR it opens from the watch on your left wrist (tap it, or press Y): it grows out of the watch and hangs in front of you.
 const WIDTH = 1600, HEIGHT = 960;
 const PANEL_WIDTH_METRES = 1.9;
 const C = {
@@ -45,7 +46,8 @@ export function hitMenuControl(controls, x, y) {
 // onPlace(type, { hand }) starts placing an item (the campfire): the game shows a ghost to aim and confirm, and returns { ok, message }.
 // `hand` is the VR hand whose trigger chose Place (it aims), or null. The menu closes on ok so the player can see the ghost.
 // backpack ({ isWorn(), takeOff() -> { ok, message } }) is the pack you wear: the Back slot, and how much you can carry.
-export function createSurvivorMenu({ scene, renderer, states, tools = null, backpack = null, onToggle = () => {}, onPlace = null }) {
+// popOrigin(target): where the panel grows out of when it opens in VR (the watch), written into target; null if nowhere.
+export function createSurvivorMenu({ scene, renderer, states, tools = null, backpack = null, onToggle = () => {}, onPlace = null, popOrigin = null }) {
   const controllers = states.map(state => state.controller);
   const surface = document.createElement('canvas');
   surface.width = WIDTH; surface.height = HEIGHT;
@@ -565,7 +567,12 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
     } else say(getInventoryCount(type) < 1 ? `No ${ITEMS[type].name.toLowerCase()} in your inventory.` : `${ITEMS[type].name} isn’t ready yet.`);
   }
 
-  function setOpen(value) {
+  // VR: the panel hangs in front of you a little below the eyes, near enough to read, tilted up to face you. Opened from the watch (`from`, a world
+  // position), it grows out of the watch to there.
+  const PLACE = { distance: 1.05, below: 0.24, scale: 0.62, popSeconds: 0.28 };
+  const popFrom = new THREE.Vector3(), popTo = new THREE.Vector3();
+  let popStart = -1;
+  function setOpen(value, from = null) {
     if (open === value) return;
     open = value; hovered = ''; message = ''; dirty = true;
     overlay.hidden = !open || renderer.xr.isPresenting; panel.visible = open && renderer.xr.isPresenting;
@@ -578,8 +585,13 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
       if (renderer.xr.isPresenting) {
         const view = renderer.xr.getCamera(); view.getWorldPosition(headPosition); view.getWorldDirection(forward);
         forward.y = 0; if (forward.lengthSq() < .01) forward.set(0, 0, -1); forward.normalize();
-        panel.position.copy(headPosition).addScaledVector(forward, 1.5); panel.position.y -= .1;
-        panel.rotation.set(0, Math.atan2(-forward.x, -forward.z), 0); panel.updateMatrixWorld(true);
+        popTo.copy(headPosition).addScaledVector(forward, PLACE.distance); popTo.y -= PLACE.below;
+        panel.rotation.set(-Math.atan2(PLACE.below, PLACE.distance), Math.atan2(-forward.x, -forward.z), 0, 'YXZ');
+        panel.position.copy(popTo); panel.scale.setScalar(PLACE.scale);
+        if (!from && popOrigin) from = popOrigin(popFrom);
+        if (from) { popFrom.copy(from); popStart = performance.now(); panel.position.copy(from); panel.scale.setScalar(0.02); }
+        else popStart = -1;
+        panel.updateMatrixWorld(true);
       }
       draw();
       if (!renderer.xr.isPresenting) buttons.querySelector('[data-action="inventory"]')?.focus();
@@ -598,6 +610,14 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
   });
 
   function update() {
+    if (open && popStart >= 0) {
+      const t = Math.min(1, (performance.now() - popStart) / (PLACE.popSeconds * 1000));
+      const e = 1 - Math.pow(1 - t, 3);
+      panel.position.lerpVectors(popFrom, popTo, e);
+      panel.scale.setScalar(0.02 + (PLACE.scale - 0.02) * e);
+      panel.updateMatrixWorld(true);
+      if (t >= 1) popStart = -1;
+    }
     const session = renderer.xr.getSession();
     const visible = session?.visibilityState === 'visible';
     const sources = [...(session?.inputSources || [])];
@@ -637,7 +657,7 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
   }
   renderer.xr.addEventListener('sessionstart', () => { setOpen(false); yDown = false; triggerDown.fill(false); });
   renderer.xr.addEventListener('sessionend', () => { setOpen(false); yDown = false; triggerDown.fill(false); });
-  return { update, setOpen, toggle: () => setOpen(!open), isOpen: () => open };
+  return { update, setOpen, toggle: (from = null) => setOpen(!open, from), isOpen: () => open };
 }
 
 export const MENU_SIZE = Object.freeze({ width: WIDTH, height: HEIGHT, metres: PANEL_WIDTH_METRES });
