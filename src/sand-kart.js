@@ -2,13 +2,12 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SPAWN, WATER } from './world.js';
 import { pulseHaptics } from './haptics.js';
-import { setHeldGripProfile, clearHeldGripProfile, GRIP_PROFILE } from './grip-poses.js';
-import { attachHeldObject, setGripSurface } from './grip-contact.js';
+import { createHandleHold, measureHandleRadius } from './handle-hold.js';
 
 // The sand sail kart (the owner's model, public/models/sand-kart/sand_sail_kart.glb): it waits on the sand by the oasis start. Grab its handle (either grip,
 // one hand is enough) and you sit in it and it starts rolling; turn the handle like handlebars to steer (the sail rig swings on its mast pivot, up to 40
-// degrees, and heels into the turn); let go and it coasts to a stop and you step off beside it. While you hold a grip your hand is locked onto it (the
-// hand model sits on the bar, fingers closed round it). Seated, you are carried in the kart's own frame, so your view climbs, dips and rolls with it over
+// degrees, and heels into the turn); let go and it coasts to a stop and you step off beside it. While you hold a grip your hand is locked onto it (src/handle-hold.js:
+// the hollow of the closed hand on the grip, fingers round it). Seated, you are carried in the kart's own frame, so your view climbs, dips and rolls with it over
 // the dunes. It follows the ground on its three wheels and stops against rocks.
 // Desktop: F gets in (or lets go) when you stand by it, A and D steer.
 // The model's own markers drive all of it: Grip_Left / Grip_Right (where a hand takes the handle), Sail_Rig_Pivot (the rig's yaw about +Y and lean about
@@ -32,7 +31,7 @@ export const KART = Object.freeze({
   eyeAboveSeat: 0.64,
   viewTilt: 0.45,            // share of the kart's pitch and roll the view takes
   viewResponse: 5,           // how fast the view's tilt follows (1/s)
-  grip: Object.freeze({ radius: 0.018, length: 0.3 }),  // the invisible bar the fingers close on (the rubber grips, slimmed in Blender to a tool handle's 3.5 cm)
+  grip: Object.freeze({ halfLength: 0.1 }),             // metres either side of a grip marker the hand may sit (the rubber is 37 cm long)
   turn: 0.85,                // rad/s at full lock and cruising speed
   yawLimit: 40 * Math.PI / 180,
   leanLimit: 18 * Math.PI / 180,
@@ -99,7 +98,7 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
   const gripDown = new Map();
   const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), hand = new THREE.Vector3();
   const qYaw = new THREE.Quaternion(), qLean = new THREE.Quaternion(), qTilt = new THREE.Quaternion();
-  const mat = new THREE.Matrix4(), mat2 = new THREE.Matrix4(), scl = new THREE.Vector3();
+  const qAlign = new THREE.Quaternion();
   const eyeLocal = new THREE.Vector3(), headInRig = new THREE.Vector3(), viewTilt = new THREE.Quaternion(), tiltWant = new THREE.Quaternion(), qHeading = new THREE.Quaternion();
   let vy = 0, lastGround = null, airborne = false;
   const kartTilt = new THREE.Quaternion();
@@ -147,56 +146,15 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
   // the controller itself (the real hand): steering reads this, since the drawn hand is locked onto the grip while held
   function controllerWorld(s, target) { s.grip.updateWorldMatrix(true, false); return s.grip.getWorldPosition(target); }
 
-  // ---- the drawn hand locked onto a grip: the hand model is moved so its grip socket (the palm, fingers wrapping a bar along the socket's Y) sits on the
-  // grip point, turned only as much as it takes to lay that bar along the handle (so the wrist keeps its own roll), and closed to a medium bar grip.
-  const homes = new Map();             // hand state -> the hand model's own offset on the controller, to put back on release
-  const anchorWorld = new THREE.Matrix4(), socketWorld = new THREE.Matrix4(), socketInAnchor = new THREE.Matrix4();
-  const sPos = new THREE.Vector3(), sQuat = new THREE.Quaternion(), barNow = new THREE.Vector3(), barWant = new THREE.Vector3(), qAlign = new THREE.Quaternion();
-  function lockHand(s, gripIndex) {
-    const anchor = s.handAnchor, socket = s.gripSocket;
-    if (!anchor || !socket) return;
-    if (!homes.has(s)) {
-      homes.set(s, { position: anchor.position.clone(), quaternion: anchor.quaternion.clone() });
-      setHeldGripProfile(s, GRIP_PROFILE.MEDIUM);
-      // an invisible bar the size of the rubber grip in the hand, so the fingers close until they touch it (as round any held tool's handle)
-      if (s.objectGrip.children.length === 0) attachHeldObject(s, gripBar());
+  // ---- the drawn hand on a grip: src/handle-hold.js puts the hollow of the closed hand on the grip's axis (the same for every handle in the game)
+  const hold = createHandleHold();
+  let handles = [];
+  function handleFor(i) {
+    if (!handles[i]) {
+      const node = grips[i];
+      handles[i] = { node, axis: [0, 0, 1], halfLength: KART.grip.halfLength, radius: measureHandleRadius(model, node, [0, 0, 1], KART.grip.halfLength) };
     }
-    const home = homes.get(s);
-    anchor.position.copy(home.position); anchor.quaternion.copy(home.quaternion);    // start from where the hand really is
-    anchor.updateMatrixWorld(true);
-    anchorWorld.copy(anchor.matrixWorld);
-    socketWorld.copy(socket.matrixWorld);
-    socketInAnchor.copy(anchorWorld).invert().multiply(socketWorld);
-    socketWorld.decompose(sPos, sQuat, scl);
-    const g = grips[gripIndex];
-    g.updateWorldMatrix(true, false);
-    barNow.set(0, 1, 0).applyQuaternion(sQuat);
-    barWant.set(0, 0, 1).transformDirection(g.matrixWorld);                         // the handle's axis (+Z on the grip markers)
-    if (barWant.dot(barNow) < 0) barWant.negate();                                  // whichever way round needs the smaller turn
-    qAlign.setFromUnitVectors(barNow, barWant);
-    sQuat.premultiply(qAlign);
-    g.getWorldPosition(sPos);
-    mat.compose(sPos, sQuat, scl);                                                  // where the socket should be
-    mat2.copy(mat).multiply(socketInAnchor.invert());                               // so the hand model goes here
-    mat.copy(anchor.parent.matrixWorld).invert().multiply(mat2);                    // in the controller's space
-    mat.decompose(anchor.position, anchor.quaternion, scl);
-    anchor.updateMatrixWorld(true);
-  }
-  function gripBar() {
-    const bar = new THREE.Mesh(new THREE.CylinderGeometry(KART.grip.radius, KART.grip.radius, KART.grip.length, 12),
-      new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
-    bar.name = 'Kart grip bar';
-    bar.userData.kartGrip = true;
-    setGripSurface(bar, { axis: [0, 1, 0], point: [0, 0, 0], halfLength: KART.grip.length / 2 });
-    return bar;
-  }
-  function unlockHand(s) {
-    const home = homes.get(s);
-    if (!home) return;
-    if (s.handAnchor) { s.handAnchor.position.copy(home.position); s.handAnchor.quaternion.copy(home.quaternion); }
-    for (const child of [...s.objectGrip.children]) if (child.userData.kartGrip) s.objectGrip.remove(child);
-    clearHeldGripProfile(s);
-    homes.delete(s);
+    return handles[i];
   }
 
   // The rig yaw from the hands: the handle swings about the pivot's +Y axis, so a hand's angle round the pivot is the yaw. It is taken RELATIVE to where the
@@ -258,7 +216,7 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
     for (const s of states) {
       const squeeze = Boolean(s.inputSource?.gamepad?.buttons?.[GRIP_BUTTON]?.pressed);
       const was = gripDown.get(s) ?? false;
-      if (holders.has(s) && (!squeeze || !s.inputSource)) { holders.delete(s); unlockHand(s); }
+      if (holders.has(s) && (!squeeze || !s.inputSource)) { holders.delete(s); hold.release(s); }
       else if (squeeze && !was && s.inputSource && s.objectGrip.children.length === 0) {
         handWorld(s, hand);
         let best = -1, bestD = KART.grabRadius;
@@ -311,7 +269,7 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
       tmp.copy(eyeLocal).applyMatrix4(root.matrixWorld);
       rig.position.copy(tmp).sub(tmp2.copy(headInRig).applyQuaternion(rig.quaternion));
       rig.updateMatrixWorld(true);
-      for (const [h, held] of holders) lockHand(h, held.grip);
+      for (const [h, held] of holders) { if (hold.grab(h, handleFor(held.grip))) hold.place(h); }
       rumbleIn -= dt;
       if (rumbleIn <= 0 && state.speed > 1) {
         rumbleIn = KART.rumble.every;

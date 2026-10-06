@@ -30,6 +30,7 @@ import { createCrystalMotes } from './crystal-motes.js';
 import { createGiantBones } from './giant-bones.js';
 import { createColossus } from './colossus.js';
 import { createSandKart, KART } from './sand-kart.js';
+import { createGlider } from './glider.js';
 import { registerLooseFindDrops } from './loose-finds.js';
 import { createBackpack, PACK } from './backpack.js';
 import { SPEAR } from './spear.js';
@@ -42,7 +43,7 @@ import { createPlacement } from './placement.js';
 import { createGlowGarden } from './glow-garden.js';
 import { pulseHaptics } from './haptics.js';
 import { createSurvivorMenu } from './survivor-menu.js';
-import { getInventoryWeight, getCarryCapacity, getCarrySpeedMultiplier, addInventoryItem, removeInventoryItem, getInventoryItems, importInventoryItems } from './inventory.js';
+import { getInventoryWeight, getCarryCapacity, getCarrySpeedMultiplier, addInventoryItem, removeInventoryItem, getInventoryItems, importInventoryItems, getInventoryCount } from './inventory.js';
 import { createSaveStore, createAutosave, wantsFresh } from './save-game.js';
 
 // Every model and texture asks for ?v=<build id>, so a new deploy is never answered from the browser's 10 minute cache.
@@ -439,6 +440,16 @@ const backpack = createBackpack({
 const sandKart = createSandKart({ scene, states: hands.states, heightAt: field.sample, pushOut: (x, z) => mining.pushOut(x, z), onError: message => console.warn(message) });
 let kartKeyDown = false, kartRide = null;
 if (import.meta.env.DEV) window.__kart = sandKart; // dev only: for screenshots
+// The glider (src/glider.js): while one is in the inventory, raise both hands above your head and squeeze both grips to open it; step off a height and
+// it flies. Let go with both hands to fold it away. Desktop: G opens or closes it, A and D bank, W and S pitch.
+const glider = createGlider({ scene, states: hands.states, onError: message => console.warn(message) });
+// the ground for a flight: the island's top only while you are above it, the desert's otherwise
+function flightGround(x, z, y) {
+  const height = skyIsland.groundHeight(x, z);
+  return height !== null && y >= height - 0.5 ? height : field.sample(x, z);
+}
+let gliderKeyDown = false, flight = null;
+if (import.meta.env.DEV) window.__glider = glider; // dev only: for screenshots and the flight check
 // Development-only: ?pack=worn starts with the backpack already on.
 if (import.meta.env.DEV && new URLSearchParams(location.search).get('pack') === 'worn') backpack.debug.wear();
 // Development-only: ?camp=lit or ?camp=unlit puts a campfire in view near the spawn point.
@@ -482,9 +493,11 @@ const autosave = createAutosave({
 });
 // TESTING (the owner, 5 Oct): a new game starts with a campfire in your pockets, so placing and lighting one needs no gathering first.
 // Reload the page for another (saving is off, so every load is a new game). Empty this list when the real start is wanted.
-const TESTING_START_KIT = Object.freeze({ campfire: 1 });
+const TESTING_START_KIT = Object.freeze({ campfire: 1, glider: 1 });
 if (!saveStart.save) for (const [type, amount] of Object.entries(TESTING_START_KIT)) addInventoryItem(type, amount);
 autosave.update(); // what is already loaded goes back now, before the first frame
+// TESTING (the owner, 6 Oct): you always have the glider for now, a saved game included.
+if (getInventoryCount('glider') < 1) addInventoryItem('glider', 1);
 if (import.meta.env.DEV) window.__save = { autosave, store: saveStore, start: saveStart.note, world: { THREE, renderer, scene, camera, rig, campfires, tools: hands.tools, backpack, mining, dayNight } }; // dev only: for the save's browser test
 document.addEventListener('visibilitychange', () => { if (document.hidden) autosave.flush(); });
 window.addEventListener('pagehide', () => autosave.flush());
@@ -545,7 +558,7 @@ window.addEventListener('keydown', e => {
   }
   if (e.code === 'Escape' && !renderer.xr.isPresenting) setPlaying(false);
   if (!playing || survivorMenu.isOpen() || renderer.xr.isPresenting) return;
-  if (['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','KeyF','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight','Space'].includes(e.code)) {
+  if (['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','KeyF','KeyG','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight','Space'].includes(e.code)) {
     e.preventDefault(); keys.add(e.code);
   }
 });
@@ -741,6 +754,29 @@ function frame(time) {
     kartRide = sandKart.update(dt, { rig, head, desktopToggle: kartToggle, desktopSteer: steer, presenting: renderer.xr.isPresenting });
     if (kartRide.stepOff) { groundY = groundAt(kartRide.stepOff.x, kartRide.stepOff.z); velocity.set(0, 0, 0); }
   } else kartRide = null;
+  {
+    const presenting = renderer.xr.isPresenting;
+    const gliderToggle = !presenting && keys.has('KeyG') && !gliderKeyDown;
+    gliderKeyDown = keys.has('KeyG');
+    const desktopFlight = presenting ? {} : {
+      toggle: gliderToggle,
+      bank: Number(keys.has('KeyD')) - Number(keys.has('KeyA')),
+      pitch: Number(keys.has('KeyS')) - Number(keys.has('KeyW')),   // S pushes the bar out (slow, float), W pulls it in (dive)
+    };
+    flight = glider.update(dt, {
+      rig, head, presenting, groundAt: flightGround, groundY, rigOffset: seatedOffset + crouchOffset,
+      fallSpeed: fall.active ? fall.speed : 0, velocity, bounds: WALK, desktop: desktopFlight,
+      blocked: !playing || Boolean(kartRide?.riding),
+    });
+    if (flight.flying) onIsland = false; // (flightGround decides the ground while you fly)
+    if (flight.landed) {
+      groundY = flight.feetY;
+      const island = skyIsland.groundHeight(head.x, head.z);
+      onIsland = island !== null && Math.abs(island - flight.feetY) < 0.6;
+      fall.active = false; fall.speed = 0; velocity.set(0, 0, 0);
+      for (const state of hands.states) pulseHaptics(state, 0.4, 60);
+    }
+  }
   // One wind clock for the sand and the swaying plants, so their gusts line up.
   windTime.value = devWindTime ?? time * 0.001;
   const viewHeight = renderer.xr.isPresenting ? WIND_SAND.vrViewHeight : renderer.getDrawingBufferSize(drawingSize).y;
@@ -833,7 +869,13 @@ function frame(time) {
       if (jumpHeight <= 0) { jumpHeight = 0; jumpVelocity = 0; }
     }
 
-    if (kartRide?.riding) {
+    if (flight?.flying) {
+      // flying the glider: it carries the rig (src/glider.js) and has placed it this frame; no walking or jumping, and no fall (it lands you gently)
+      velocity.set(0, 0, 0); jumpHeight = 0; jumpVelocity = 0;
+      fall.active = false; fall.speed = 0;
+      groundY = flight.feetY;
+      updateSurvival(dt, { sprinting: false, inWater: false });
+    } else if (kartRide?.riding) {
       // seated in the sand kart: it carries the rig (src/sand-kart.js); no walking, turning or jumping, the floor lowered to a seated eye height
       velocity.set(0, 0, 0); jumpHeight = 0; jumpVelocity = 0;
       groundY = sandKart.rigFloorY() + KART.seatDrop;
