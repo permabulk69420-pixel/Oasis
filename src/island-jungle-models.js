@@ -168,13 +168,13 @@ function buildJungleTree(lod, name) {
     }
   }
   // canopy cards
-  const keep = [1, 0.55, 0.26][lod], boost = [1, 1.36, 1.85][lod];
+  const keep = [1, 0.72, 0.42][lod], boost = [1, 1.2, 1.55][lod];   // the levels stay close in look, so the switch between them is hard to see (Kane, 6 Oct: too much pop-in on the big trees)
   for (const card of cards) {
     if (card.rank > keep) continue;
     const size = card.size * boost;
     const centre = card.centre;
     rosette(m, card.sprite, centre, card.normal, size, card.spin, {
-      rows: lod === 0 ? 2 : 1, cols: lod === 0 ? 3 : 2, cup: lod === 0 ? 0.1 : 0,
+      rows: lod === 2 ? 1 : 2, cols: lod === 0 ? 3 : 2, cup: [0.1, 0.07, 0][lod],
       shade: (t, s, p) => {
         const height = clamp01((p[1] - H * 0.4) / (H * 0.7));
         const k = card.tone * (0.72 + 0.4 * height);
