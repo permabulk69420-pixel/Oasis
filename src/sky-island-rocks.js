@@ -1,13 +1,16 @@
 import * as THREE from 'three';
-import { SKY_ISLAND, noise3, outlineRadius } from './sky-island-shape.js';
-import { clamp, mix, smooth, noise } from './world-math.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { SKY_ISLAND, outlineRadius } from './sky-island-shape.js';
+import { clamp, smooth, noise } from './world-math.js';
 import { mulberry32 } from './find-shapes.js';
 
 // The island's stone: boulders, the tall spire on the rise, the lookout ledge, the hollow's overhang, outcrops standing in the lake, stepping stones over the
-// outflow, and small stones along the paths. All of it is set dressing in the terrain's own material (dark cool "island stone", see materials.js), baked
-// into a few merged meshes, one per place, so each is culled on its own and the whole lot is a handful of draw calls. Shapes are flat shaded: a
-// displaced icosphere cut by a few planes (fractured blocks) and tapered faceted columns (the spire). Pure up to `createRockMeshes`, so tests can run it.
-// Everything is placed on the drawn ground (the mesh), sunk a little, away from the meadow, the paths and the water.
+// outflow, and small stones along the paths. The SHAPES are a kit of rocks built in headless Blender (public/models/island/rocks_lod{0,1,2}.glb, made by
+// tools/island-rocks/build_rocks.py: fractured boulders, rounded pebbles, a slab, a spire blade); this file says where each stone goes and how big (pure up to
+// `createRockMeshes`, so tests can run the layout), takes a kit piece for each, and merges them per patch of island in the terrain's own material (dark cool
+// "island stone", see materials.js), so each patch is culled on its own and the whole lot is a handful of draw calls. Shaded smooth with crisp fracture edges
+// (the kit's own normals). Everything is placed on the
+// drawn ground (the mesh), sunk a little, away from the meadow, the paths and the water.
 
 const TAU = Math.PI * 2;
 
@@ -18,41 +21,12 @@ export const ROCKS = Object.freeze({
   spire: Object.freeze({ height: 27 }),
 });
 
-// ---------------------------------------------------------------------------------------------------------------------------- shapes
-const spheres = new Map();
-function icosphere(detail) {
-  if (spheres.has(detail)) return spheres.get(detail);
-  const t = (1 + Math.sqrt(5)) / 2;
-  const raw = [[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t], [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]];
-  let verts = raw.map(([x, y, z]) => { const l = Math.hypot(x, y, z); return [x / l, y / l, z / l]; });
-  let faces = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
-    [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
-  for (let d = 0; d < detail; d++) {
-    const cache = new Map();
-    const mid = (i, j) => {
-      const key = i < j ? `${i}_${j}` : `${j}_${i}`;
-      if (cache.has(key)) return cache.get(key);
-      const a = verts[i], b = verts[j];
-      const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
-      const l = Math.hypot(m[0], m[1], m[2]);
-      verts.push([m[0] / l, m[1] / l, m[2] / l]);
-      cache.set(key, verts.length - 1);
-      return verts.length - 1;
-    };
-    const next = [];
-    for (const [a, b, c] of faces) { const ab = mid(a, b), bc = mid(b, c), ca = mid(c, a); next.push([a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca]); }
-    faces = next;
-  }
-  const result = { verts, faces };
-  spheres.set(detail, result);
-  return result;
-}
-
 // A flat-shaded triangle soup in the terrain material's attributes: colour (1, tone, turf) and zone (0, -stone, 0). `moss` (0..1) puts turf on a face.
 class RockSoup {
   constructor() { this.position = []; this.normal = []; this.color = []; this.zone = []; this.minX = Infinity; this.maxX = -Infinity; this.minZ = Infinity; this.maxZ = -Infinity; }
   get triangles() { return this.position.length / 9; }
-  tri(a, b, c, tone, moss) {
+  // `normals`: the three corners' own normals (a smooth-shaded stone); without them the face is flat.
+  tri(a, b, c, tone, moss, normals = null) {
     const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
     let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
     const length = Math.hypot(nx, ny, nz);
@@ -61,14 +35,14 @@ class RockSoup {
     // turf on the faces that look up, in patches
     const cx = (a[0] + b[0] + c[0]) / 3, cz = (a[2] + b[2] + c[2]) / 3;
     const m = moss * smooth(0.5, 0.9, ny) * (0.45 + 0.55 * noise(cx * 0.9 + 3, cz * 0.9 - 8));
-    for (const p of [a, b, c]) {
+    [a, b, c].forEach((p, k) => {
       this.position.push(p[0], p[1], p[2]);
-      this.normal.push(nx, ny, nz);
+      if (normals) this.normal.push(...normals[k]); else this.normal.push(nx, ny, nz);
       this.color.push(1, tone, m);
       this.zone.push(0, -(1 - 0.8 * m), 0);
       if (p[0] < this.minX) this.minX = p[0]; if (p[0] > this.maxX) this.maxX = p[0];
       if (p[2] < this.minZ) this.minZ = p[2]; if (p[2] > this.maxZ) this.maxZ = p[2];
-    }
+    });
     return true;
   }
 }
@@ -87,89 +61,6 @@ function rotation(yaw, tiltX, tiltZ) {
   return mul(ry, mul(rz, rx));
 }
 const apply = (R, x, y, z) => [R[0] * x + R[1] * y + R[2] * z, R[3] * x + R[4] * y + R[5] * z, R[6] * x + R[7] * y + R[8] * z];
-
-// A block of fractured stone. spec: { x, y, z (centre, world), yaw, tiltX, tiltZ, half: [a, b, c], seed, detail, cuts, flat, moss, tone }
-export function addBoulder(soup, spec) {
-  const { verts, faces } = icosphere(spec.detail);
-  const rnd = mulberry32(spec.seed);
-  const [a, b, c] = spec.half;
-  const ox = rnd() * 64, oy = rnd() * 64, oz = rnd() * 64;
-  const planes = [];
-  for (let k = 0; k < spec.cuts; k++) {
-    const phi = rnd() * TAU, ny = -0.1 + rnd() * 1.1, rr = Math.sqrt(Math.max(0, 1 - ny * ny));
-    const n = [Math.cos(phi) * rr, ny, Math.sin(phi) * rr];
-    planes.push({ n, d: Math.hypot(a * n[0], b * n[1], c * n[2]) * (0.62 + rnd() * 0.24) });
-  }
-  const R = rotation(spec.yaw, spec.tiltX, spec.tiltZ);
-  const bottom = -b * spec.flat;
-  const local = verts.map(([ux, uy, uz]) => {
-    const lump = noise3(ux * 1.5 + ox, uy * 1.5 + oy, uz * 1.5 + oz) * 0.6 + noise3(ux * 3.3 + oy, uy * 3.3 + oz, uz * 3.3 + ox) * 0.4;
-    const r = 1 + (lump - 0.5) * 0.7;
-    let px = ux * r * a, py = uy * r * b, pz = uz * r * c;
-    for (const pl of planes) {
-      const t = px * pl.n[0] + py * pl.n[1] + pz * pl.n[2] - pl.d;
-      if (t > 0) { px -= pl.n[0] * t; py -= pl.n[1] * t; pz -= pl.n[2] * t; }
-    }
-    const chip = (noise3(ux * 7 + oz, uy * 7 + ox, uz * 7 + oy) - 0.5) * 0.07 * Math.min(a, b, c);
-    px += ux * chip; py += uy * chip; pz += uz * chip;
-    return { x: px, y: Math.max(py, bottom), z: pz };
-  });
-  const world = local.map(p => { const q = apply(R, p.x, p.y, p.z); return [q[0] + spec.x, q[1] + spec.y, q[2] + spec.z]; });
-  let n = 0;
-  faces.forEach(([i, j, k], f) => {
-    // the flat underside is buried: leave it out
-    if (local[i].y <= bottom + 1e-4 && local[j].y <= bottom + 1e-4 && local[k].y <= bottom + 1e-4) return;
-    const tone = clamp(spec.tone + (mulberry32(spec.seed + f * 31)() - 0.5) * 0.3, 0, 1);
-    if (soup.tri(world[i], world[j], world[k], tone, spec.moss)) n++;
-  });
-  return n;
-}
-
-// A tapering faceted column leaning and twisting as it rises (the spire's blades). spec: { x, y, z (the foot, world), height, baseR, topR, sides, lean: [x, z] (metres at the top),
-// twist (radians over the height), seed, tone, bury }
-export function addColumn(soup, spec) {
-  const rnd = mulberry32(spec.seed);
-  const bury = spec.bury ?? 1.6;
-  const rings = Math.max(3, Math.round((spec.height + bury) / 1.7));
-  const ox = rnd() * 50, oz = rnd() * 50;
-  const phase = rnd() * TAU;
-  const sides = spec.sides;
-  const jitter = Array.from({ length: sides }, () => 0.86 + rnd() * 0.26);
-  const grid = [];
-  for (let k = 0; k <= rings; k++) {
-    const t = k / rings;
-    const h = -bury + (spec.height + bury) * t;
-    const u = h / spec.height;                                  // 0 at the foot, 1 at the top (negative below ground)
-    const lean = Math.pow(Math.max(u, 0), 1.35);
-    const cx = spec.x + spec.lean[0] * lean, cz = spec.z + spec.lean[1] * lean;
-    const taper = mix(spec.baseR * (1 + 0.5 * Math.max(0, -u * 0.6)), spec.topR, Math.pow(clamp(u, 0, 1), 0.85));
-    const strata = 1 + 0.075 * Math.sin(h * 1.9 + ox) + 0.05 * Math.sin(h * 4.3 + oz);
-    const row = [];
-    for (let s = 0; s < sides; s++) {
-      const ang = phase + (s / sides) * TAU + spec.twist * clamp(u, 0, 1);
-      const lump = 0.9 + 0.2 * noise3(Math.cos(ang) * 1.4 + ox, h * 0.35, Math.sin(ang) * 1.4 + oz);
-      const r = taper * strata * jitter[s] * lump;
-      row.push([cx + Math.cos(ang) * r, spec.y + h, cz + Math.sin(ang) * r]);
-    }
-    grid.push(row);
-  }
-  let n = 0;
-  for (let k = 0; k < rings; k++) {
-    for (let s = 0; s < sides; s++) {
-      const s2 = (s + 1) % sides;
-      const a = grid[k][s], b = grid[k][s2], c = grid[k + 1][s], d = grid[k + 1][s2];
-      const tone = clamp(spec.tone + (mulberry32(spec.seed + k * 977 + s * 13)() - 0.5) * 0.28, 0, 1);
-      const moss = spec.moss ? spec.moss * (1 - smooth(0, 3.5, (a[1] + c[1]) / 2 - spec.y)) : 0;
-      if (soup.tri(a, c, b, tone, moss)) n++;
-      if (soup.tri(b, c, d, tone, moss)) n++;
-    }
-  }
-  // the top: a broken point, off to one side
-  const top = grid[rings];
-  const apex = [top.reduce((s, p) => s + p[0], 0) / sides + (rnd() - 0.5) * spec.topR * 0.8, spec.y + spec.height + spec.topR * (0.5 + rnd() * 0.9), top.reduce((s, p) => s + p[2], 0) / sides + (rnd() - 0.5) * spec.topR * 0.8];
-  for (let s = 0; s < sides; s++) if (soup.tri(top[s], apex, top[(s + 1) % sides], clamp(spec.tone + 0.08, 0, 1), 0)) n++;
-  return n;
-}
 
 // ---------------------------------------------------------------------------------------------------------------------------- where it all goes
 // `ctx`: { ground (the drawn ground), features (sky-island-places.js), pathIndex (sky-island-paths.js), config, avoid, waterY }. Returns [{ chunk, type, ...spec }].
@@ -437,13 +328,59 @@ export function layoutRocks(ctx, spec = ROCKS) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------- the geometry
-// Items to arrays, one set per chunk: { name, positions, normals, colors, zones, bounds, triangles }.
-export function buildRocks(items) {
+// The kit (each piece unit sized round its middle: a ball of radius 1, the spire blade 1 high on a base of radius 1, buried 0.12 under its foot).
+export const ROCK_KIT = Object.freeze({ boulders: ['boulderA', 'boulderB', 'boulderC', 'boulderD'], pebbles: ['pebbleA', 'pebbleB'], slab: 'slab', column: 'column' });
+
+// Which piece a stone wears, and which level of it: the stones are merged and drawn whole, so the level goes by size (small stones the coarse one).
+export function rockPiece(item) {
+  if (item.type === 'column') return { name: ROCK_KIT.column, lod: 0 };
+  if (item.flat >= 1) return { name: ROCK_KIT.slab, lod: 0 };
+  const list = item.r < 0.6 ? ROCK_KIT.pebbles : ROCK_KIT.boulders;
+  return { name: list[item.seed % list.length], lod: item.r >= 2.2 ? 0 : item.r >= 0.6 ? 1 : 2 };
+}
+
+// One stone into a soup: the piece's triangles (a flat array, nine numbers each, in the piece's own unit frame) scaled, turned and moved onto the stone.
+// A boulder is scaled by its half sizes; a spire blade by its height and base radius, then leaned (more toward the top, as the old ones were).
+export function placeStone(soup, item, piece) {
+  const { triangles, normals } = piece.positions ? { triangles: piece.positions, normals: piece.normals } : { triangles: piece, normals: null };
+  const R = rotation(item.yaw ?? 0, item.tiltX ?? 0, item.tiltZ ?? 0);
+  const column = item.type === 'column';
+  const spin = column ? rotation((item.seed % 628) / 100, 0, 0) : null;
+  const [a, b, c] = column ? [item.baseR, item.height, item.baseR] : item.half;
+  const at = k => {
+    let x = triangles[k] * a, y = triangles[k + 1] * b, z = triangles[k + 2] * c;
+    if (column) {
+      [x, y, z] = apply(spin, x, y, z);
+      const lean = Math.pow(Math.max(y / item.height, 0), 1.35);
+      return [item.x + x + item.lean[0] * lean, item.y + y, item.z + z + item.lean[1] * lean];
+    }
+    const q = apply(R, x, y, z);
+    return [q[0] + item.x, q[1] + item.y, q[2] + item.z];
+  };
+  // a normal goes through the same turn, scaled by the inverse of the stretch (so a flattened stone's top still faces up)
+  const turn = k => {
+    let x = normals[k] / a, y = normals[k + 1] / b, z = normals[k + 2] / c;
+    [x, y, z] = column ? apply(spin, x, y, z) : apply(R, x, y, z);
+    const l = Math.hypot(x, y, z) || 1;
+    return [x / l, y / l, z / l];
+  };
+  let n = 0;
+  for (let k = 0, f = 0; k < triangles.length; k += 9, f++) {
+    const tone = clamp(item.tone + (mulberry32(item.seed + f * 31)() - 0.5) * 0.3, 0, 1);
+    if (soup.tri(at(k), at(k + 3), at(k + 6), tone, item.moss ?? 0, normals ? [turn(k), turn(k + 3), turn(k + 6)] : null)) n++;
+  }
+  return n;
+}
+
+// Items to arrays, one set per chunk: { name, positions, normals, colors, zones, bounds, triangles }. `kit`: [level] -> { pieceName: triangles }.
+export function buildRocks(items, kit) {
   const soups = new Map();
   for (const item of items) {
+    const piece = rockPiece(item);
+    const shape = kit[piece.lod]?.[piece.name];
+    if (!shape) continue;
     if (!soups.has(item.chunk)) soups.set(item.chunk, new RockSoup());
-    const soup = soups.get(item.chunk);
-    if (item.type === 'column') addColumn(soup, item); else addBoulder(soup, item);
+    placeStone(soups.get(item.chunk), item, shape);
   }
   const chunks = [];
   let triangles = 0;
@@ -457,21 +394,41 @@ export function buildRocks(items) {
   return { chunks, triangles };
 }
 
-// In the game: one mesh per place, in the terrain's own material.
-export function createRockMeshes({ island, material, items }) {
-  const data = buildRocks(items);
+// The kit's three files as flat triangle arrays per piece, positions and normals (the pieces' own frames: their places side by side in the file are ignored).
+export async function loadRockKit(base = import.meta.env.BASE_URL) {
+  const loader = new GLTFLoader();
+  return Promise.all([0, 1, 2].map(async lod => {
+    const gltf = await loader.loadAsync(`${base}models/island/rocks_lod${lod}.glb`);
+    const pieces = {};
+    gltf.scene.traverse(object => {
+      if (!object.isMesh) return;
+      const geometry = object.geometry.index ? object.geometry.toNonIndexed() : object.geometry;
+      pieces[object.name] = { positions: Float32Array.from(geometry.attributes.position.array), normals: Float32Array.from(geometry.attributes.normal.array) };
+    });
+    return pieces;
+  }));
+}
+
+// In the game: one mesh per patch of island, in the terrain's own material. The kit is fetched first (a few hundred KB); the meshes appear when it has.
+export function createRockMeshes({ material, items, onError = console.warn }) {
   const group = new THREE.Group();
   group.name = 'Island stone';
-  for (const chunk of data.chunks) {
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(chunk.positions, 3));
-    geometry.setAttribute('normal', new THREE.BufferAttribute(chunk.normals, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(chunk.colors, 3));
-    geometry.setAttribute('zone', new THREE.BufferAttribute(chunk.zones, 3));
-    geometry.computeBoundingSphere();
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.name = `Island stone: ${chunk.name}`;
-    group.add(mesh);
-  }
-  return { group, triangles: data.triangles, chunks: data.chunks, items };
+  const result = { group, triangles: 0, chunks: [], items };
+  result.ready = loadRockKit().then(kit => {
+    const data = buildRocks(items, kit);
+    for (const chunk of data.chunks) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(chunk.positions, 3));
+      geometry.setAttribute('normal', new THREE.BufferAttribute(chunk.normals, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(chunk.colors, 3));
+      geometry.setAttribute('zone', new THREE.BufferAttribute(chunk.zones, 3));
+      geometry.computeBoundingSphere();
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.name = `Island stone: ${chunk.name}`;
+      group.add(mesh);
+    }
+    result.triangles = data.triangles;
+    result.chunks = data.chunks;
+  }).catch(error => onError(`[Island stone] rocks.glb: ${error?.message || error}`));
+  return result;
 }
