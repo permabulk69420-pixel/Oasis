@@ -1,0 +1,153 @@
+{
+  "bow": {
+    "triangles": 5370,
+    "size_gltf_xyz_m": [
+      0.068462,
+      1.251612,
+      0.11794
+    ],
+    "nodes": [
+      "arrow_rest",
+      "bow_mesh",
+      "bow_root",
+      "grip",
+      "nock_rest",
+      "string_bottom",
+      "string_bottom_drawn",
+      "string_top",
+      "string_top_drawn"
+    ],
+    "materials": [
+      "bow_PBR_atlas"
+    ],
+    "textures": [
+      "bow_Emission",
+      "bow_Normal",
+      "bow_ORM",
+      "bow_BaseColor"
+    ],
+    "file_bytes": 2811228,
+    "markers_gltf_xyz_m": {
+      "arrow_rest": [
+        -0.029,
+        0.072,
+        -0.004
+      ],
+      "grip": [
+        0.0,
+        0.0,
+        -0.0
+      ],
+      "nock_rest": [
+        -0.00163,
+        0.0,
+        0.023957
+      ],
+      "string_bottom": [
+        -0.00163,
+        -0.625,
+        0.023957
+      ],
+      "string_bottom_drawn": [
+        -0.00163,
+        -0.575,
+        0.143957
+      ],
+      "string_top": [
+        -0.00163,
+        0.625,
+        0.023957
+      ],
+      "string_top_drawn": [
+        -0.00163,
+        0.575,
+        0.143957
+      ]
+    },
+    "Draw": {
+      "top": {
+        "back_m": 0.12,
+        "inward_m": 0.05,
+        "verified_terminal_vertices": 28
+      },
+      "bottom": {
+        "back_m": 0.12,
+        "inward_m": 0.05,
+        "verified_terminal_vertices": 28
+      }
+    },
+    "handle_stationary": true,
+    "checks": "PASS"
+  },
+  "arrow": {
+    "triangles": 320,
+    "size_gltf_xyz_m": [
+      0.036459,
+      0.037689,
+      0.75
+    ],
+    "nodes": [
+      "arrow_mesh",
+      "arrow_root",
+      "nock",
+      "tip"
+    ],
+    "materials": [
+      "arrow_PBR_atlas"
+    ],
+    "textures": [
+      "arrow_Emission",
+      "arrow_Normal",
+      "arrow_ORM",
+      "arrow_BaseColor"
+    ],
+    "file_bytes": 658820,
+    "markers_gltf_xyz_m": {
+      "nock": [
+        0.0,
+        0.0,
+        -0.0
+      ],
+      "tip": [
+        0.0,
+        0.0,
+        -0.75
+      ]
+    },
+    "nock_to_tip_m": 0.75,
+    "checks": "PASS"
+  },
+  "quiver": {
+    "triangles": 2696,
+    "size_gltf_xyz_m": [
+      0.126941,
+      0.8,
+      0.235
+    ],
+    "nodes": [
+      "opening",
+      "quiver_mesh",
+      "quiver_root"
+    ],
+    "materials": [
+      "quiver_PBR_atlas"
+    ],
+    "textures": [
+      "quiver_Emission",
+      "quiver_Normal",
+      "quiver_ORM",
+      "quiver_BaseColor"
+    ],
+    "file_bytes": 2772628,
+    "markers_gltf_xyz_m": {
+      "opening": [
+        0.0,
+        0.12,
+        -0.058
+      ]
+    },
+    "container_height_m": 0.55,
+    "stored_arrows": 5,
+    "checks": "PASS"
+  }
+}
