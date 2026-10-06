@@ -5,7 +5,7 @@ description: Use when a change is ready to commit: opening the PR without gh pr 
 
 # Shipping a change
 
-Moved out of CLAUDE.md so it only loads when needed. The owner's standing rules are still in CLAUDE.md.
+A project skill, loaded only when the job needs it. The owner's standing rules are kept outside this public repo.
 
 - `gh pr create` fails here (GraphQL is blocked). Use the REST API:
   `gh api repos/permabulk69420-pixel/oasis/pulls -X POST -f title=... -f head=BRANCH -f base=main -F body=@file`

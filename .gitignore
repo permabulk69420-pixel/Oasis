@@ -7,3 +7,6 @@ smoke-shots/
 dev.log
 __pycache__/
 tools/island-leaves/preview/
+# personal working notes stay off this public repo (the owner keeps them privately)
+CLAUDE.md
+CLAUDE.local.md

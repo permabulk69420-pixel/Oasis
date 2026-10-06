@@ -17,7 +17,7 @@ import { createIslandGrass } from './island-grass.js';
 // worked out in the order that lets each avoid the one before: paths first, then the palms, then the stone, which keeps off both, then the glow plants,
 // then the new plants and landmarks (src/island-flora-layout.js), which keep off everything.
 export const ISLAND_SCENERY = Object.freeze({
-  paths: false,   // the owner, 6 Oct: "we shouldn't have paths... it's not great if you follow paths and can see everything". The code stays (src/sky-island-paths.js), nothing is laid.
+  paths: false,   // The owner, 6 Oct: "we shouldn't have paths... it's not great if you follow paths and can see everything". The code stays (src/sky-island-paths.js), nothing is laid.
 });
 
 export function createIslandScenery({ island, materials, getExposure = () => 1 }) {
