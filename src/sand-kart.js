@@ -35,6 +35,7 @@ export const KART = Object.freeze({
 });
 
 const up = new THREE.Vector3(0, 1, 0);
+const WHEEL_FEET = Object.freeze([[0, 1.28], [0.99, -0.74], [-0.99, -0.74], [0, 0]]);     // where the wheels (and the belly) touch, in the kart's frame
 
 // The flattest place for it near the start: the spread of the ground's height under its wheels and middle, on rings round the start point.
 export function flattestSpot(heightAt, spawn = KART.spawn) {
@@ -81,6 +82,8 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
     place(x, z, heading) { state.x = x; state.z = z; state.heading = heading; settle(); },
     hold(v = true) { desktopHeld = v; debug.forced = true; },
     steer(v) { debug.steerFixed = v; },
+    // the lowest wheel's height above the sand (negative: sunk in)
+    clearance() { return Math.min(...WHEEL_FEET.map(([lx, lz]) => { const p = new THREE.Vector3(lx, 0, lz).applyMatrix4(root.matrixWorld); return p.y - heightAt(p.x, p.z); })); },
   };
   const gripDown = new Map();
   const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), hand = new THREE.Vector3();
@@ -102,7 +105,14 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
     const k = dt > 0 ? 1 - Math.exp(-dt * KART.settle) : 1;
     root.position.set(state.x, dt > 0 ? root.position.y + (y - root.position.y) * k : y, state.z);
     if (dt > 0) root.quaternion.slerp(qWant, k); else root.quaternion.copy(qWant);
+    // the easing lags the ground on a climb at speed: never let a wheel sink into it (lift the kart until all three are on or above the sand)
     root.updateMatrixWorld(true);
+    let sink = 0;
+    for (const [lx, lz] of WHEEL_FEET) {
+      tmp.set(lx, 0, lz).applyMatrix4(root.matrixWorld);
+      sink = Math.max(sink, heightAt(tmp.x, tmp.z) - tmp.y);
+    }
+    if (sink > 0) { root.position.y += sink; root.updateMatrixWorld(true); }
   }
   settle();
 
@@ -196,9 +206,9 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
     return { x: tx, z: tz };
   }
 
-  // input: { desktopToggle (edge), desktopSteer (-1..1, + is right) }; rig and head so it can seat you and carry you.
+  // input: { desktopToggle (edge), desktopSteer (-1..1, + is right), lift (the seated-play eye calibration, metres) }; rig and head so it can seat you and carry you.
   // Returns { riding, stepOff: { x, z } | null } for the caller's own ground following.
-  function update(dt, { rig, head, desktopToggle = false, desktopSteer: steerIn = 0, presenting = false }) {
+  function update(dt, { rig, head, desktopToggle = false, desktopSteer: steerIn = 0, presenting = false, lift = 0 }) {
     if (!model || !pivot) return { riding: false, stepOff: null };
     // ---- hands take and leave the handle
     for (const s of states) {
@@ -249,6 +259,7 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
     let stepOff = null;
     if (riding) {
       mat.multiplyMatrices(root.matrixWorld, rigLocal).decompose(rig.position, rig.quaternion, scl);
+      rig.position.y += lift;                    // the caller's seated-play calibration, BEFORE the hands are locked on (or they would float above the bar by it)
       rig.updateMatrixWorld(true);
       for (const [h, held] of holders) lockHand(h, held.grip);
       rumbleIn -= dt;
