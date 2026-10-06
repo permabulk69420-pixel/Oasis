@@ -355,6 +355,13 @@ const alienBirds = createAlienBirds({
   getAvoid: () => campfires.list().map(fire => ({ x: fire.x, z: fire.z, r: 6 })),
   onError: message => console.warn(message),
 });
+// Alien vultures: a few always circling high over the desert, gliding with a few slow wingbeats now and then (never over the sky island).
+const alienVultures = createAlienVultures({
+  scene, renderer, camera, field,
+  avoid: (x, z) => skyIsland.groundHeight(x, z) !== null,
+  onError: message => console.warn(message),
+});
+if (import.meta.env.DEV) window.__vultures = alienVultures; // dev only
 // The dune stinger: one lives in the dunes to the right of the start. It wanders, stalks you when it sees you, and strikes with its
 // tail (a warning first, and it lands where you were standing). Your spear and axe hurt it; a few good blows kill it.
 const STINGER_HIT_HAPTIC = [1, 220];
