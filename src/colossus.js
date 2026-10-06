@@ -42,7 +42,7 @@ export const COLOSSUS = Object.freeze({
   // own time. `base` and `tip` scale the glow at either end; `rim` is the extra at the edges, `core` how much is left face on; `inner` the light
   // inside; `pulse` the breath (a share of the glow) and `rate` its speed; `body` darkens the crystal's own colour so the glow and the sky's
   // reflection carry it; `roughness` is the facets' polish.
-  crystal: Object.freeze({ base: 0.35, tip: 1.3, rim: 1.1, core: 0.45, inner: 0.6, pulse: 0.12, rate: 1.3, body: 0.3, roughness: 0.14 }),
+  crystal: Object.freeze({ base: 0.12, tip: 2.4, rim: 2.8, core: 0.15, inner: 1.6, pulse: 0.35, rate: 1.6, body: 0.12, roughness: 0.06 }),
   // The model's colours are the brief's (a dark slate hide, ivory plates) and under this game's dim low sun they come out black. So: a lift on the
   // hide's colour and the plates', a soft sky light from above and warm bounce from below (times the surface colour, by day only), and a thin
   // sky-coloured sheen on the edges, so the shapes read in the shade. All of it fades out with the daylight: the night look is the glow and the
