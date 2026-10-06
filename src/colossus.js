@@ -37,6 +37,12 @@ export const COLOSSUS = Object.freeze({
   // fraction of a pixel and would fade out long before the animal does.
   glow: Object.freeze({ day: 0.42, night: 1.4, far: Object.freeze({ gain: 3.0, from: 60, to: 420 }) }),
   crystalBoost: 1.25,
+  // The crystals' look (the owner: they looked like glowing plastic): cut facets that are glassy and dark straight on and bright at a glancing
+  // angle, a glow that gathers toward the tip, a light inside that slides across the facets as you move, and a slow breath, each crystal in its
+  // own time. `base` and `tip` scale the glow at either end; `rim` is the extra at the edges, `core` how much is left face on; `inner` the light
+  // inside; `pulse` the breath (a share of the glow) and `rate` its speed; `body` darkens the crystal's own colour so the glow and the sky's
+  // reflection carry it; `roughness` is the facets' polish.
+  crystal: Object.freeze({ base: 0.35, tip: 1.3, rim: 1.1, core: 0.45, inner: 0.6, pulse: 0.12, rate: 1.3, body: 0.3, roughness: 0.14 }),
   // The model's colours are the brief's (a dark slate hide, ivory plates) and under this game's dim low sun they come out black. So: a lift on the
   // hide's colour and the plates', a soft sky light from above and warm bounce from below (times the surface colour, by day only), and a thin
   // sky-coloured sheen on the edges, so the shapes read in the shade. All of it fades out with the daylight: the night look is the glow and the
@@ -79,9 +85,99 @@ export function mergeSkinnedByMaterial(root) {
   return merged;
 }
 
+// Each crystal's own coordinates, for the crystal shader: an `oasisCrystal` vertex attribute of how far along the crystal the vertex is (0 at its
+// base, 1 at its tip) and a number of the crystal's own (0 to 1, from where it is). The crystals are found as tools/colossus/extract_holds.py finds
+// them: the vertices joined by faces or welded where they share a position (each crystal is a separate closed solid); its axis is its long
+// direction and its base the wider end. Returns how many crystals it found.
+export function addCrystalAttribute(geometry) {
+  const position = geometry.getAttribute('position');
+  const n = position.count;
+  const parent = new Int32Array(n);
+  for (let i = 0; i < n; i++) parent[i] = i;
+  const find = a => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
+  const join = (a, b) => { a = find(a); b = find(b); if (a !== b) parent[b] = a; };
+  const at = new Map();
+  const unique = new Uint8Array(n); // the first vertex at each position: a hard edge's copies would weigh its side more
+  for (let i = 0; i < n; i++) {
+    const key = `${Math.round(position.getX(i) * 1e4)},${Math.round(position.getY(i) * 1e4)},${Math.round(position.getZ(i) * 1e4)}`;
+    const first = at.get(key);
+    if (first === undefined) { at.set(key, i); unique[i] = 1; } else join(first, i);
+  }
+  const index = geometry.index;
+  if (index) for (let f = 0; f < index.count; f += 3) { join(index.getX(f), index.getX(f + 1)); join(index.getX(f), index.getX(f + 2)); }
+  else for (let f = 0; f < n; f += 3) { join(f, f + 1); join(f, f + 2); }
+
+  // the vertices of each crystal, together
+  const group = new Int32Array(n);
+  const groups = new Map();
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    if (!groups.has(root)) groups.set(root, groups.size);
+    group[i] = groups.get(root);
+  }
+  const count = groups.size;
+  const start = new Int32Array(count + 1);
+  for (let i = 0; i < n; i++) start[group[i] + 1]++;
+  for (let g = 0; g < count; g++) start[g + 1] += start[g];
+  const members = new Int32Array(n);
+  const fill = start.slice(0, count);
+  for (let i = 0; i < n; i++) members[fill[group[i]]++] = i;
+
+  const values = new Float32Array(n * 2);
+  const p = new THREE.Vector3(), centre = new THREE.Vector3(), axis = new THREE.Vector3(), next = new THREE.Vector3();
+  for (let g = 0; g < count; g++) {
+    const from = start[g], to = start[g + 1];
+    centre.set(0, 0, 0);
+    let points = 0;
+    for (let k = from; k < to; k++) if (unique[members[k]]) { centre.add(p.fromBufferAttribute(position, members[k])); points++; }
+    centre.divideScalar(points);
+    // its long direction: the spread's main axis, by repeated multiplication from the widest of the three
+    let xx = 0, xy = 0, xz = 0, yy = 0, yz = 0, zz = 0;
+    for (let k = from; k < to; k++) {
+      if (!unique[members[k]]) continue;
+      p.fromBufferAttribute(position, members[k]).sub(centre);
+      xx += p.x * p.x; xy += p.x * p.y; xz += p.x * p.z; yy += p.y * p.y; yz += p.y * p.z; zz += p.z * p.z;
+    }
+    axis.set(xx >= yy && xx >= zz ? 1 : 0, yy > xx && yy >= zz ? 1 : 0, zz > xx && zz > yy ? 1 : 0).addScalar(0.1).normalize();
+    for (let it = 0; it < 24; it++) {
+      next.set(xx * axis.x + xy * axis.y + xz * axis.z, xy * axis.x + yy * axis.y + yz * axis.z, xz * axis.x + yz * axis.y + zz * axis.z);
+      if (next.lengthSq() < 1e-30) break;
+      axis.copy(next).normalize();
+    }
+    let lo = Infinity, hi = -Infinity;
+    for (let k = from; k < to; k++) {
+      const t = p.fromBufferAttribute(position, members[k]).sub(centre).dot(axis);
+      if (t < lo) lo = t;
+      if (t > hi) hi = t;
+    }
+    const span = Math.max(hi - lo, 1e-6);
+    // the base is the wider end: compare how far out the vertices in the first and last quarters are
+    let wideLo = 0, nLo = 0, wideHi = 0, nHi = 0;
+    for (let k = from; k < to; k++) {
+      if (!unique[members[k]]) continue;
+      p.fromBufferAttribute(position, members[k]).sub(centre);
+      const t = p.dot(axis);
+      const r = p.addScaledVector(axis, -t).length();
+      if (t < lo + 0.25 * span) { wideLo += r; nLo++; }
+      if (t > hi - 0.25 * span) { wideHi += r; nHi++; }
+    }
+    const flip = wideHi / Math.max(nHi, 1) > wideLo / Math.max(nLo, 1);
+    const own = Math.abs(Math.sin(centre.x * 12.9898 + centre.y * 78.233 + centre.z * 37.719) * 43758.5453) % 1;
+    for (let k = from; k < to; k++) {
+      const i = members[k];
+      const t = (p.fromBufferAttribute(position, i).sub(centre).dot(axis) - lo) / span;
+      values[i * 2] = flip ? 1 - t : t;
+      values[i * 2 + 1] = own;
+    }
+  }
+  geometry.setAttribute('oasisCrystal', new THREE.BufferAttribute(values, 2));
+  return count;
+}
+
 // The shader parts added to the colossus materials: the ground's haze; the day's soft sky light, bounce and edge sheen (see COLOSSUS.light); on the
 // glowing materials the lift with distance; and (crystals only) the hue of the emissive taken from the vertex colour (glTF vertex colour only
-// multiplies the base colour, so violet crystals would otherwise glow cyan).
+// multiplies the base colour, so violet crystals would otherwise glow cyan) and their look (COLOSSUS.crystal, read from addCrystalAttribute's
+// attribute: uCrystalA is base, tip, rim, core; uCrystalB is inner, pulse, rate and the clock).
 export function patchColossusShader(shader, uniforms, { crystal = false, glow = crystal } = {}) {
   shader.uniforms.uHaze = uniforms.haze;
   shader.uniforms.uHazeRates = uniforms.rates;
@@ -120,6 +216,28 @@ export function patchColossusShader(shader, uniforms, { crystal = false, glow = 
     totalEmissiveRadiance = hue * min(lumE / max(dot(hue, vec3(0.2126, 0.7152, 0.0722)), 0.2), lumE * 5.0);
   }
 #endif`);
+    shader.uniforms.uCrystalA = uniforms.crystalA;
+    shader.uniforms.uCrystalB = uniforms.crystalB;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', () => '#include <common>\nattribute vec2 oasisCrystal;\nvarying vec2 vCrystal;')
+      .replace('#include <begin_vertex>', () => '#include <begin_vertex>\n  vCrystal = oasisCrystal;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', () => '#include <common>\nvarying vec2 vCrystal;\nuniform vec4 uCrystalA;\nuniform vec4 uCrystalB;')
+      .replace('#include <emissivemap_fragment>', () => `#include <emissivemap_fragment>
+  {
+    // a cut crystal: dim face on, bright at a glancing angle; the glow gathers toward the tip; a light inside that each facet sees in another
+    // place, so it slides across them as you move; a slow breath, each crystal in its own time; and the edges toward the tip burn white
+    float along = vCrystal.x, own = vCrystal.y;
+    vec3 eye = normalize(vViewPosition);
+    float facing = abs(dot(normal, eye));
+    float rim = pow(1.0 - facing, 2.0);
+    float body = mix(uCrystalA.x, uCrystalA.y, pow(along, 1.4));
+    float inner = 0.5 + 0.5 * sin(along * 7.0 + facing * 5.0 + dot(normal, vec3(1.7, 2.3, 1.1)) + own * 6.2832);
+    float breath = 1.0 + uCrystalB.y * sin(uCrystalB.w * uCrystalB.z + own * 6.2832);
+    vec3 glowColour = totalEmissiveRadiance;
+    totalEmissiveRadiance = glowColour * (body * mix(uCrystalA.w, 1.0, rim) + uCrystalB.x * inner * inner * along + uCrystalA.z * rim) * breath;
+    totalEmissiveRadiance += vec3(dot(glowColour, vec3(0.2126, 0.7152, 0.0722))) * rim * along * 0.6;
+  }`);
   }
   return true;
 }
@@ -181,11 +299,15 @@ export function createColossus({
     groundFill: { value: new THREE.Vector3() },
     sheen: { value: new THREE.Vector3() },
     glowFar: { value: new THREE.Vector3(cfg.glow.far.gain, cfg.glow.far.from, cfg.glow.far.to) },
+    crystalA: { value: new THREE.Vector4() },
+    crystalB: { value: new THREE.Vector4() },
   };
   // the look's numbers, copied so a screenshot session can try others (debug.tune) without a reload
-  const look = { ...cfg.light, ground: [...cfg.light.ground], glow: { ...cfg.glow } };
+  const look = { ...cfg.light, ground: [...cfg.light.ground], glow: { ...cfg.glow }, crystal: { ...cfg.crystal } };
   const tints = []; // { material, base, kind }: the hide and plate colours as the model has them
   const glowMaterials = [];
+  const crystalMaterials = []; // { material, base }: the crystal colour as the model has it
+  let crystalClock = 0;
   let lod = 2;
   let shown = -1;
   let attached = false;
@@ -207,6 +329,7 @@ export function createColossus({
       object.castShadow = object.receiveShadow = false;
       const material = object.material;
       if (material && !own.includes(material)) own.push(material);
+      if (material?.name === 'Colossus crystal') addCrystalAttribute(object.geometry);
     });
     if (level > 0) mergeSkinnedByMaterial(root);
     root.traverse(object => {
@@ -225,6 +348,10 @@ export function createColossus({
         glow.push({ material, boost: crystal ? cfg.crystalBoost : 1 });
         glowMaterials.push({ material, boost: crystal ? cfg.crystalBoost : 1 });
       }
+      if (crystal) {
+        crystalMaterials.push({ material, base: material.color.clone() });
+        material.flatShading = true; // cut facets, each catching the sky its own way
+      }
       if (material.name === 'Colossus hide' || material.name === 'Colossus plate') {
         tints.push({ material, base: material.color.clone(), kind: material.name === 'Colossus hide' ? 'hide' : 'plate' });
       }
@@ -242,6 +369,10 @@ export function createColossus({
 
   function applyTints() {
     for (const { material, base, kind } of tints) material.color.copy(base).multiplyScalar(look[kind]);
+    const c = look.crystal;
+    for (const { material, base } of crystalMaterials) { material.color.copy(base).multiplyScalar(c.body); material.roughness = c.roughness; }
+    uniforms.crystalA.value.set(c.base, c.tip, c.rim, c.core);
+    uniforms.crystalB.value.set(c.inner, c.pulse, c.rate, crystalClock);
   }
 
   function attach(level, gltf) {
@@ -349,6 +480,8 @@ export function createColossus({
   function update(dt, head) {
     updateGlow();
     if (!(dt >= 0)) return;
+    crystalClock = (crystalClock + dt) % 1e4;
+    uniforms.crystalB.value.w = crystalClock;
     distance = Math.hypot(head.x - state.x, head.z - state.z);
     const visible = ready && distance < cfg.hideBeyond;
     if (!visible) {
@@ -394,10 +527,11 @@ export function createColossus({
       load: request,
       freeze(on = true) { frozen = on; },
       lod(level = -1) { forced = level; },
-      // try other numbers for the look without a reload: { hide, plate, sky, sheen, ground: [r, g, b], glow: { day, night } }
+      // try other numbers for the look without a reload: { hide, plate, sky, sheen, ground: [r, g, b], glow: { day, night }, crystal: { ... } }
       tune(values = {}) {
-        const { glow: glowValues, ground, ...rest } = values;
+        const { glow: glowValues, ground, crystal, ...rest } = values;
         Object.assign(look, rest);
+        if (crystal) Object.assign(look.crystal, crystal);
         if (ground) look.ground = [...ground];
         if (glowValues) Object.assign(look.glow, glowValues);
         applyTints();
