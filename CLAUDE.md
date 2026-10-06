@@ -22,7 +22,7 @@ tests by opening the deployed GitHub Pages URL on the headset. Pushing to `main`
   Never run a far, medium, close, day and night sweep for one change. At most 3 images per check in total; if more seem needed, pick the most telling and say what I skipped.
   After a fix, re-shoot only the view that changed. Do not re-look at a view that was already fine. Judge by eye at full size; no stitching.
 - Do not read all of `README.md` or `docs/claude-history.md`: grep for the section, read that part.
-- **No smoke test, no full test run** (Kane, 6 Oct: he does not want them). GitHub runs `npm test` before every deploy. For an art change run only the one test file for that module (`node --test tests/<file>.js`), or none for docs. Do not write new tests or harnesses for art tweaks; reuse the existing labs (`tools/island-lab/flora_shot.py`, `island_shot.py`) and add no new tool unless nothing existing does the job.
+- **No smoke test, no full test run** (Kane, 6 Oct). GitHub runs `npm test` (15 files) before every deploy. For an art change run nothing, or only the one test file that covers that module if there is one. Do not write new tests or harnesses for art tweaks; reuse the existing labs (`tools/island-lab/flora_shot.py`, `island_shot.py`) and add no new tool unless nothing existing does the job.
 - Update `CLAUDE.md`, the README and the Project docs once at the end of a run, not as each thing lands.
 - Do not pipe long logs into the conversation: tail, grep, or write to a file and read the summary line.
 - Keep tool waits short; long idle gaps can drop the prompt cache. Poll a background job with a few quick checks, not a long sleep.
@@ -59,7 +59,7 @@ Kane is casual, often away from the headset and happy to hand me a stretch of wo
 ## Working on this repo
 
 - Tests: `npm test` (node --test, no browser). Build: `npx vite build`. Dev: `npm run dev` (port 4173).
-- The smoke test (`tools/smoke/smoke_test.py`) still exists but is not run by default and is not in the deploy (6 Oct, Kane's call). Use it only if he asks.
+- **Cut on 6 Oct (Kane: the tests and harnesses were as big as the game):** the smoke test and the colossus, hold, stinger and finds labs are deleted (restore from git history with `git show <old commit>:path` only if he asks), and `tests/` is down from 78 files to 15 that guard real logic (saves, survival, crafting, world and zones heights, shader markers, sun path). The `grip-debug` skill refers to the deleted hold lab. The only shot tools left are `tools/island-lab/` (flora lab, `island_shot.py`). Do not rebuild harnesses.
 - Long procedures live in project skills (`.claude/skills/`): `ship-a-change`, `grip-debug`, `perf-triangles`. Load one when the job matches.
 - `gh pr create` fails here (GraphQL blocked): use the REST API (see `ship-a-change`).
 - Stop-hook "N unpushed commits and no remote branch" is this clone's fault: run `git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*' && git fetch origin` once per session.
