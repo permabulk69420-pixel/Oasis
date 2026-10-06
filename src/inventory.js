@@ -22,6 +22,7 @@ const ITEM_WEIGHTS = Object.freeze({
   pickaxe: 12,
   crystal: 4,
   campfire: 25,
+  glider: 15,
 });
 
 export function addInventoryItem(type, amount = 1) {
