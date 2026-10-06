@@ -761,7 +761,7 @@ function frame(time) {
     const desktopFlight = presenting ? {} : {
       toggle: gliderToggle,
       bank: Number(keys.has('KeyD')) - Number(keys.has('KeyA')),
-      pitch: Number(keys.has('KeyS')) - Number(keys.has('KeyW')),   // S pushes the bar out (slow, float), W pulls it in (dive)
+      pitch: Number(keys.has('KeyS')) - Number(keys.has('KeyW')),   // W noses down (dive), S lifts the nose (float)
     };
     flight = glider.update(dt, {
       rig, head, presenting, groundAt: flightGround, groundY, rigOffset: seatedOffset + crouchOffset,
