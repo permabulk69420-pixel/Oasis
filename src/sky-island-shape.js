@@ -240,19 +240,41 @@ export function buildIsland(baseY, config = SKY_ISLAND, features = null) {
 // `topGround`). The mesh is a polar grid, a ring of `around` points per ring and `topRings` rings, so this finds the quad the point is in and
 // interpolates the triangle the faces split it into. Anything that walks or stands on the island uses this, so nothing floats over or sinks into
 // what is drawn (the smooth `topGround` is up to a quarter of a metre off on the rocky rise, where the mesh cannot follow every crag).
+// The ground carries on over the rounded lip (the owner, 6 Oct: the last few metres of the edge were drawn but you fell through them): out to where
+// the lip has turned LIP_WALKABLE from level, about 3.8 m past where the rounding starts and 1.8 m lower; past that it is too steep to stand on
+// and you go over.
+export const LIP_WALKABLE = 50 * Math.PI / 180;
 export function makeMeshGround(data, config = SKY_ISLAND) {
-  const A = config.around, R = config.topRings;
+  const A = config.around, R = config.topRings, L = config.lipRings;
   const { positions } = data;
-  const high = (i, j) => positions[(i === 0 ? 0 : 1 + (i - 1) * A + (((j % A) + A) % A)) * 3 + 1];
+  const vertex = (i, j) => (i === 0 ? 0 : 1 + (i - 1) * A + (((j % A) + A) % A)) * 3;
+  const high = (i, j) => positions[vertex(i, j) + 1];
+  const radiusAt = (i, j) => { const k = vertex(i, j); return Math.hypot(positions[k] - config.x, positions[k + 2] - config.z); };
+  const lipReach = Math.sin(LIP_WALKABLE);
   return function meshGround(x, z) {
     const dx = x - config.x, dz = z - config.z;
     let theta = Math.atan2(dz, dx);
     if (theta < 0) theta += TAU;
     const lipStart = outlineRadius(theta, config) - config.lip;
     const r = Math.hypot(dx, dz);
-    if (r >= lipStart) return null;
     const fj = (theta / TAU) * A;
     const j = Math.min(Math.floor(fj), A - 1), tj = fj - j;
+    if (r >= lipStart) {
+      // on the lip: along its rings (as drawn), between the two columns either side
+      if (r > lipStart + config.lip * lipReach) return null;
+      const along = (i) => {
+        // ring i's radius and height here, between columns j and j + 1
+        return { r: radiusAt(i, j) * (1 - tj) + radiusAt(i, j + 1) * tj, y: high(i, j) * (1 - tj) + high(i, j + 1) * tj };
+      };
+      let a = along(R);
+      if (r <= a.r) return a.y;
+      for (let k = 1; k <= L; k++) {
+        const b = along(R + k);
+        if (r <= b.r) return a.y + (b.y - a.y) * (r - a.r) / Math.max(b.r - a.r, 1e-6);
+        a = b;
+      }
+      return null;
+    }
     const fi = (r / lipStart) * R;
     const i = Math.min(Math.floor(fi), R - 1), ti = fi - i;
     if (i === 0) { // the fan round the pole
