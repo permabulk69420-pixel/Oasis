@@ -33,6 +33,7 @@ import { createSandKart, KART } from './sand-kart.js';
 import { createGlider } from './glider.js';
 import { createWatch } from './watch.js';
 import { createColossusAudio } from './colossus-audio.js';
+import { createColossusClimb } from './colossus-climb.js';
 import { createWindAudio } from './wind-audio.js';
 import { setListener } from './audio.js';
 import { createSkyEnvironment, setSkyEnvironment } from './sky-environment.js';
@@ -403,6 +404,10 @@ const colossus = createColossus({
   },
 });
 if (import.meta.env.DEV) window.__colossus = colossus; // dev only: pose it for a screenshot (colossus.debug)
+// Climbing it (src/colossus-climb.js): squeeze a grip with your hand on one of its crystals to clamp on, pull down to climb, hand over hand.
+const colossusClimb = createColossusClimb({ states: hands.states, getRoot: () => colossus.shownRoot, getDistance: () => colossus.distance, onError: message => console.warn(message) });
+let climbing = false;
+if (import.meta.env.DEV) window.__climb = colossusClimb; // dev only
 if (import.meta.env.DEV) window.__mining = mining; // dev only: lets a test strike a node without swinging a tool
 if (import.meta.env.DEV) { window.__stinger = duneStinger; window.__sandPuffs = sandPuffs; window.__prints = footprints; window.__terrain = terrain; } // dev only: lets a screenshot script read or hurt the stinger and throw dust
 const weaponHits = createWeaponHits({ tools: hands.tools, rig, targets: [duneStinger, mining] });
@@ -794,7 +799,7 @@ function frame(time) {
     flight = glider.update(dt, {
       rig, head, presenting, groundAt: flightGround, groundY, rigOffset: seatedOffset + crouchOffset,
       fallSpeed: fall.active ? fall.speed : 0, velocity, bounds: WALK, desktop: desktopFlight,
-      blocked: !playing || Boolean(kartRide?.riding),
+      blocked: !playing || Boolean(kartRide?.riding) || climbing,
     });
     if (flight.flying) onIsland = false; // (flightGround decides the ground while you fly)
     if (flight.landed) {
@@ -821,6 +826,10 @@ function frame(time) {
   footprints.update(time * 0.001);
   giantBones.update(head);
   colossus.update(dt, head);
+  climbing = colossusClimb.update(dt, {
+    rig, head, presenting: renderer.xr.isPresenting && playing, blocked: glider.deployed || Boolean(kartRide?.riding),
+    floorY: groundAt, rigOffset: seatedOffset + crouchOffset,
+  }).climbing;
   // ---- sound: the listener is the headset; the Colossus's growl; the wind of your speed
   activeCamera.getWorldQuaternion(listenerQuat);
   setListener(head, listenerForward.set(0, 0, -1).applyQuaternion(listenerQuat), listenerUp.set(0, 1, 0).applyQuaternion(listenerQuat));
@@ -903,7 +912,13 @@ function frame(time) {
       if (jumpHeight <= 0) { jumpHeight = 0; jumpVelocity = 0; }
     }
 
-    if (flight?.flying) {
+    if (climbing) {
+      // on the Colossus: your hands hold you (src/colossus-climb.js has placed the rig); no walking, no falling; let go and you fall from here
+      velocity.set(0, 0, 0); jumpHeight = 0; jumpVelocity = 0;
+      fall.active = false; fall.speed = 0;
+      groundY = rig.position.y - seatedOffset - crouchOffset;
+      updateSurvival(dt, { sprinting: false, inWater: false });
+    } else if (flight?.flying) {
       // flying the glider: it carries the rig (src/glider.js) and has placed it this frame; no walking or jumping, and no fall (it lands you gently)
       velocity.set(0, 0, 0); jumpHeight = 0; jumpVelocity = 0;
       fall.active = false; fall.speed = 0;
