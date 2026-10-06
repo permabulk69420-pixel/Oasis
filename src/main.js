@@ -355,13 +355,6 @@ const alienBirds = createAlienBirds({
   getAvoid: () => campfires.list().map(fire => ({ x: fire.x, z: fire.z, r: 6 })),
   onError: message => console.warn(message),
 });
-// Alien vultures: a few always circling high over the desert, gliding with a few slow wingbeats now and then (never over the sky island).
-const alienVultures = createAlienVultures({
-  scene, renderer, camera, field,
-  avoid: (x, z) => skyIsland.groundHeight(x, z) !== null,
-  onError: message => console.warn(message),
-});
-if (import.meta.env.DEV) window.__vultures = alienVultures; // dev only
 // The dune stinger: one lives in the dunes to the right of the start. It wanders, stalks you when it sees you, and strikes with its
 // tail (a warning first, and it lands where you were standing). Your spear and axe hurt it; a few good blows kill it.
 const STINGER_HIT_HAPTIC = [1, 220];
@@ -412,6 +405,9 @@ const colossus = createColossus({
   },
 });
 if (import.meta.env.DEV) window.__colossus = colossus; // dev only: pose it for a screenshot (colossus.debug)
+// Alien vultures: a few that live over the Colossus's gravel plain, circling high and gliding with a few slow wingbeats now and then.
+const alienVultures = createAlienVultures({ scene, renderer, camera, field, onError: message => console.warn(message) });
+if (import.meta.env.DEV) window.__vultures = alienVultures; // dev only
 // Climbing it (src/colossus-climb.js): squeeze a grip with your hand on one of its crystals to clamp on, pull down to climb, hand over hand.
 const colossusClimb = createColossusClimb({ states: hands.states, getRoot: () => colossus.shownRoot, getDistance: () => colossus.distance, onError: message => console.warn(message) });
 let climbing = false;

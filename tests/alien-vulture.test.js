@@ -9,34 +9,27 @@ function seeded(seed = 7) {
   return () => { a = (a * 1664525 + 1013904223) % 4294967296; return a / 4294967296; };
 }
 
-test('a vulture circles out over the sand, facing where it flies and banked into the turn', () => {
+const inPlain = (x, z) => ((x - ALIEN_VULTURE.area.x) / ALIEN_VULTURE.area.rx) ** 2 + ((z - ALIEN_VULTURE.area.z) / ALIEN_VULTURE.area.rz) ** 2 <= 1 + 1e-9;
+
+test('a vulture circles over the plain, facing where it flies, banked into the turn and above the Colossus', () => {
   const flight = createVultureFlight({ rng: seeded(), groundAt: () => 5 });
-  flight.place(0, 0);
+  flight.start();
   const s = flight.state;
-  const d = Math.hypot(s.cx, s.cz);
-  assert.ok(d >= ALIEN_VULTURE.place[0] - 1 && d <= ALIEN_VULTURE.place[1] + 1, `circle ${d} m away`);
-  for (let i = 0; i < 300; i++) {
+  const dt = 1 / 30;
+  for (let i = 0; i < 30 * 1200; i++) {                       // twenty minutes
     const x0 = s.x, z0 = s.z;
-    flight.update(1 / 30, 0, 0);
+    flight.update(dt);
+    assert.ok(inPlain(s.cx, s.cz), 'its circle stays over the plain');
+    assert.ok(Math.hypot(s.x - x0, s.z - z0) <= (ALIEN_VULTURE.speed[1] + ALIEN_VULTURE.wander) * dt + 1e-6, 'no jump');
+    if (i % 30) continue;
     assert.ok(Math.abs(Math.hypot(s.x - s.cx, s.z - s.cz) - s.radius) < 1e-6);
     const heading = Math.atan2(s.x - x0, s.z - z0);
-    assert.ok(Math.abs(Math.atan2(Math.sin(heading - s.yaw), Math.cos(heading - s.yaw))) < 0.2, 'faces the way it flies (the drift with the wind aside)');
+    assert.ok(Math.abs(Math.atan2(Math.sin(heading - s.yaw), Math.cos(heading - s.yaw))) < 1e-6, 'faces the way it flies');
     // the circle's middle is on the side it banks toward: its left (+x of the bird) when the left wing is down (roll < 0)
     const leftX = Math.cos(s.yaw), leftZ = -Math.sin(s.yaw);
-    const toCentre = (s.cx - s.x) * leftX + (s.cz - s.z) * leftZ;
-    assert.ok(Math.sign(toCentre) === -Math.sign(s.roll), 'banks into the turn');
-    const h = s.y - 5;
-    assert.ok(h >= ALIEN_VULTURE.altitude[0] - 1 && h <= ALIEN_VULTURE.altitude[1] + 1);
+    assert.ok(Math.sign((s.cx - s.x) * leftX + (s.cz - s.z) * leftZ) === -Math.sign(s.roll), 'banks into the turn');
+    assert.ok(s.y - 5 >= ALIEN_VULTURE.altitude[0] - 1 && s.y - 5 > 55, 'flies above the Colossus (55 m tall)');
   }
-});
-
-test('a vulture that has drifted too far is put back near you, and never over a place to keep off', () => {
-  const flight = createVultureFlight({ rng: seeded(3), groundAt: () => 0, avoid: (x, z) => x > 0 && x < 2000 });
-  flight.place(0, 0);
-  const s = flight.state;
-  assert.ok(s.cx + s.radius + ALIEN_VULTURE.keepOff < 0, 'keeps the whole circle off the place');
-  flight.update(1 / 30, 5000, 0);
-  assert.ok(Math.hypot(s.cx - 5000, s.cz) <= ALIEN_VULTURE.place[1] + 1, 'put back near you');
 });
 
 test('the vulture poser finds its bones and turns a wing about the model axes from its rest', () => {
