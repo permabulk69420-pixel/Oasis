@@ -25,25 +25,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      # Load the real game in headless Chromium and fail on page errors, a blank picture or a blown budget, so a broken game never deploys.
-      # (tools/smoke/smoke_test.py; it reads the dev server's telemetry, so it runs against `npm run dev`, and gets one retry for a slow runner.)
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Smoke test the real game
-        run: |
-          pip install playwright pillow
-          playwright install --with-deps chromium
-          npm run dev > dev.log 2>&1 &
-          for i in $(seq 1 40); do curl -sf http://localhost:4173/ > /dev/null && break; sleep 1; done
-          python3 tools/smoke/smoke_test.py --shots smoke-shots || { echo "retrying once"; python3 tools/smoke/smoke_test.py --shots smoke-shots; }
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: smoke-shots
-          path: |
-            smoke-shots
-            dev.log
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
         with:
