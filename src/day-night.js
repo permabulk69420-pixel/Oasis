@@ -5,7 +5,7 @@ import { createWaterFireflies } from './water-fireflies.js';
 import { nightFill } from './night-fill.js';
 import { milkyWayPoint, planetCovers } from './night-sky.js';
 
-// The game leans toward twilight and night. Kane (5 Oct): "five minutes and five minutes ... I need more time"
+// The game leans toward twilight and night. The owner (5 Oct): "five minutes and five minutes ... I need more time"
 // (it was 3 and 3, which felt like one minute while exploring the 4 km world). Still short on purpose while
 // testing; the shipped game will use longer days. The clock runs in real seconds (a slow frame never speeds it up).
 export const DAY_SECONDS = 5 * 60;

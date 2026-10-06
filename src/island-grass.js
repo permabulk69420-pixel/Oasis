@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { addWindSway, SWAY } from './wind.js';
 import { createIslandPatchGeometry, ISLAND_RICH_BLADES as RICH_BLADES, ISLAND_LITE_BLADES as LITE_BLADES, ISLAND_RICH_TRIANGLES as RICH_TRIANGLES, ISLAND_LITE_TRIANGLES as LITE_TRIANGLES } from './island-grass-blades.js';
 
-// Grass blades over the island's meadows and floor (Kane, 6 Oct: the day does not look dense or Ark-like; then "the grass looks trash": lime, rigid, every blade the same).
+// Grass blades over the island's meadows and floor (the owner, 6 Oct: the day does not look dense or Ark-like; then "the grass looks trash": lime, rigid, every blade the same).
 // The blades are the island's own patch (island-grass-blades.js: three kinds of blade, arched tips, dark roots, the same triangle count as the oasis's, which keeps its
 // patch and look); the material and the wind are the oasis's. The field is clumped: a smooth noise thins it in places and varies its colour and height, so it is not an even
 // carpet. The island is 190,000 square metres, far too many for one list, so the field is made in 8 m chunks round you

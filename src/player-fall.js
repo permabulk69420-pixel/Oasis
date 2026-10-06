@@ -1,4 +1,4 @@
-// Falling (Kane, 5 Oct: walk off the island and you should fall, and he is fine with it hurting; no death, health floors at 10 in survival.js).
+// Falling (the owner, 5 Oct: walk off the island and you should fall, and he is fine with it hurting; no death, health floors at 10 in survival.js).
 // The numbers are mine. `gravity` matches the jump's. Landing slower than `safeSpeed` (a drop of about 3 m) costs nothing.
 export const FALL = Object.freeze({ gravity: 12, startDrop: 0.6, safeSpeed: 9, damagePerMetrePerSecond: 2.5, maxDamage: 90 });
 

@@ -11,7 +11,7 @@ export const SURVIVAL_RATES = Object.freeze({
   foodPerSecond: STAT_MAX / (35 * 60), // about 35 minutes from full to empty
   waterPerSecond: STAT_MAX / (22 * 60), // about 22 minutes
   waterRefillPerSecond: 30, // standing in the pond
-  staminaSprintPerSecond: 0.25, // TESTING (Kane, 5 Oct): 20 times the endurance, about 400 seconds of sprinting. Normal was 5 (about 20 seconds).
+  staminaSprintPerSecond: 0.25, // TESTING (the owner, 5 Oct): 20 times the endurance, about 400 seconds of sprinting. Normal was 5 (about 20 seconds).
   staminaRegenPerSecond: 12,
   staminaRegenDelay: 1.0, // seconds after sprinting stops before it comes back
   staminaMinToSprint: 15, // once exhausted, wait until this much has recovered

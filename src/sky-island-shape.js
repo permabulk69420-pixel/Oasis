@@ -1,6 +1,6 @@
 import { noise, clamp, mix, smooth } from './world-math.js';
 
-// A floating island (Kane, 5 Oct: a big lush home high above the desert, glide down to explore; nothing about how you get there is decided).
+// A floating island (the owner, 5 Oct: a big lush home high above the desert, glide down to explore; nothing about how you get there is decided).
 // This file is the pure shape: no three.js, so tests can run it. src/sky-island.js turns it into a mesh.
 //
 // The island is one surface of revolution, bent out of true by noise: a grassy top, a rounded lip, then a rocky underside
@@ -9,7 +9,7 @@ import { noise, clamp, mix, smooth } from './world-math.js';
 // on it later can use the same numbers as the picture.
 
 export const SKY_ISLAND = Object.freeze({
-  x: -150, z: 700,         // centre, metres. South-west of the pond, opposite the colossus plain (Kane's idea: far from the colossi)
+  x: -150, z: 700,         // centre, metres. South-west of the pond, opposite the colossus plain (the owner's idea: far from the colossi)
   radius: 250,             // mean radius at the lip (about 500 m across)
   altitude: 250,           // the top's height above the desert at its centre
   thickness: 190,          // from the lip down to the lowest point

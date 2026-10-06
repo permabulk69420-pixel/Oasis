@@ -5,7 +5,7 @@ import { addWindSwayToModel } from './wind.js';
 import { exposureGlow } from './glow.js';
 import { createHaloInstances, findPodIslands } from './glow-halos.js';
 
-// The oasis's glow plants (Kane, 5 Oct: the oasis is barren and nothing connects to the hero tree's glow). Two plants, built in
+// The oasis's glow plants (the owner, 5 Oct: the oasis is barren and nothing connects to the hero tree's glow). Two plants, built in
 // Blender (tools/glow-plants/build_glow_plants.py): a clump of glow reeds for the water's edge, and the lantern bloom for the banks
 // and the foot of the hero tree. They are drawn as instanced meshes (one draw per material per level of detail, however many
 // plants), they sway with the wind like the grass, and the bulbs and pods glow the same by day and by night. At night each bulb

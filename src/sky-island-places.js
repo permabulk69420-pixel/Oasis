@@ -1,7 +1,7 @@
 import { SKY_ISLAND, outlineRadius, topOffset } from './sky-island-shape.js';
 import { clamp, mix, smooth, noise } from './world-math.js';
 
-// The island as a place (Kane, 5 Oct: it is going to be the player's home base, so it needs a lake and a handful of distinct places you can see from
+// The island as a place (the owner, 5 Oct: it is going to be the player's home base, so it needs a lake and a handful of distinct places you can see from
 // each other, joined by paths). This file is the pure layout: where each place is, how the ground is shaped for it, what colour the ground is, and
 // the paths between them. No three.js, so tests can run it. The meshes that make it are in sky-island-lake.js, sky-island-paths.js and
 // sky-island-rocks.js; what grows on it is in sky-island-flora.js.

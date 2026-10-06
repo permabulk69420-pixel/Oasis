@@ -3,7 +3,7 @@
 
     /usr/bin/python3 tools/island-leaves/make_leaf_atlas.py [outdir] [--only fern,vine] [--preview]
 
-Own art (Kane, 6 Oct: no other people's models, textures are fine): every pixel comes from the formulas in leafkit.py, no photographs. The sprite rectangles
+Own art (the owner, 6 Oct: no other people's models, textures are fine): every pixel comes from the formulas in leafkit.py, no photographs. The sprite rectangles
 (pixels, top-left origin) are written to sprites.json next to the PNGs; the island models' UVs point into these rectangles, so a sprite that moves means rebuilding the models that wear it.
 """
 import json

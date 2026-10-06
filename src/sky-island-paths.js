@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { SKY_ISLAND, outlineRadius, topPaint } from './sky-island-shape.js';
 import { clamp, mix, noise } from './world-math.js';
 
-// The island's paths (Kane, 5 Oct: it is the player's home base, so the places on it are joined by winding low paths). Each is worn earth and
+// The island's paths (the owner, 5 Oct: it is the player's home base, so the places on it are joined by winding low paths). Each is worn earth and
 // pebbles laid on the ground as a thin strip that fades into the turf at its edges, in the terrain's own material, so it takes the light, the haze and
 // the night the same way. Paths are only a look (and a guide for where things grow): nothing about walking changes. The routes are hand placed
 // (control points in world metres), then smoothed, kept out of the lake and away from the rim. Pure up to `createPathMesh`, so tests can run it.

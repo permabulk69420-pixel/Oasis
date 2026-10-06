@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-// Every island plant, tree and landmark is a real .glb file (Kane, 6 Oct: models are built in headless Blender and saved as files, never built by code in
+// Every island plant, tree and landmark is a real .glb file (the owner, 6 Oct: models are built in headless Blender and saved as files, never built by code in
 // the game): public/models/island/<name>_lod0.glb, _lod1, _lod2, made by tools/island-models/build.py. src/island-flora.js draws them, places them and picks
 // the level by distance; this reads a file into the flora's own arrays.
 // A file is one mesh with a primitive per material: "Leaf cards" (the painted leaf atlas) or "Body" (plain colour) first, then "Bark" (the tiling bark photo).

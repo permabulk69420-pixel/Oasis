@@ -28,7 +28,7 @@ export const FINDS = Object.freeze({
   rockSites: 8,
   crystalSites: 9,
   spireSites: 7,
-  // The wider world (beyond the oasis square): rock groups and spire groves, no crystals (Kane, 5 Oct: no more of them).
+  // The wider world (beyond the oasis square): rock groups and spire groves, no crystals (the owner, 5 Oct: no more of them).
   wildRockSites: 16,
   wildSpireSites: 11,
   wildSpacing: 120, // between the middles of two wild sites

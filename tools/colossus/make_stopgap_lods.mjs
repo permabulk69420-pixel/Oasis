@@ -1,4 +1,4 @@
-// STOPGAP levels of detail for Colossus 01: decimates Kane's lod0 into rough lod1 and lod2 files on the identical skeleton, so the game can switch
+// STOPGAP levels of detail for Colossus 01: decimates the owner's lod0 into rough lod1 and lod2 files on the identical skeleton, so the game can switch
 // by distance until the real lod1 and lod2 arrive. Clearly labelled (file names end in _stopgap, the glTF carries extras.stopgap = true).
 //
 //   cd <a folder with: npm i @gltf-transform/core @gltf-transform/extensions meshoptimizer>
@@ -96,7 +96,7 @@ for (const lod of [1, 2]) {
   }
   for (const node of root.listNodes()) node.setName(node.getName().replace('_LOD0', `_LOD${lod}`));
   await doc.transform(prune());
-  root.setExtras({ stopgap: true, level: lod, source: path.basename(input), note: `Rough meshoptimizer decimation of Kane's lod0 on the identical skeleton, a stopgap until the real lod${lod} exists.` });
+  root.setExtras({ stopgap: true, level: lod, source: path.basename(input), note: `Rough meshoptimizer decimation of the owner's lod0 on the identical skeleton, a stopgap until the real lod${lod} exists.` });
   const out = path.join(outDir, `colossus_01_lod${lod}_stopgap.glb`);
   await io.write(out, doc);
   console.log(`lod${lod}: ${before.toLocaleString()} -> ${Math.round(after).toLocaleString()} triangles, ${(fs.statSync(out).size / 1e6).toFixed(1)} MB  ${out}`);

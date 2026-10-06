@@ -1,7 +1,7 @@
 # Dune stinger (first creature; v3 is in the game, see the main README)
 
 `brief.md` is the brief written for another model to build the creature in headless Blender. `astra-v1/` is what came back (3 LODs,
-build script, its own report). It is **not shipped**: nothing here is under `public/`, and Kane has not approved it for the game.
+build script, its own report). It is **not shipped**: nothing here is under `public/`, and the owner has not approved it for the game.
 
 Checked by me with `python3 tools/creature/check_glb.py tools/dune-stinger/astra-v1/*.glb` (numpy + trimesh; independent of Blender):
 4,482 / 1,560 / 582 triangles, 49 bones (identity rest rotations, `_L` at +X, head at +Z), two materials, all weights sum to 1 with at most 2
@@ -12,7 +12,7 @@ The zip had the earlier build (the chat said a refined 5,888 / 1,780 / 590 versi
 
 ## v3 (mine, built from scratch in Blender; this is the one in the game)
 
-Kane's verdict on v2 was "the centipede thing, we need to make it way more complex": 16 legs and no pincers read as a centipede. v3 is a different
+The owner's verdict on v2 was "the centipede thing, we need to make it way more complex": 16 legs and no pincers read as a centipede. v3 is a different
 animal: a **plated carapace** with a ridge and a mound of eyes (two big, a ring of small), **four pairs of three-part legs** (thigh, shin, claw foot,
 knobbly knees, spikes), **two jointed pincers** (the left one a size bigger) that raise, spread and snap, toothed **mandibles**, six abdomen plates
 with a keel and rear spines, and a **five segment tail** (about 2 m long) ending in a lancet sting. Glow is a second material (cyan, the spear's
@@ -42,7 +42,7 @@ Same 49-bone skeleton and names as v1, so any pose code works on either. `v2/` h
 `tools/creature/check_glb.py` and the script's own audit. Build it with the bpy venv: `python3.11 -m venv v && v/bin/pip install bpy==4.5.3 numpy pillow trimesh`
 then `python tools/dune-stinger/build_stinger.py --out-dir out [--lod 0] [--no-render]` (Cycles renders are slow here; `QUICK=1 SAMPLES=8 RES_X=900`
 cuts them down). `viewer.html` loads a GLB in three.js with night lighting and test poses (copy it to the repo root, serve with `npm run dev`).
-In the game since Kane's go-ahead (4 Oct 2026): `v2/*.glb` are copied to `public/models/creatures/` and `src/dune-stinger.js` loads them. Rebuilding the models means copying the new files there again.
+In the game since the owner's go-ahead (4 Oct 2026): `v2/*.glb` are copied to `public/models/creatures/` and `src/dune-stinger.js` loads them. Rebuilding the models means copying the new files there again.
 
 The combat build (same day) lengthened the tail: `TAIL_SCALE = 2.4` (and `TAIL_GIRTH = 1.45`) in `build_stinger.py` stretch the four tail pieces
 from `TAIL_BASE` and carry the lancet, glow and bead points with them (`tp()`), because with the original tail the sting could never reach past

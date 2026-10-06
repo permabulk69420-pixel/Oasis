@@ -18,7 +18,7 @@ export const windTime = { value: 0 };
 // 1 is the everyday breeze. A storm could push it up; the dev build can exaggerate it with ?windgain=.
 export const windStrength = { value: 1 };
 
-// Plants that give way to you (Kane, 5 Oct): up to three points push the plants near them away, your feet and both hands. All of it is in the
+// Plants that give way to you (the owner, 5 Oct): up to three points push the plants near them away, your feet and both hands. All of it is in the
 // vertex shader, from this one uniform array (src/plant-push.js fills it every frame): xyz is a point in the world, w is how far it reaches
 // in metres (0 switches that point off). Nothing is remembered, so a plant springs back as soon as you move off it.
 //   feetRadius, handRadius: how far from your feet / a hand a plant starts to bend

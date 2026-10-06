@@ -1,4 +1,4 @@
-// Where a new game starts (Kane, 5 Oct: spawn him on the floating island): 'island' (the default) or 'oasis' (the old start by the pond).
+// Where a new game starts (the owner, 5 Oct: spawn him on the floating island): 'island' (the default) or 'oasis' (the old start by the pond).
 // `?start=oasis` or `?start=island` asks for one in any build. A dev build that is given a screenshot fixture (?at, ?view, ?bird and so on)
 // keeps the oasis, because every one of those was written for the desert; add `&start=island` to look at the island with them.
 export const DESERT_FIXTURES = Object.freeze(['at', 'look', 'view', 'eye', 'yaw', 'pitch', 'bird', 'camp', 'treelod']);

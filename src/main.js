@@ -442,7 +442,7 @@ let devCamp = import.meta.env.DEV ? new URLSearchParams(location.search).get('ca
 // ?fresh=1 starts a new game. A dev build saves nothing unless the address has ?save=1, so the screenshot fixtures stay repeatable.
 const pageParams = new URLSearchParams(location.search);
 const saveStore = createSaveStore();
-// Off for now (Kane, 5 Oct: he is testing and wants a fresh world each time; a player-chosen save may come later). `?save=1` turns it on, in any build.
+// Off for now (the owner, 5 Oct: he is testing and wants a fresh world each time; a player-chosen save may come later). `?save=1` turns it on, in any build.
 const savingEnabled = pageParams.get('save') === '1' && saveStore.available();
 const askedFresh = wantsFresh(location.search);
 const saveStart = savingEnabled ? saveStore.begin({ fresh: askedFresh }) : { save: null, note: 'off' };
@@ -474,7 +474,7 @@ const autosave = createAutosave({
     { key: 'mining', read: () => mining.serialize(), write: data => mining.restore(data) },
   ],
 });
-// TESTING (Kane, 5 Oct): a new game starts with a campfire in your pockets, so placing and lighting one needs no gathering first.
+// TESTING (the owner, 5 Oct): a new game starts with a campfire in your pockets, so placing and lighting one needs no gathering first.
 // Reload the page for another (saving is off, so every load is a new game). Empty this list when the real start is wanted.
 const TESTING_START_KIT = Object.freeze({ campfire: 1 });
 if (!saveStart.save) for (const [type, amount] of Object.entries(TESTING_START_KIT)) addInventoryItem(type, amount);

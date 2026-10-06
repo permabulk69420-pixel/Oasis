@@ -4,7 +4,7 @@ import { SUN } from './world.js';
 // Where the sun is at any point of the day, and so the moon (always opposite it): one smooth path, shared by the day/night cycle, the sky and
 // the tests.
 //
-// A twilight planet (Kane, 5 Oct): the sun never climbs far. It comes up over the horizon, slides round along it (peaking at SUN_PEAK_DEGREES, a
+// A twilight planet (the owner, 5 Oct): the sun never climbs far. It comes up over the horizon, slides round along it (peaking at SUN_PEAK_DEGREES, a
 // hand's width up) and sets, so the whole day is long, low, golden-to-red light and shadows. The moon is opposite it, so it is as low by night.
 //
 // The azimuth (which way round the sun is) used to be fixed in the morning and then jump to the opposite side at noon, and the same again at

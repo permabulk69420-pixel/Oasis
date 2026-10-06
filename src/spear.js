@@ -39,7 +39,7 @@ export const SPEAR_THRUST_TILT = 35;
 // hand and the spear flips most of the way end for end in your fist: the point that stuck out in front for a poke now points back behind
 // the hand, the way a javelin is carried cocked back, ready to be thrown forward. The flip is a turn about the palm normal, so the shaft
 // stays on (nearly) the same line across the palm and the fingers close on it just the same (the hold lab solves it on both hands:
-// `item=spear&pitch=-30&tilt=160`). It is 160 degrees, not the full 180, at Kane's word: he found a full half turn a bit much and
+// `item=spear&pitch=-30&tilt=160`). It is 160 degrees, not the full 180, at the owner's word: he found a full half turn a bit much and
 // wanted the point a touch short of dead behind. Let go of the button and it flips back to the poke. (A first try turned it only 40
 // degrees and felt like nothing.) Letting go of the grip throws it (src/falling.js).
 export const SPEAR_FLIP = 160; // degrees
