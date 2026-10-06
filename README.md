@@ -26,7 +26,7 @@ WebXR needs HTTPS, or localhost in development. Pushing to `main` builds and dep
 - `src/world.js`, `src/zones.js`, `src/terrain*.js`: the 4 km height field, zones and the terrain tiles. `src/materials.js`: sand, sky and water shaders.
 - `src/main.js`: input and rendering. `src/hands.js`: VR hands and held things. `src/survival.js`: health, food, water, stamina.
 - Tools and pickups: `src/axe.js`, `spear.js`, `pickaxe.js`, `torch.js`, `backpack.js`, `campfire`. Mining and finds: `src/mining.js`, `src/desert-finds.js`.
-- The sand sail kart (`src/sand-kart.js`, model `public/models/sand-kart/`): waits on flat sand by the oasis start. Grab its handle to sit in and roll, turn the handle to steer, let go to coast to a stop. Desktop: F by the kart, A/D steer.
+- The sand sail kart (`src/sand-kart.js`, model `public/models/sand-kart/`): waits on flat sand by the oasis start. Grab its handle to sit in and roll, turn the handle to steer, let go to coast to a stop. Hands lock onto the grips (either hand, one is enough); seated, your view climbs and rolls with the kart. Desktop: F by the kart, A/D steer.
 - Creatures: the dune stinger (`src/dune-stinger.js`, `stinger-*.js`) and Colossus 01 (`src/colossus*.js`).
 - The sky island and its jungle: `src/sky-island-*.js`, `src/island-*.js` (every plant and landmark a `.glb` in `public/models/island/` built in headless Blender, loaded by `island-glb.js`, drawn by `island-flora.js`; grass `island-grass*.js`).
 - Models are in `public/models/`, textures in `public/textures/`, build tools and labs in `tools/`, notes in `docs/`.
