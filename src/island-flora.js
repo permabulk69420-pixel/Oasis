@@ -16,7 +16,7 @@ export const FLORA_LOOK = Object.freeze({
   glow: Object.freeze({ day: 0.5, night: 0.95 }),   // how bright the glow looks by day and by night (same as the lantern blooms)
   halo: Object.freeze({ distance: 55, cyanSlots: 360, paleSlots: 120, scale: 1 }),
   refresh: Object.freeze({ metres: 2, seconds: 0.5 }),
-  lodHysteresis: 6,
+  lodHysteresis: 3,
 });
 
 // ONE level rule for everything but the hero objects (Kane, 6 Oct): close level to 30 m, middle level to 70 m, the far level beyond. Do not give a plant its own numbers.
@@ -208,15 +208,15 @@ export function geometryFromLevel(level) {
   return geometry;
 }
 
-// Which level of detail at `distance`, or -1 past the draw distance; keeps the previous level a few metres either side of a boundary.
+// Which level of detail at `distance`, or -1 past the draw distance. Coming closer a plant switches EXACTLY at the boundary (30 m and 70 m for the standard rule); only
+// going away does it hold the finer level a few metres past the boundary, so it does not flicker back and forth when you stand on the line.
 export function floraLodFor(distance, render, previous = -1) {
   if (distance > render.draw) return -1;
   const [near, far] = render.lod, h = FLORA_LOOK.lodHysteresis;
   let lod = distance < near ? 0 : distance < far ? 1 : 2;
-  if (previous >= 0 && previous !== lod) {
+  if (previous >= 0 && previous < lod) {
     if (previous === 0 && distance < near + h) lod = 0;
-    else if (previous === 1 && distance >= near - h && distance < far + h) lod = 1;
-    else if (previous === 2 && distance >= far - h) lod = 2;
+    else if (previous <= 1 && lod === 2 && distance < far + h) lod = 1;
   }
   return lod;
 }
