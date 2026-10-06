@@ -16,6 +16,7 @@ import { attachHeldObject, setGripSurface } from './grip-contact.js';
 //
 //   const hold = createHandleHold();
 //   const handle = { node: model.getObjectByName('Grip_Left'), axis: [0, 0, 1], halfLength: 0.1, radius: measureHandleRadius(model, marker, axis, 0.1) };
+//   (maxRadius: let a thicker hold than a tool's handle through, as the Colossus's crystals do: the hand clamps on rather than closing round it)
 //   hold.grab(state, handle);     // when the squeeze starts
 //   hold.place(state);            // every frame after the object (and the rig) has moved
 //   hold.release(state);          // when the squeeze ends
@@ -57,12 +58,14 @@ export function createHandleHold() {
   const p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3(), c = new THREE.Vector3(), axis = new THREE.Vector3(), barAxis = new THREE.Vector3();
   const nq = new THREE.Quaternion(), align = new THREE.Quaternion(), ps = new THREE.Vector3(), handleQ = new THREE.Quaternion();
 
-  function bar(radius) {
+  function bar(radius, big = false) {
     const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, HANDLE_HOLD.barLength, 16),
       new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
     mesh.name = 'Handle hold bar';
     mesh.userData.handleHold = true;
-    setGripSurface(mesh, { axis: [0, 1, 0], point: [0, 0, 0], halfLength: HANDLE_HOLD.barLength / 2 });
+    // a thick hold (wider than a hand closes round) may be pushed further out of the palm, starting about where it will end up
+    setGripSurface(mesh, { axis: [0, 1, 0], point: [0, 0, 0], halfLength: HANDLE_HOLD.barLength / 2,
+      ...(big ? { maxShift: radius + 0.06, startShift: Math.max(0, radius - 0.02) } : {}) });
     return mesh;
   }
 
@@ -76,8 +79,8 @@ export function createHandleHold() {
     if (!state?.handAnchor || !state.gripSocket || !handle?.node) return false;
     if (holds.has(state)) { holds.get(state).handle = handle; return true; }
     if (state.objectGrip.children.length) return false;
-    const radius = THREE.MathUtils.clamp(handle.radius ?? 0.02, HANDLE_HOLD.minRadius, HANDLE_HOLD.maxRadius);
-    const b = bar(radius);
+    const radius = THREE.MathUtils.clamp(handle.radius ?? 0.02, HANDLE_HOLD.minRadius, handle.maxRadius ?? HANDLE_HOLD.maxRadius);
+    const b = bar(radius, radius > HANDLE_HOLD.maxRadius);
     if (!attachHeldObject(state, b)) return false;
     holds.set(state, { home: { position: state.handAnchor.position.clone(), quaternion: state.handAnchor.quaternion.clone() }, bar: b, handle });
     setHeldGripProfile(state, radius < 0.017 ? GRIP_PROFILE.THIN : radius > 0.026 ? GRIP_PROFILE.LARGE : GRIP_PROFILE.MEDIUM);

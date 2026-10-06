@@ -218,9 +218,12 @@ export function createAdaptiveGrip({ root, clips, objectGrip, handedness, debug 
     normal.set(0, -1, 0).applyQuaternion(quaternion);
     objectGrip.getWorldQuaternion(quaternion).invert();
     normal.applyQuaternion(quaternion).normalize();
-    let shift = 0;
-    while (openIntersects() && shift < MAX_PALM_SHIFT) {
-      const step = Math.min(0.0015, MAX_PALM_SHIFT - shift);
+    // (a surface may allow a bigger shift than a tool's handle, and start part way out: the Colossus's crystals, src/colossus-climb.js)
+    const maxShift = object.userData.gripSurface?.maxShift ?? MAX_PALM_SHIFT;
+    let shift = Math.min(object.userData.gripSurface?.startShift ?? 0, maxShift);
+    if (shift > 0) { offset.copy(normal).multiplyScalar(shift); object.position.add(offset); contact.translate(offset); }
+    while (openIntersects() && shift < maxShift) {
+      const step = Math.min(0.0015, maxShift - shift);
       offset.copy(normal).multiplyScalar(step);
       object.position.add(offset);
       contact.translate(offset);
