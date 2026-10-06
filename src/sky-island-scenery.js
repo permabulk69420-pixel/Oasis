@@ -41,7 +41,7 @@ export function createIslandScenery({ island, materials, getExposure = () => 1 }
   group.add(palms.group);
 
   const rockItems = layoutRocks({ ground: island.groundHeight, features: island.features, pathIndex, config: island.config, avoid: palmLayout, waterY });
-  const rocks = createRockMeshes({ island, material: materials.sand, items: rockItems });
+  const rocks = createRockMeshes({ material: materials.sand, items: rockItems });
   group.add(rocks.group);
 
   // the glow plants are the oasis garden's (src/glow-garden.js draws them); this says where on the island they go, off the paths, rocks and palms
@@ -106,7 +106,7 @@ export function createIslandScenery({ island, materials, getExposure = () => 1 }
   let grassStarted = false;
   return {
     group, lake, spill, paths, palms, rocks, pathIndex, palmLayout, rockItems, glow, flora, floraItems, undergrowth, trees, treeVines, jungleField, grass, motes, groundGlow,
-    triangles: lake.triangles + spill.triangles + paths.triangles + rocks.triangles + groundGlow.triangles,
+    get triangles() { return lake.triangles + spill.triangles + paths.triangles + rocks.triangles + groundGlow.triangles; },     // (the stone counts once its kit has loaded)
     // every 100 ms (cheap): loads the palms when you are near the island, and picks the level of detail each is drawn at (y: the eye's height)
     update(x, z, y) { palms.update(x, z, y); },
     // every frame: the plants' glow follows the light, the nearest ones are drawn in detail, the motes drift and the ground takes the glow. viewHeight: pixels tall one eye's picture is

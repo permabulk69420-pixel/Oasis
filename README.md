@@ -27,6 +27,6 @@ WebXR needs HTTPS, or localhost in development. Pushing to `main` builds and dep
 - `src/main.js`: input and rendering. `src/hands.js`: VR hands and held things. `src/survival.js`: health, food, water, stamina.
 - Tools and pickups: `src/axe.js`, `spear.js`, `pickaxe.js`, `torch.js`, `backpack.js`, `campfire`. Mining and finds: `src/mining.js`, `src/desert-finds.js`.
 - Creatures: the dune stinger (`src/dune-stinger.js`, `stinger-*.js`) and Colossus 01 (`src/colossus*.js`).
-- The sky island and its jungle: `src/sky-island-*.js`, `src/island-*.js` (flora models `island-jungle-models.js`, `island-undergrowth-models.js`, drawn by `island-flora.js`; grass `island-grass*.js`).
+- The sky island and its jungle: `src/sky-island-*.js`, `src/island-*.js` (every plant and landmark a `.glb` in `public/models/island/` built in headless Blender, loaded by `island-glb.js`, drawn by `island-flora.js`; grass `island-grass*.js`).
 - Models are in `public/models/`, textures in `public/textures/`, build tools and labs in `tools/`, notes in `docs/`.
 - Dev-only URL fixtures for screenshots (`?at=x,z&look=x,z,h`, `?hour=N`, `?start=oasis`, and so on) are listed in `CLAUDE.md`.
