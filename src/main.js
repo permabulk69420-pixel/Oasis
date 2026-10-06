@@ -412,6 +412,9 @@ const colossus = createColossus({
   },
 });
 if (import.meta.env.DEV) window.__colossus = colossus; // dev only: pose it for a screenshot (colossus.debug)
+// Alien vultures: a few that live over the Colossus's gravel plain, circling high and gliding with a few slow wingbeats now and then.
+const alienVultures = createAlienVultures({ scene, renderer, camera, field, onError: message => console.warn(message) });
+if (import.meta.env.DEV) window.__vultures = alienVultures; // dev only
 // Climbing it (src/colossus-climb.js): squeeze a grip with your hand on one of its crystals to clamp on, pull down to climb, hand over hand.
 const colossusClimb = createColossusClimb({ states: hands.states, getRoot: () => colossus.shownRoot, getDistance: () => colossus.distance, onError: message => console.warn(message) });
 let climbing = false;
