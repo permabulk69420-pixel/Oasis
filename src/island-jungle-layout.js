@@ -1,7 +1,7 @@
 import { noise, clamp, smooth } from './world-math.js';
 import { SKY_ISLAND, outlineRadius, topPaint } from './sky-island-shape.js';
 import { mulberry32 } from './find-shapes.js';
-import { treeSpec } from './island-jungle-models.js';
+import { VINE_ANCHORS } from './island-model-data.js';
 
 // How overgrown the island is, and where the undergrowth goes (Kane, 6 Oct: "it's meant to be like a dense island area to explore, it's not great if you follow paths and
 // can see everything"). One field says how thick the growth is at every point; the grass, the ferns, the big-leaf plants and the shrubs all read it, so the thickets and the
@@ -18,7 +18,7 @@ export const JUNGLE = Object.freeze({
   plants: Object.freeze([['fernA', 'fern', 1], ['fernB', 'fern', 1], ['broadleafA', 'broad', 1], ['broadleafB', 'broad', 1], ['bushA', 'shrub', 1], ['bushB', 'shrub', 1], ['treeFernA', 'tall', 1], ['treeFernB', 'tall', 1]]),
 });
 
-// The tall trees (src/island-jungle-models.js): a jittered grid of cells, at most one tree a cell, denser where the growth is thicker, none near the meadow's centre (it
+// The tall trees (public/models/island/jungle{A,B,C}_lod*.glb): a jittered grid of cells, at most one tree a cell, denser where the growth is thicker, none near the meadow's centre (it
 // is a clearing: open inside `openRadius`, full density by `fullRadius`), none near the rim, the shore, the rocky rise or the hollow.
 export const JUNGLE_TREES_LAYOUT = Object.freeze({
   seed: 0x2b6e91,
@@ -203,12 +203,12 @@ export function layoutTreeVines(trees, ground, spec = JUNGLE_TREES_LAYOUT) {
   trees.forEach((tree, index) => {
     const r = cellStream(Math.round(tree.x * 7), Math.round(tree.z * 7), spec.seed ^ 0x55aa);
     if (r() > spec.vines.chance) return;
-    const model = treeSpec(tree.type);
+    const anchors = VINE_ANCHORS[tree.type] ?? [];
     const c = Math.cos(tree.yaw), s = Math.sin(tree.yaw);
-    const picks = model.anchors.length ? [Math.floor(r() * model.anchors.length)] : [];
-    if (model.anchors.length > 3 && r() < 0.5) picks.push((picks[0] + 2 + Math.floor(r() * (model.anchors.length - 3))) % model.anchors.length);
+    const picks = anchors.length ? [Math.floor(r() * anchors.length)] : [];
+    if (anchors.length > 3 && r() < 0.5) picks.push((picks[0] + 2 + Math.floor(r() * (anchors.length - 3))) % anchors.length);
     for (const k of picks) {
-      const a = model.anchors[k];
+      const a = anchors[k];
       const x = tree.x + (a[0] * c + a[2] * s) * tree.scale, z = tree.z + (-a[0] * s + a[2] * c) * tree.scale;
       const g = ground(x, z);
       const top = tree.y + a[1] * tree.scale;

@@ -2,11 +2,10 @@ import * as THREE from 'three';
 import { addWindSway, WIND_GLSL, WIND, windTime, windStrength } from './wind.js';
 import { exposureGlow } from './glow.js';
 import { createHaloInstances } from './glow-halos.js';
-import { buildFloraLevels } from './island-flora-models.js';
-import { buildFoliageLevels, UNDERGROWTH_MODELS } from './island-undergrowth-models.js';
-import { GLB_MODELS, glbLevelsFor, loadGlbLevels } from './island-glb.js';
+import { glbLevelsFor, loadGlbLevels } from './island-glb.js';
 
-// Draws the island's new plants and landmarks (src/island-flora-models.js builds them, src/island-flora-layout.js says where). One instanced mesh per model and
+// Draws the island's plants and landmarks (each a .glb built in headless Blender by tools/island-models/build.py, read by src/island-glb.js; src/island-flora-layout.js
+// and src/island-jungle-layout.js say where). One instanced mesh per model and
 // level of detail, so a few dozen draw calls however many plants there are; each plant picks its level by distance and is left out past its draw distance. The
 // bodies are plain dark standard materials (so the night fill, torch light and haze all work); the glow is a per-vertex colour (`emit`) multiplied into the
 // material's emissive, so one mesh carries both and the glow follows the exposure like every other glow in the game (src/glow.js). Upright plants (ferns,
@@ -22,7 +21,7 @@ export const FLORA_LOOK = Object.freeze({
 
 // ONE level rule for everything but the hero objects (Kane, 6 Oct): close level to 30 m, middle level to 70 m, the far level beyond. Do not give a plant its own numbers.
 const STANDARD_LOD = Object.freeze([30, 70]);
-// The heroes (the giant trees, the weeping tree, the root arch, the standing stones, the ribcage) keep their own, further out.
+// The heroes (the giant trees, the weeping tree, the root arch) keep their own, further out.
 
 // How each model is drawn: the level boundaries (metres: level 0 up to the first, level 1 up to the second, level 2 beyond), the draw distance, the material.
 const JUNGLE_BARK = Object.freeze({ colour: 'jungle_bark_colour.jpg', normal: 'jungle_bark_normal.jpg' });
@@ -30,23 +29,14 @@ export const LEAF_ALPHA_TEST = 0.42;
 
 export const FLORA_RENDER = Object.freeze({
   fern: { lod: STANDARD_LOD, draw: 150, double: true, sway: { name: 'island-fern', top: 0.85, reach: 0.10, lean: 0.25, bend: 1.5, radial: 0.45, rate: 0.9, flutter: 0.012, shade: 0, push: 1, pushPad: 0.4 } },
-  cushion: { lod: STANDARD_LOD, draw: 130 },
   mushrooms: { lod: STANDARD_LOD, draw: 130 },
   flower: { lod: STANDARD_LOD, draw: 150, double: true, sway: { name: 'island-flower', top: 1.65, reach: 0.12, lean: 0.3, bend: 1.8, radial: 0.12, rate: 0.55, flutter: 0.008, shade: 0, push: 1, pushPad: 0.3 } },
-  fungusLog: { lod: STANDARD_LOD, draw: 130 },
-  log: { lod: STANDARD_LOD, draw: 130 },
-  driftwoodA: { lod: STANDARD_LOD, draw: 130 },
-  driftwoodB: { lod: STANDARD_LOD, draw: 130 },
-  driftwoodC: { lod: STANDARD_LOD, draw: 130 },
   weepingTree: { lod: [30, 80], draw: 300, double: true, hang: { reach: 0.42, rate: 0.55, flutter: 0.03 } },
   vines: { lod: STANDARD_LOD, draw: 130, double: true, hang: { reach: 0.3, rate: 0.7, flutter: 0.04 } },
   rootArch: { lod: [45, 120], draw: 360 },
-  standingStoneA: { lod: [45, 130], draw: 360 },
-  standingStoneB: { lod: [45, 130], draw: 360 },
-  ribcage: { lod: [32, 95], draw: 300 },
-  bonesA: { lod: STANDARD_LOD, draw: 130 },
-  bonesB: { lod: STANDARD_LOD, draw: 130 },
-  // The textured undergrowth (src/island-undergrowth-models.js): cards of painted leaf (`map`: public/textures/island-leaves/<map>.png), cut out by alpha. `tint`: each copy
+  // (Retired by Kane on 6 Oct as low quality, so not placed and not made: the mossy cushions, the logs and driftwood, the bones, the ribcage and the standing
+  // stones. A better version comes back as a new model in tools/island-models/ with its line here.)
+  // The textured undergrowth (public/models/island/): cards of painted leaf (`map`: public/textures/island-leaves/<map>.png), cut out by alpha. `tint`: each copy
   // may carry its own colour multiplier (item.tint). They are many (hundreds to thousands), so they are drawn only within `draw` metres and the coarse levels are cheap.
   fernA: { lod: STANDARD_LOD, draw: 260, double: true, map: 'fern', tint: true, sway: { name: 'island-fernA', top: 0.95, reach: 0.10, lean: 0.25, bend: 1.5, radial: 0.45, rate: 0.9, flutter: 0.010, shade: 0, push: 1, pushPad: 0.45 } },
   fernB: { lod: STANDARD_LOD, draw: 260, double: true, map: 'fern', tint: true, sway: { name: 'island-fernB', top: 1.05, reach: 0.10, lean: 0.25, bend: 1.5, radial: 0.45, rate: 0.85, flutter: 0.010, shade: 0, push: 1, pushPad: 0.45 } },
@@ -55,7 +45,7 @@ export const FLORA_RENDER = Object.freeze({
   bushA: { lod: STANDARD_LOD, draw: 270, double: true, map: 'canopy', tint: true, sway: { name: 'island-bushA', top: 1.6, reach: 0.07, lean: 0.25, bend: 1.8, radial: 0.25, rate: 0.8, flutter: 0.014, shade: 0, push: 0.8, pushPad: 0.5 } },
   bushB: { lod: STANDARD_LOD, draw: 270, double: true, map: 'canopy', tint: true, sway: { name: 'island-bushB', top: 1.9, reach: 0.07, lean: 0.25, bend: 1.8, radial: 0.25, rate: 0.8, flutter: 0.014, shade: 0, push: 0.8, pushPad: 0.5 } },
   vineCurtain: { lod: STANDARD_LOD, draw: 260, double: true, map: 'vine', tint: true, hang: { reach: 0.3, rate: 0.7, flutter: 0.04 } },
-  // The tall growth (src/island-jungle-models.js): the trunk wears a tiling bark photo (a second material on the same mesh), the leaves are cards of the canopy and fern atlases.
+  // The tall growth (public/models/island/): the trunk wears a tiling bark photo (a second material on the same mesh), the leaves are cards of the canopy and fern atlases.
   treeFernA: { lod: STANDARD_LOD, draw: 330, double: true, map: 'fern', tint: true, bark: JUNGLE_BARK, sway: { name: 'island-treeFernA', top: 4.5, reach: 0.16, lean: 0.3, bend: 1.8, radial: 0.12, rate: 0.7, flutter: 0.014, shade: 0, push: 0 } },
   treeFernB: { lod: STANDARD_LOD, draw: 330, double: true, map: 'fern', tint: true, bark: JUNGLE_BARK, sway: { name: 'island-treeFernB', top: 5.6, reach: 0.18, lean: 0.3, bend: 1.8, radial: 0.12, rate: 0.65, flutter: 0.014, shade: 0, push: 0 } },
   jungleA: { lod: [60, 150], draw: 645, double: true, map: 'canopy', tint: true, bark: JUNGLE_BARK, sway: { name: 'island-jungleA', top: 30, reach: 0.5, lean: 0.3, bend: 2.0, radial: 0, rate: 0.4, flutter: 0.05, shade: 0, push: 0 } },
@@ -192,7 +182,13 @@ export function createBarkMaterial(name, render) {
   return material;
 }
 
-export const levelsFor = type => glbLevelsFor(type) ?? (UNDERGROWTH_MODELS[type] ? buildFoliageLevels(type) : buildFloraLevels(type));
+// The three levels of a model, once its file has loaded (loadIslandModels or the flora's own update fetches them).
+export function levelsFor(type) {
+  const levels = glbLevelsFor(type);
+  if (!levels) throw new Error(`island model ${type} is not loaded`);
+  return levels;
+}
+export const loadIslandModels = types => Promise.all([...new Set(types)].map(type => loadGlbLevels(type)));
 
 export function geometryFromLevel(level) {
   const geometry = new THREE.BufferGeometry();
@@ -326,10 +322,10 @@ export function createIslandFlora({ items, getExposure = () => 1, sunDirection =
     }
     if (away) { away = false; group.visible = true; sinceRefresh = Infinity; }
     if (queue.length) {
-      // a model that is a .glb file is fetched first (one at a time is fine: it is a few hundred KB); the others are built meanwhile. A file that will not load falls back to the built model.
-      for (const type of queue) if (GLB_MODELS.has(type) && !requested.has(type)) { requested.add(type); loadGlbLevels(type).catch(error => { failed.add(type); onError(`[Island flora] ${type}.glb: ${error?.message || error}`); }); }
-      const index = queue.findIndex(type => !GLB_MODELS.has(type) || glbLevelsFor(type) || failed.has(type));
-      if (index >= 0) { const [type] = queue.splice(index, 1); try { build(type); } catch (error) { onError(`[Island flora] ${error?.message || error}`); } }
+      // every model is a file: all are fetched at once (a few tens of KB each), and one that has arrived is put together per frame. One that will not load is left out.
+      for (const type of queue) if (!requested.has(type)) { requested.add(type); loadGlbLevels(type).catch(error => { failed.add(type); onError(`[Island flora] ${type}.glb: ${error?.message || error}`); }); }
+      const index = queue.findIndex(type => glbLevelsFor(type) || failed.has(type));
+      if (index >= 0) { const [type] = queue.splice(index, 1); if (!failed.has(type)) try { build(type); } catch (error) { onError(`[Island flora] ${error?.message || error}`); } }
     }
     if (!built.size) return;
     const intensity = exposureGlow(getExposure(), FLORA_LOOK.glow);
@@ -345,6 +341,7 @@ export function createIslandFlora({ items, getExposure = () => 1, sunDirection =
     }
   }
 
+  // (the lab: once loadIslandModels has fetched every file)
   function buildAll() { while (queue.length) build(queue.shift()); }
 
   return {

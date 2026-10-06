@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { installNightFill, nightFill } from '../../src/night-fill.js';
-import { createIslandFlora, levelsFor } from '../../src/island-flora.js';
+import { createIslandFlora, levelsFor, loadIslandModels } from '../../src/island-flora.js';
 import { windTime } from '../../src/wind.js';
 
 // Stands island models in a row, lit like the game (the real night fill, ACES tone mapping at the game's exposures).
-//   models   comma-separated names from FLORA_MODELS (default fern)
+//   models   comma-separated island model names (FLORA_RENDER in src/island-flora.js; the files in public/models/island/; default fern)
 //   lod      0 | 1 | 2 | all (every level of each model, one row each; default 0)
 //   night    1 for the night light (exposure 0.035, moonlit, glow) else a dusky day
 //   cam      tq (default) | front | side | top | close | wide | up     d: camera distance, ty: target height, tx: target x
@@ -46,6 +46,7 @@ if (night) {
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: night ? 0x0c1410 : 0x1c2a1c, roughness: 1 }));
 scene.add(ground);
 
+await loadIslandModels(names);
 const rowCount = names.length * copies;
 const items = [];
 const floras = [];

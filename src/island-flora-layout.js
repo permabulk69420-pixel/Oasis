@@ -1,7 +1,6 @@
 import { noise, clamp } from './world-math.js';
 import { SKY_ISLAND, outlineRadius, undersidePoint } from './sky-island-shape.js';
 import { mulberry32 } from './find-shapes.js';
-import { addBoulder } from './sky-island-rocks.js';
 
 // Where the island's new plants and landmarks go (Kane, 5 Oct: it is the player's home base, so each place has its own plants and the layout stays loose enough to
 // build over later). Every plant type has its own spot:
@@ -33,38 +32,29 @@ export const ISLAND_FLORA = Object.freeze({
 const TAU = Math.PI * 2;
 
 // ---------------------------------------------------------------------------------------------------------------------------- stone surfaces
-const surfaces = new WeakMap();
-function boulderTriangles(item) {
-  let tris = surfaces.get(item);
-  if (!tris) {
-    tris = [];
-    addBoulder({ tri(a, b, c) { tris.push([a, b, c]); return true; } }, item);
-    surfaces.set(item, tris);
-  }
-  return tris;
-}
-
-// The top of a boulder at (x, z): the highest drawn surface straight over that point, or null when the point is off the stone.
+// The top of a boulder at (x, z): its ellipsoid (the layout's half sizes, turned by its yaw; its small tilts are left out), or null off the stone. The stones'
+// shapes are a Blender kit (src/sky-island-rocks.js) that fills about this ellipsoid, a few centimetres either way.
 export function boulderTop(item, x, z) {
-  let best = -Infinity;
-  for (const [a, b, c] of boulderTriangles(item)) {
-    const d = (b[2] - c[2]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[2] - c[2]);
-    if (Math.abs(d) < 1e-9) continue;
-    const l1 = ((b[2] - c[2]) * (x - c[0]) + (c[0] - b[0]) * (z - c[2])) / d;
-    const l2 = ((c[2] - a[2]) * (x - c[0]) + (a[0] - c[0]) * (z - c[2])) / d;
-    const l3 = 1 - l1 - l2;
-    if (l1 < -1e-6 || l2 < -1e-6 || l3 < -1e-6) continue;
-    const y = l1 * a[1] + l2 * b[1] + l3 * c[1];
-    if (y > best) best = y;
-  }
-  return best === -Infinity ? null : best;
+  const [a, b, c] = item.half;
+  const dx = x - item.x, dz = z - item.z, cy = Math.cos(item.yaw ?? 0), sy = Math.sin(item.yaw ?? 0);
+  const u = (dx * cy - dz * sy) / a, w = (dx * sy + dz * cy) / c;
+  const k = 1 - u * u - w * w;
+  return k <= 0 ? null : item.y + b * Math.sqrt(k);
 }
 
 // The lowest vertices on the front of a stone's underside, for hanging things from an overhang: [{ x, y, z }] sorted along x.
 export function undersideEdge(item, front) {
-  const tris = boulderTriangles(item);
+  // points over the stone's ellipsoid (flat underneath where it is cut, as the kit's pieces are), turned by its yaw
+  const [a, b, c] = item.half, cy = Math.cos(item.yaw ?? 0), sy = Math.sin(item.yaw ?? 0), bottom = -b * (item.flat ?? 0.5);
   const verts = [];
-  for (const tri of tris) for (const p of tri) verts.push(p);
+  for (let i = 1; i < 16; i++) {
+    const lat = Math.PI * (i / 16 - 0.5), ring = Math.cos(lat);
+    for (let j = 0; j < 32; j++) {
+      const lon = (j / 32) * TAU;
+      const lx = Math.cos(lon) * ring * a, ly = Math.max(Math.sin(lat) * b, bottom), lz = Math.sin(lon) * ring * c;
+      verts.push([item.x + lx * cy + lz * sy, item.y + ly, item.z - lx * sy + lz * cy]);
+    }
+  }
   const dir = Math.atan2(front[1], front[0]);
   const cs = Math.cos(dir), sn = Math.sin(dir);
   let far = -Infinity;
