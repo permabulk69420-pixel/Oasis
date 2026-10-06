@@ -378,6 +378,9 @@ export function createColossus({
   return {
     update,
     get ready() { return ready; },
+    // the model on show (its bones are the climbing holds' frames: src/colossus-climb.js), or null; and how far you are from its middle
+    get shownRoot() { return attached && shown >= 0 && levels[shown] ? levels[shown].root : null; },
+    get distance() { return distance; },
     brain,
     state,
     list() {
