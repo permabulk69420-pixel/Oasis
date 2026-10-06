@@ -32,7 +32,7 @@ export const KART = Object.freeze({
   eyeAboveSeat: 0.64,
   viewTilt: 0.45,            // share of the kart's pitch and roll the view takes
   viewResponse: 5,           // how fast the view's tilt follows (1/s)
-  grip: Object.freeze({ radius: 0.04, length: 0.3 }),   // the invisible bar the fingers close on (the rubber grips are about 8 cm across)
+  grip: Object.freeze({ radius: 0.018, length: 0.3 }),  // the invisible bar the fingers close on (the rubber grips, slimmed in Blender to a tool handle's 3.5 cm)
   turn: 0.85,                // rad/s at full lock and cruising speed
   yawLimit: 40 * Math.PI / 180,
   leanLimit: 18 * Math.PI / 180,
@@ -157,7 +157,7 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
     if (!anchor || !socket) return;
     if (!homes.has(s)) {
       homes.set(s, { position: anchor.position.clone(), quaternion: anchor.quaternion.clone() });
-      setHeldGripProfile(s, GRIP_PROFILE.LARGE);
+      setHeldGripProfile(s, GRIP_PROFILE.MEDIUM);
       // an invisible bar the size of the rubber grip in the hand, so the fingers close until they touch it (as round any held tool's handle)
       if (s.objectGrip.children.length === 0) attachHeldObject(s, gripBar());
     }
