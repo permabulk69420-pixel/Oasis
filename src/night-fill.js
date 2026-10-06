@@ -71,7 +71,8 @@ export const NIGHT_FILL_CODE = /* glsl */`
   {
     vec3 nightNormal = normalize(normal);
     float moonUp = max(inverseTransformDirection(nightNormal, viewMatrix).y, 0.0);
-    float rim = pow(1.0 - clamp(dot(nightNormal, normalize(vViewPosition)), 0.0, 1.0), 2.6);
+    // abs: a leaf card seen from its back (its normal is not flipped, see patchFoliage in island-flora.js) used to read as full rim, a flat pale wash over every leaf
+    float rim = pow(1.0 - clamp(abs(dot(nightNormal, normalize(vViewPosition))), 0.0, 1.0), 2.6);
     gl_FragColor.rgb += (diffuseColor.rgb * ${fmt(NIGHT_FILL.colour)} * (0.55 + 0.45 * moonUp)
       + ${fmt(NIGHT_FILL.rim)} * rim) * uNightFill;
     if (uTorchStrength > 0.001) {
