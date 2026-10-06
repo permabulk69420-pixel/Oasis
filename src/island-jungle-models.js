@@ -117,63 +117,21 @@ export function treeSpec(name) {
     const y = H * lerp(0.32, 0.5, r());
     blob(add(trunkAt(y), [(r() - 0.5) * 3, 0, (r() - 0.5) * 3]), 1.9 + 0.5 * r(), 0.8);
   }
-  // Root fins (buttresses): thin sails of root standing on edge round the foot, tall at the trunk and sloping down to the ground a few metres out; and low snaking
-  // surface roots between them.
-  const fins = [], roots = [];
+  // The root flare is the trunk's own (see buildJungleTree): no separate fins or surface roots (Kane, 6 Oct: the fins did not join the trunk and roots were everywhere).
   const finPhase = (def.seed % 100) * 0.0628;
-  const nFins = def.buttress.count;
-  for (let k = 0; k < nFins; k++) {
-    fins.push({ angle: finPhase + (k + (r() - 0.5) * 0.3) / nFins * TAU, length: R * (3.0 + 2.5 * r()), height: def.buttress.height * (0.9 + 0.45 * r()) * 0.65, thick: 0.8 + 0.4 * r(), bend: (r() - 0.5) * 0.6, curl: r() * TAU });
-  }
-  const nRoots = nFins + 3;
-  for (let k = 0; k < nRoots; k++) {
-    roots.push({ angle: finPhase + (k + 0.5 + (r() - 0.5) * 0.5) / nRoots * TAU + 0.2, length: R * (2.6 + 3.2 * r()), radius: R * (0.2 + 0.12 * r()), wander: 0.25 + 0.35 * r(), curl: r() * TAU });
-  }
-  const spec = { def, trunkAt, radiusAt, limbs, cards, anchors, fins, roots, finPhase, height: H, radius: R };
+  const spec = { def, trunkAt, radiusAt, limbs, cards, anchors, finPhase, height: H, radius: R };
   specCache.set(name, spec);
   return spec;
 }
 
-// A fin's centre line and its oval section (half width across, half height up) at each of `n` stations out from the trunk. The section reaches from just under the ground
-// up to the fin's top edge, which comes down from its full height at the trunk to the ground at its far end.
-function finShape(spec, fin, n) {
-  const R = spec.radius;
-  const rho0 = R * 0.55, rho1 = R + fin.length, floor = -0.35;
-  const path = [], radii = [];
-  for (let i = 0; i < n; i++) {
-    const rho = lerp(rho0, rho1, Math.pow(i / (n - 1), 0.9));
-    const s = clamp01((rho - R * 0.9) / (rho1 - R * 0.9));
-    const top = fin.height * Math.pow(1 - s, 2.6);
-    // the root wanders a little sideways as it runs out, so a fin is not a flat board
-    const angle = fin.angle + fin.bend * s * Math.sin(s * 2.4 + fin.curl);
-    path.push([Math.cos(angle) * rho, (top + floor) / 2, Math.sin(angle) * rho]);
-    radii.push([lerp(0.3, 0.07, s) * fin.thick * Math.max(1, spec.radius), Math.max((top - floor) / 2, 0.12)]);
-  }
-  return { path, radii };
-}
-
-// A surface root: a round tube winding out from the foot along the ground, sinking into it at the far end.
-function rootShape(spec, root, n) {
-  const R = spec.radius;
-  const path = [], radii = [];
-  for (let i = 0; i < n; i++) {
-    const s = i / (n - 1);
-    const rho = lerp(R * 0.6, R + root.length, s);
-    const angle = root.angle + root.wander * 0.5 * Math.sin(s * 4.2 + root.curl) * s;
-    path.push([Math.cos(angle) * rho, 0.42 * root.radius / 0.3 * Math.pow(1 - s, 1.4) - 0.04 - 0.2 * s, Math.sin(angle) * rho]);
-    radii.push(root.radius * lerp(1, 0.28, Math.pow(s, 0.8)));
-  }
-  return { path, radii };
-}
-
 function ringHeights(lod, H) {
   if (lod === 0) {
-    const ys = [-0.5, 0, 0.45, 1.0, 1.7, 2.6, 3.8, 5.2, 6.8];
+    const ys = [-0.5, 0, 0.2, 0.45, 0.75, 1.1, 1.6, 2.2, 3.0, 3.9, 5.2, 6.8];
     for (let y = 9; y < H - 1.5; y += 2.4) ys.push(y);
     ys.push(H);
     return ys;
   }
-  if (lod === 1) return [-0.5, 0.3, 1.6, 3.6, ...[0.26, 0.42, 0.58, 0.74, 0.88, 1.0].map(k => k * H)].filter((y, i, a) => i === 0 || y > a[i - 1] + 1.0);
+  if (lod === 1) return [-0.5, 0.2, 0.8, 1.6, 2.8, 4.2, ...[0.26, 0.42, 0.58, 0.74, 0.88, 1.0].map(k => k * H)].filter((y, i, a) => i === 0 || y > a[i - 1] + 0.7);
   return [-0.5, 1.2, 0.3 * H, 0.65 * H, H];
 }
 
@@ -199,22 +157,9 @@ function buildJungleTree(lod, name) {
   m.trunk(trunkPath, {
     radius: (t, i, p) => radiusAt(Math.max(p[1], 0)) * (p[1] < 0 ? 1.0 : 1),
     sides: [28, 14, 8][lod], repeats: 3,
-    buttress: { count: def.buttress.count, reach: 0.5, height: def.buttress.height * 0.8, power: 2.0, phase: spec.finPhase, sharp: 2.0 },
+    buttress: { count: def.buttress.count, reach: 0.95, height: def.buttress.height, power: 1.7, phase: spec.finPhase, sharp: 2.2 },
     shade: barkShade(H, def.seed % 17),
   });
-  // root fins and surface roots
-  if (lod < 2) {
-    for (const fin of spec.fins) {
-      const shape = finShape(spec, fin, lod === 0 ? 8 : 4);
-      m.trunk(shape.path, { radius: (t, i) => shape.radii[i], frameUp: UP, sides: lod === 0 ? 10 : 6, repeats: 2, shade: barkShade(H, 3) });
-    }
-  }
-  if (lod === 0) {
-    for (const root of spec.roots) {
-      const shape = rootShape(spec, root, 7);
-      m.trunk(shape.path, { radius: (t, i) => shape.radii[i], sides: 6, repeats: 2, shade: barkShade(H, 7) });
-    }
-  }
   // limbs
   if (lod < 2) {
     for (const limb of limbs) {
@@ -287,30 +232,39 @@ function buildTreeFern(lod, name) {
 // ------------------------------------------------------------------------------------------------------------------------------------ bushes
 // A leafy mass about as high as you: rosettes at every angle packed into a ball. Soft ball shading so it reads as one bush, not a pile of cards.
 const BUSHES = Object.freeze({
-  bushA: Object.freeze({ seed: 6101, sprites: ['broad', 'fan', 'broad', 'rusty'], size: 1.0, cards: 26, height: 1.25, radius: 0.85 }),
-  bushB: Object.freeze({ seed: 7243, sprites: ['slender', 'fan', 'slender', 'broad'], size: 1.15, cards: 24, height: 1.5, radius: 0.95 }),
+  bushA: Object.freeze({ seed: 6101, sprites: ['broad', 'fan', 'broad', 'rusty'], size: 1.0, cards: 34, height: 1.25, radius: 0.85 }),
+  bushB: Object.freeze({ seed: 7243, sprites: ['slender', 'fan', 'slender', 'broad'], size: 1.1, cards: 32, height: 1.5, radius: 0.95 }),
 });
 
+// The cards lie on the bush's dome like scales, each facing out from the middle (tilted a little up), so from any side you see leaf faces, never a card on edge (the first
+// version gave them random normals and edge-on slivers stuck out like fallen blocks: Kane, 6 Oct). A third of them sit inside the shell to fill it. `rank` (golden spread)
+// says which a coarser level keeps, and the height of a card comes from a second spread, so the kept cards still cover the dome evenly.
 function buildBush(lod, name) {
   const def = BUSHES[name];
   const m = new CardModel(name, 'canopy');
   const total = def.cards;
   const keep = [1, 0.62, 0.38][lod], boost = [1, 1.25, 1.55][lod];
-  const centre = [0, def.height * 0.5, 0];
+  const half = def.height * 0.5;
+  const centre = [0, half + 0.05, 0];
   for (let c = 0; c < total; c++) {
     const r = rng(def.seed + c * 19);
     const rank = ((c + 1) * 0.6180339887) % 1;
-    const az = c * GOLDEN, up = Math.pow(r(), 0.75);
-    const ring = Math.sqrt(1 - up * up);
-    const radial = def.radius * (0.25 + 0.75 * r());
-    const pos = [Math.cos(az) * ring * radial, 0.2 + up * def.height * 0.95 + (r() - 0.5) * 0.2, Math.sin(az) * ring * radial];
-    const size = def.size * (0.7 + 0.5 * r()) * boost;
     if (rank > keep) continue;
+    const u = ((c + 1) * 0.7548776662) % 1;
+    const az = c * GOLDEN + (r() - 0.5) * 0.4;
+    const y = lerp(-0.62, 1, u);                                   // down the dome's side to its top
+    const ring = Math.sqrt(Math.max(0, 1 - y * y));
+    const dir = [Math.cos(az) * ring, y, Math.sin(az) * ring];
+    const inner = c % 3 === 0;
+    const reach = inner ? 0.35 + 0.3 * r() : 0.82 + 0.18 * r();
+    const pos = [centre[0] + dir[0] * def.radius * reach, centre[1] + dir[1] * half * reach, centre[2] + dir[2] * def.radius * reach];
+    const normal = normalize([dir[0] + (r() - 0.5) * 0.45, dir[1] + 0.3 + (r() - 0.5) * 0.35, dir[2] + (r() - 0.5) * 0.45]);
+    const size = def.size * (0.75 + 0.4 * r()) * boost;
     const tone = 0.8 + 0.3 * r();
     const sprite = def.sprites[Math.floor(r() * def.sprites.length)];
-    rosette(m, sprite, pos, cardNormal(r, 0.45, 55 * DEG), size, r() * TAU, {
-      rows: lod === 2 ? 1 : 2, cols: lod === 0 ? 3 : 2, cup: lod === 0 ? 0.08 : 0,
-      shade: (t, s, p) => { const k = tone * (0.55 + 0.45 * smoothstep(0, def.height, p[1])); return [k, k, k * 0.95]; },
+    rosette(m, sprite, pos, normal, size, r() * TAU, {
+      rows: lod === 2 ? 1 : 2, cols: lod === 0 ? 3 : 2, cup: lod === 0 ? 0.1 : 0.04,
+      shade: (t, sv, p) => { const k = tone * (0.55 + 0.45 * smoothstep(0, def.height, p[1])); return [k, k, k * 0.95]; },
       bias: { fn: p => sub(p, centre), mix: 0.55 },
     });
   }

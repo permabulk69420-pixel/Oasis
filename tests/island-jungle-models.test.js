@@ -78,8 +78,7 @@ test('the giants are as tall as they are made to be, a coarser level keeps their
     const spec = treeSpec(name);
     assert.ok(spec.anchors.length >= 8, `${name}: ${spec.anchors.length} anchors`);
     for (const a of spec.anchors) assert.ok(a.every(Number.isFinite) && a[1] > 0.25 * def.height && a[1] < 1.3 * def.height, `${name}: an anchor at ${a}`);
-    assert.ok(spec.fins.length >= 4 && spec.roots.length > spec.fins.length, `${name}: root fins and surface roots`);
-    for (const fin of spec.fins) assert.ok(fin.height < def.buttress.height * 1.5 * 0.7, `${name}: a fin ${fin.height.toFixed(1)} m tall is a wall, not a root`);
+    assert.equal(spec.fins, undefined, `${name}: the root flare is the trunk's own (no loose fins to leave a seam)`);
   }
 });
 

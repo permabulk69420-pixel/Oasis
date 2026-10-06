@@ -26,8 +26,8 @@ import time
 from playwright.sync_api import sync_playwright
 
 # Generous ceilings: they catch a mistake like drawing everything twice, not a few thousand triangles (see the perf-triangles skill for those).
-# Kane, 6 Oct: "forget about triangles if you aren't hitting over a million, I would rather scale back than have weak results": so the ceiling at the spawn is a million.
-BUDGET = {"calls": 250, "triangles": 1_000_000, "geometries": 400, "textures": 120}
+# Kane, 6 Oct: "forget about triangles if you aren't hitting over a million, I would rather scale back than have weak results"; then (6 Oct, later) "stop caring so much about the triangles... Meta say about 1.8 million": the ceiling at the spawn is 1.6 million (draw calls are what to watch).
+BUDGET = {"calls": 250, "triangles": 1_600_000, "geometries": 400, "textures": 120}
 LOAD_TIMEOUT_MS = 240_000
 IGNORED_CONSOLE = ("GL Driver Message", "GPU stall", "Automatic fallback to software WebGL", "WebGL", "AudioContext", "favicon")
 
