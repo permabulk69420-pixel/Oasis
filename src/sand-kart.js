@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SPAWN, WATER } from './world.js';
 import { pulseHaptics } from './haptics.js';
 import { setHeldGripProfile, clearHeldGripProfile, GRIP_PROFILE } from './grip-poses.js';
+import { attachHeldObject, setGripSurface } from './grip-contact.js';
 
 // The sand sail kart (the owner's model, public/models/sand-kart/sand_sail_kart.glb): it waits on the sand by the oasis start. Grab its handle (either grip,
 // one hand is enough) and you sit in it and it starts rolling; turn the handle like handlebars to steer (the sail rig swings on its mast pivot, up to 40
@@ -23,7 +24,15 @@ export const KART = Object.freeze({
   cruise: 22,                // m/s while you hold the handle (about 80 km/h)
   accel: 4.8,                // m/s per second, getting going (about 4.5 s to cruising)
   coast: 3.2,                // m/s per second, slowing once you let go (about 7 s from cruising)
-  settle: 9,                 // how fast the kart's height and tilt follow the ground (1/s): smooth over ripples, so the carried view does not shake
+  settle: 9,                 // how fast the kart's tilt follows the ground (1/s) when its wheels are on it; in the air it holds its attitude (airTilt)
+  airTilt: 1.2,
+  gravity: 9.8,              // off a crest faster than the ground falls away it flies (m/s/s)
+  // the rider: the eye is pinned to a point above the seat in the kart's frame (it cannot drift into the seat whatever the kart does); the view takes only
+  // part of the kart's pitch and roll, smoothed, so landings and ripples do not throw it about (the heading is followed exactly)
+  eyeAboveSeat: 0.64,
+  viewTilt: 0.45,            // share of the kart's pitch and roll the view takes
+  viewResponse: 5,           // how fast the view's tilt follows (1/s)
+  grip: Object.freeze({ radius: 0.04, length: 0.3 }),   // the invisible bar the fingers close on (the rubber grips are about 8 cm across)
   turn: 0.85,                // rad/s at full lock and cruising speed
   yawLimit: 40 * Math.PI / 180,
   leanLimit: 18 * Math.PI / 180,
@@ -82,13 +91,18 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
     place(x, z, heading) { state.x = x; state.z = z; state.heading = heading; settle(); },
     hold(v = true) { desktopHeld = v; debug.forced = true; },
     steer(v) { debug.steerFixed = v; },
+    flight() { return { airborne, vy }; },
+    eye(target) { return target.copy(eyeLocal).applyMatrix4(root.matrixWorld); },
     // the lowest wheel's height above the sand (negative: sunk in)
     clearance() { return Math.min(...WHEEL_FEET.map(([lx, lz]) => { const p = new THREE.Vector3(lx, 0, lz).applyMatrix4(root.matrixWorld); return p.y - heightAt(p.x, p.z); })); },
   };
   const gripDown = new Map();
   const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), hand = new THREE.Vector3();
-  const qYaw = new THREE.Quaternion(), qLean = new THREE.Quaternion(), qTilt = new THREE.Quaternion(), qWant = new THREE.Quaternion();
-  const rigLocal = new THREE.Matrix4(), mat = new THREE.Matrix4(), mat2 = new THREE.Matrix4(), scl = new THREE.Vector3();
+  const qYaw = new THREE.Quaternion(), qLean = new THREE.Quaternion(), qTilt = new THREE.Quaternion();
+  const mat = new THREE.Matrix4(), mat2 = new THREE.Matrix4(), scl = new THREE.Vector3();
+  const eyeLocal = new THREE.Vector3(), headInRig = new THREE.Vector3(), viewTilt = new THREE.Quaternion(), tiltWant = new THREE.Quaternion(), qHeading = new THREE.Quaternion();
+  let vy = 0, lastGround = null, airborne = false;
+  const kartTilt = new THREE.Quaternion();
 
   // The kart's place on the ground: height from its three wheels, tilted to lie on them; eased toward it over `dt` (0: at once).
   function settle(dt = 0) {
@@ -98,13 +112,25 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
     const rear = left.clone().add(right).multiplyScalar(0.5);
     const normal = tmp.copy(right).sub(left).cross(tmp2.copy(front).sub(left)).normalize();
     if (normal.y < 0) normal.negate();
-    const y = (front.y + rear.y * 2) / 3;
-    qWant.setFromAxisAngle(up, state.heading);
+    const ground = (front.y + rear.y * 2) / 3;
     qTilt.setFromUnitVectors(up, normal);
-    qWant.premultiply(qTilt);
-    const k = dt > 0 ? 1 - Math.exp(-dt * KART.settle) : 1;
-    root.position.set(state.x, dt > 0 ? root.position.y + (y - root.position.y) * k : y, state.z);
-    if (dt > 0) root.quaternion.slerp(qWant, k); else root.quaternion.copy(qWant);
+    let y = ground;
+    if (dt > 0) {
+      // on the sand it rises and falls with it (so it carries that climb rate); where the sand drops away faster than gravity can pull it down, it flies
+      vy -= KART.gravity * dt;
+      y = root.position.y + vy * dt;
+      if (y <= ground) {
+        const rate = lastGround === null ? 0 : (ground - lastGround) / dt;
+        vy = Math.max(-15, Math.min(15, rate));
+        y = ground;
+        airborne = false;
+      } else airborne = true;
+    } else vy = 0;
+    lastGround = ground;
+    root.position.set(state.x, y, state.z);
+    // the tilt eases toward the ground's (slowly in the air, so it holds its attitude over a jump); the heading is always exactly the steering's
+    if (dt > 0) kartTilt.slerp(qTilt, 1 - Math.exp(-dt * (airborne ? KART.airTilt : KART.settle))); else kartTilt.copy(qTilt);
+    root.quaternion.copy(kartTilt).multiply(qHeading.setFromAxisAngle(up, state.heading));
     // the easing lags the ground on a climb at speed: never let a wheel sink into it (lift the kart until all three are on or above the sand)
     root.updateMatrixWorld(true);
     let sink = 0;
@@ -112,7 +138,7 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
       tmp.set(lx, 0, lz).applyMatrix4(root.matrixWorld);
       sink = Math.max(sink, heightAt(tmp.x, tmp.z) - tmp.y);
     }
-    if (sink > 0) { root.position.y += sink; root.updateMatrixWorld(true); }
+    if (sink > 0) { root.position.y += sink; vy = Math.max(vy, 0); airborne = false; root.updateMatrixWorld(true); }
   }
   settle();
 
@@ -129,7 +155,12 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
   function lockHand(s, gripIndex) {
     const anchor = s.handAnchor, socket = s.gripSocket;
     if (!anchor || !socket) return;
-    if (!homes.has(s)) { homes.set(s, { position: anchor.position.clone(), quaternion: anchor.quaternion.clone() }); setHeldGripProfile(s, GRIP_PROFILE.MEDIUM); }
+    if (!homes.has(s)) {
+      homes.set(s, { position: anchor.position.clone(), quaternion: anchor.quaternion.clone() });
+      setHeldGripProfile(s, GRIP_PROFILE.LARGE);
+      // an invisible bar the size of the rubber grip in the hand, so the fingers close until they touch it (as round any held tool's handle)
+      if (s.objectGrip.children.length === 0) attachHeldObject(s, gripBar());
+    }
     const home = homes.get(s);
     anchor.position.copy(home.position); anchor.quaternion.copy(home.quaternion);    // start from where the hand really is
     anchor.updateMatrixWorld(true);
@@ -151,10 +182,19 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
     mat.decompose(anchor.position, anchor.quaternion, scl);
     anchor.updateMatrixWorld(true);
   }
+  function gripBar() {
+    const bar = new THREE.Mesh(new THREE.CylinderGeometry(KART.grip.radius, KART.grip.radius, KART.grip.length, 12),
+      new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
+    bar.name = 'Kart grip bar';
+    bar.userData.kartGrip = true;
+    setGripSurface(bar, { axis: [0, 1, 0], point: [0, 0, 0], halfLength: KART.grip.length / 2 });
+    return bar;
+  }
   function unlockHand(s) {
     const home = homes.get(s);
     if (!home) return;
     if (s.handAnchor) { s.handAnchor.position.copy(home.position); s.handAnchor.quaternion.copy(home.quaternion); }
+    for (const child of [...s.objectGrip.children]) if (child.userData.kartGrip) s.objectGrip.remove(child);
     clearHeldGripProfile(s);
     homes.delete(s);
   }
@@ -183,6 +223,10 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
   // ---- the player: seated, the rig carried with the kart
   function mount(rig, head) {
     riding = true;
+    // where the head sits in the rig (the player's own height and lean), read before the rig is moved
+    rig.updateMatrixWorld(true);
+    headInRig.set(head.x, head.y, head.z);
+    rig.worldToLocal(headInRig);
     // face the kart's forward (the rig looks down -Z), turning about the rig's origin, so the head's offset from it turns too
     const turn = state.heading + Math.PI - rig.rotation.y, c = Math.cos(turn), s = Math.sin(turn);
     const ox = head.x - rig.position.x, oz = head.z - rig.position.z;
@@ -193,9 +237,9 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
     rig.position.y = root.position.y - KART.seatDrop;
     head.x = tmp.x; head.z = tmp.z;
     // from now on the rig rides in the kart's frame (so it climbs, dips and rolls with it)
-    // (square in its frame: turned half round about its up, the position wherever the seat put it)
-    const local = root.worldToLocal(rig.position.clone());
-    rigLocal.compose(local, qAlign.setFromAxisAngle(up, Math.PI), scl.set(1, 1, 1));
+    // the eye is pinned above the seat (in the kart's frame) from now on; where the head sits in the rig now is kept, so leaning still moves the view
+    root.worldToLocal(seatWorld(eyeLocal)).add(tmp2.set(0, KART.eyeAboveSeat, 0));
+    viewTilt.identity();
   }
   function dismount(rig, head) {
     riding = false;
@@ -206,9 +250,9 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
     return { x: tx, z: tz };
   }
 
-  // input: { desktopToggle (edge), desktopSteer (-1..1, + is right), lift (the seated-play eye calibration, metres) }; rig and head so it can seat you and carry you.
+  // input: { desktopToggle (edge), desktopSteer (-1..1, + is right) }; rig and head (x, y, z) so it can seat you and carry you.
   // Returns { riding, stepOff: { x, z } | null } for the caller's own ground following.
-  function update(dt, { rig, head, desktopToggle = false, desktopSteer: steerIn = 0, presenting = false, lift = 0 }) {
+  function update(dt, { rig, head, desktopToggle = false, desktopSteer: steerIn = 0, presenting = false }) {
     if (!model || !pivot) return { riding: false, stepOff: null };
     // ---- hands take and leave the handle
     for (const s of states) {
@@ -258,8 +302,14 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
     // ---- the rider is carried: moved and turned with the kart about its middle
     let stepOff = null;
     if (riding) {
-      mat.multiplyMatrices(root.matrixWorld, rigLocal).decompose(rig.position, rig.quaternion, scl);
-      rig.position.y += lift;                    // the caller's seated-play calibration, BEFORE the hands are locked on (or they would float above the bar by it)
+      // the view: the kart's heading exactly, a smoothed share of its pitch and roll
+      qHeading.setFromAxisAngle(up, state.heading);
+      tiltWant.slerpQuaternions(qAlign.identity(), kartTilt, KART.viewTilt);          // a share of the kart's tilt
+      viewTilt.slerp(tiltWant, 1 - Math.exp(-dt * KART.viewResponse));
+      rig.quaternion.copy(viewTilt).multiply(qHeading.setFromAxisAngle(up, state.heading + Math.PI));
+      // and the rig placed so the head (where it sat in the rig when you got in) lands on the eye point above the seat
+      tmp.copy(eyeLocal).applyMatrix4(root.matrixWorld);
+      rig.position.copy(tmp).sub(tmp2.copy(headInRig).applyQuaternion(rig.quaternion));
       rig.updateMatrixWorld(true);
       for (const [h, held] of holders) lockHand(h, held.grip);
       rumbleIn -= dt;
