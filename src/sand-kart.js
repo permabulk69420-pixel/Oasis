@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SPAWN, WATER } from './world.js';
 import { pulseHaptics } from './haptics.js';
 import { createHandleHold, measureHandleRadius } from './handle-hold.js';
+import { skyLight } from './sky-environment.js';
 
 // The sand sail kart (the owner's model, public/models/sand-kart/sand_sail_kart.glb): it waits on the sand by the oasis start. Grab its handle (either grip,
 // one hand is enough) and you sit in it and it starts rolling; turn the handle like handlebars to steer (the sail rig swings on its mast pivot, up to 40
@@ -70,6 +71,7 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
 
   new GLTFLoader().load(`${import.meta.env.BASE_URL}${KART.url}`, gltf => {
     model = gltf.scene;
+    skyLight(model);
     model.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = false; } });
     root.add(model);
     pivot = model.getObjectByName('Sail_Rig_Pivot');

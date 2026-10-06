@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { getInventoryCount } from './inventory.js';
 import { pulseHaptics } from './haptics.js';
 import { createHandleHold, measureHandleRadius } from './handle-hold.js';
+import { skyLight } from './sky-environment.js';
 
 // The glider (the owner's model, public/models/glider/oasis_glider.glb), from the owner's note on 6 Oct: while it is in the inventory, raise both hands
 // above your head and squeeze both grips and it appears over you and works. Let go with both hands and it folds back into the inventory.
@@ -41,6 +42,7 @@ export function createGlider({ scene, states, onError = console.warn }) {
   const grips = { left: null, right: null };
   new GLTFLoader().load(`${import.meta.env.BASE_URL}${GLIDER.url}`, gltf => {
     model = gltf.scene;
+    skyLight(model);
     model.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = false; o.frustumCulled = false; } });
     root.add(model);
     grips.left = model.getObjectByName('grip_left');

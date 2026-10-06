@@ -5,6 +5,7 @@ import { createFireEffect } from './fire-effect.js';
 import { createLoop } from './audio.js';
 import { findTerrainMesh, TORCH_SHADER_MARKERS } from './night-fill.js';
 import { pulseHaptics } from './haptics.js';
+import { skyLight } from './sky-environment.js';
 
 // Campfires: a placed structure (stone ring and logs) that you light with a burning torch.
 // The model is built by tools/campfire/build_campfire.py. When lit, a flame and warm light
@@ -185,6 +186,7 @@ export function createCampfires({
   if (!model) {
     new GLTFLoader().load(CAMPFIRE.url, gltf => {
       model = gltf.scene;
+      skyLight(model); // (its stones and logs; the fire's own shader is left alone)
       model.name = 'Campfire template';
       model.updateMatrixWorld(true);
     }, undefined, error => onError(`[Oasis campfire] Model failed to load: ${error?.message || error}`));
