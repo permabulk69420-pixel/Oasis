@@ -32,6 +32,7 @@ import { createColossus } from './colossus.js';
 import { createSandKart, KART } from './sand-kart.js';
 import { createGlider } from './glider.js';
 import { createWatch } from './watch.js';
+import { createSkyEnvironment, setSkyEnvironment } from './sky-environment.js';
 import { registerLooseFindDrops } from './loose-finds.js';
 import { createBackpack, PACK } from './backpack.js';
 import { SPEAR } from './spear.js';
@@ -156,6 +157,10 @@ if (import.meta.env.DEV) window.__glowGarden = glowGarden; // dev only: for scre
 const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), materials.sky);
 sky.frustumCulled = false; sky.renderOrder = -10; sky.name = 'Sky'; scene.add(sky);
 const dayNight = createDayNightCycle({ scene, renderer, materials });
+// The sky's light on the solid models (src/sky-environment.js): an environment painted from this sky, opted into model by model; ?sky-env=0 turns it off.
+const skyEnvironment = createSkyEnvironment({ renderer, dayNight });
+setSkyEnvironment(skyEnvironment);
+if (import.meta.env.DEV) window.__skyEnv = skyEnvironment; // dev only: for the before/after check
 // Wind-blown sand and drifting dust. It shares the terrain's sun and pond uniforms and keeps its own window of the ground round the player.
 const windSand = createWindSand({
   scene,
@@ -730,6 +735,7 @@ function frame(time) {
   lastTime = time;
   autosave.update(); // first, so what a save puts back (where you stand, the tools) is in place before anything reads it
   dayNight.update(dt);
+  skyEnvironment.update(dt);
   glowFruit.update(dt);
   campfires.update(dt, renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   if (devCamp && campfires.ready) {

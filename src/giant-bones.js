@@ -5,6 +5,7 @@ import { layoutFinds } from './desert-finds.js';
 import { mulberry32 } from './find-shapes.js';
 import { lineOfSight } from './dune-stinger.js';
 import { pickLod } from './alien-bird.js';
+import { skyLight } from './sky-environment.js';
 
 // The giant bones: the skull and the ribcage of something enormous, half buried in the dunes. They are landmarks, things you see on the
 // skyline from the start and walk out to. One carcass lies 170 to 270 m from where you start, with the open-jawed skull facing back
@@ -200,6 +201,7 @@ export function createGiantBones({ scene, camera = null, heightAt, sites = null,
       .then(() => load(BONES.file(kind, level)))
       .then(gltf => {
         const root = gltf.scene;
+        skyLight(root);
         root.traverse(object => {
           if (!object.isMesh) return;
           object.castShadow = object.receiveShadow = false;

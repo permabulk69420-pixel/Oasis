@@ -7,6 +7,7 @@ import { addInventoryItem, getInventoryCount, removeInventoryItem } from './inve
 import { pulseHaptics } from './haptics.js';
 import { createBody, launch, stepBody, bodyOrigin, isMoving, placeAtRest } from './falling.js';
 import { createHandMotion } from './hand-motion.js';
+import { skyLight } from './sky-environment.js';
 
 // How close a hand must be to any part of a tool lying on the ground (or stuck in it) to pick it up.
 const LYING_REACH = 0.3;
@@ -156,6 +157,7 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     kind.template = null;
     loader.load(kind.url, gltf => {
       const template = gltf.scene;
+      skyLight(template); // the sky's light on its wood, stone and metal (src/sky-environment.js)
       template.name = `${kind.name} template`;
       template.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(template);

@@ -7,6 +7,7 @@ import { createStinger, BRAIN } from './stinger-brain.js';
 import { createBurstPool } from './bursts.js';
 import { createShadowTexture, pickLod } from './alien-bird.js';
 import { exposureGlow } from './glow.js';
+import { skyLight } from './sky-environment.js';
 
 // The dune stinger in the game: one of them lives in the dunes to the right of where you start. It wanders slowly; when it
 // sees you it stalks you, rears its tail back (the warning, with its eyes flaring) and strikes where you were standing. It
@@ -303,6 +304,7 @@ export function createDuneStinger({
     .then(gltfs => {
       for (const gltf of gltfs) {
         const root = clone(gltf.scene);
+        skyLight(root);
         root.traverse(object => {
           if (!object.isMesh) return;
           object.frustumCulled = false; // a skinned mesh's bounds are the rest pose; it bends well outside them
