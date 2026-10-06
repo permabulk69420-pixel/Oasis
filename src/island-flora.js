@@ -19,40 +19,44 @@ export const FLORA_LOOK = Object.freeze({
   lodHysteresis: 6,
 });
 
+// ONE level rule for everything but the hero objects (Kane, 6 Oct): close level to 30 m, middle level to 70 m, the far level beyond. Do not give a plant its own numbers.
+const STANDARD_LOD = Object.freeze([30, 70]);
+// The heroes (the giant trees, the weeping tree, the root arch, the standing stones, the ribcage) keep their own, further out.
+
 // How each model is drawn: the level boundaries (metres: level 0 up to the first, level 1 up to the second, level 2 beyond), the draw distance, the material.
 const JUNGLE_BARK = Object.freeze({ colour: 'jungle_bark_colour.jpg', normal: 'jungle_bark_normal.jpg' });
 export const LEAF_ALPHA_TEST = 0.42;
 
 export const FLORA_RENDER = Object.freeze({
-  fern: { lod: [24, 64], draw: 150, double: true, sway: { name: 'island-fern', top: 0.85, reach: 0.10, lean: 0.25, bend: 1.5, radial: 0.45, rate: 0.9, flutter: 0.012, shade: 0, push: 1, pushPad: 0.4 } },
-  cushion: { lod: [16, 46], draw: 110 },
-  mushrooms: { lod: [9, 26], draw: 70 },
-  flower: { lod: [20, 56], draw: 150, double: true, sway: { name: 'island-flower', top: 1.65, reach: 0.12, lean: 0.3, bend: 1.8, radial: 0.12, rate: 0.55, flutter: 0.008, shade: 0, push: 1, pushPad: 0.3 } },
-  fungusLog: { lod: [18, 50], draw: 120 },
-  log: { lod: [18, 50], draw: 120 },
-  driftwoodA: { lod: [18, 50], draw: 110 },
-  driftwoodB: { lod: [18, 50], draw: 110 },
-  driftwoodC: { lod: [18, 50], draw: 110 },
+  fern: { lod: STANDARD_LOD, draw: 150, double: true, sway: { name: 'island-fern', top: 0.85, reach: 0.10, lean: 0.25, bend: 1.5, radial: 0.45, rate: 0.9, flutter: 0.012, shade: 0, push: 1, pushPad: 0.4 } },
+  cushion: { lod: STANDARD_LOD, draw: 130 },
+  mushrooms: { lod: STANDARD_LOD, draw: 130 },
+  flower: { lod: STANDARD_LOD, draw: 150, double: true, sway: { name: 'island-flower', top: 1.65, reach: 0.12, lean: 0.3, bend: 1.8, radial: 0.12, rate: 0.55, flutter: 0.008, shade: 0, push: 1, pushPad: 0.3 } },
+  fungusLog: { lod: STANDARD_LOD, draw: 130 },
+  log: { lod: STANDARD_LOD, draw: 130 },
+  driftwoodA: { lod: STANDARD_LOD, draw: 130 },
+  driftwoodB: { lod: STANDARD_LOD, draw: 130 },
+  driftwoodC: { lod: STANDARD_LOD, draw: 130 },
   weepingTree: { lod: [30, 80], draw: 300, double: true, hang: { reach: 0.42, rate: 0.55, flutter: 0.03 } },
-  vines: { lod: [14, 40], draw: 130, double: true, hang: { reach: 0.3, rate: 0.7, flutter: 0.04 } },
+  vines: { lod: STANDARD_LOD, draw: 130, double: true, hang: { reach: 0.3, rate: 0.7, flutter: 0.04 } },
   rootArch: { lod: [45, 120], draw: 360 },
   standingStoneA: { lod: [45, 130], draw: 360 },
   standingStoneB: { lod: [45, 130], draw: 360 },
   ribcage: { lod: [32, 95], draw: 300 },
-  bonesA: { lod: [14, 40], draw: 120 },
-  bonesB: { lod: [14, 40], draw: 120 },
+  bonesA: { lod: STANDARD_LOD, draw: 130 },
+  bonesB: { lod: STANDARD_LOD, draw: 130 },
   // The textured undergrowth (src/island-undergrowth-models.js): cards of painted leaf (`map`: public/textures/island-leaves/<map>.png), cut out by alpha. `tint`: each copy
   // may carry its own colour multiplier (item.tint). They are many (hundreds to thousands), so they are drawn only within `draw` metres and the coarse levels are cheap.
-  fernA: { lod: [30, 70], draw: 260, double: true, map: 'fern', tint: true, sway: { name: 'island-fernA', top: 0.95, reach: 0.10, lean: 0.25, bend: 1.5, radial: 0.45, rate: 0.9, flutter: 0.010, shade: 0, push: 1, pushPad: 0.45 } },
-  fernB: { lod: [30, 70], draw: 260, double: true, map: 'fern', tint: true, sway: { name: 'island-fernB', top: 1.05, reach: 0.10, lean: 0.25, bend: 1.5, radial: 0.45, rate: 0.85, flutter: 0.010, shade: 0, push: 1, pushPad: 0.45 } },
-  broadleafA: { lod: [30, 70], draw: 260, double: true, map: 'broadleaf', tint: true, sway: { name: 'island-broadleafA', top: 1.2, reach: 0.08, lean: 0.25, bend: 1.6, radial: 0.35, rate: 0.7, flutter: 0.008, shade: 0, push: 1, pushPad: 0.45 } },
-  broadleafB: { lod: [30, 70], draw: 260, double: true, map: 'broadleaf', tint: true, sway: { name: 'island-broadleafB', top: 1.3, reach: 0.08, lean: 0.25, bend: 1.6, radial: 0.35, rate: 0.7, flutter: 0.008, shade: 0, push: 1, pushPad: 0.45 } },
-  bushA: { lod: [30, 70], draw: 270, double: true, map: 'canopy', tint: true, sway: { name: 'island-bushA', top: 1.6, reach: 0.07, lean: 0.25, bend: 1.8, radial: 0.25, rate: 0.8, flutter: 0.014, shade: 0, push: 0.8, pushPad: 0.5 } },
-  bushB: { lod: [30, 70], draw: 270, double: true, map: 'canopy', tint: true, sway: { name: 'island-bushB', top: 1.9, reach: 0.07, lean: 0.25, bend: 1.8, radial: 0.25, rate: 0.8, flutter: 0.014, shade: 0, push: 0.8, pushPad: 0.5 } },
-  vineCurtain: { lod: [30, 70], draw: 260, double: true, map: 'vine', tint: true, hang: { reach: 0.3, rate: 0.7, flutter: 0.04 } },
+  fernA: { lod: STANDARD_LOD, draw: 260, double: true, map: 'fern', tint: true, sway: { name: 'island-fernA', top: 0.95, reach: 0.10, lean: 0.25, bend: 1.5, radial: 0.45, rate: 0.9, flutter: 0.010, shade: 0, push: 1, pushPad: 0.45 } },
+  fernB: { lod: STANDARD_LOD, draw: 260, double: true, map: 'fern', tint: true, sway: { name: 'island-fernB', top: 1.05, reach: 0.10, lean: 0.25, bend: 1.5, radial: 0.45, rate: 0.85, flutter: 0.010, shade: 0, push: 1, pushPad: 0.45 } },
+  broadleafA: { lod: STANDARD_LOD, draw: 260, double: true, map: 'broadleaf', tint: true, sway: { name: 'island-broadleafA', top: 1.2, reach: 0.08, lean: 0.25, bend: 1.6, radial: 0.35, rate: 0.7, flutter: 0.008, shade: 0, push: 1, pushPad: 0.45 } },
+  broadleafB: { lod: STANDARD_LOD, draw: 260, double: true, map: 'broadleaf', tint: true, sway: { name: 'island-broadleafB', top: 1.3, reach: 0.08, lean: 0.25, bend: 1.6, radial: 0.35, rate: 0.7, flutter: 0.008, shade: 0, push: 1, pushPad: 0.45 } },
+  bushA: { lod: STANDARD_LOD, draw: 270, double: true, map: 'canopy', tint: true, sway: { name: 'island-bushA', top: 1.6, reach: 0.07, lean: 0.25, bend: 1.8, radial: 0.25, rate: 0.8, flutter: 0.014, shade: 0, push: 0.8, pushPad: 0.5 } },
+  bushB: { lod: STANDARD_LOD, draw: 270, double: true, map: 'canopy', tint: true, sway: { name: 'island-bushB', top: 1.9, reach: 0.07, lean: 0.25, bend: 1.8, radial: 0.25, rate: 0.8, flutter: 0.014, shade: 0, push: 0.8, pushPad: 0.5 } },
+  vineCurtain: { lod: STANDARD_LOD, draw: 260, double: true, map: 'vine', tint: true, hang: { reach: 0.3, rate: 0.7, flutter: 0.04 } },
   // The tall growth (src/island-jungle-models.js): the trunk wears a tiling bark photo (a second material on the same mesh), the leaves are cards of the canopy and fern atlases.
-  treeFernA: { lod: [30, 70], draw: 330, double: true, map: 'fern', tint: true, bark: JUNGLE_BARK, sway: { name: 'island-treeFernA', top: 4.5, reach: 0.16, lean: 0.3, bend: 1.8, radial: 0.12, rate: 0.7, flutter: 0.014, shade: 0, push: 0 } },
-  treeFernB: { lod: [30, 70], draw: 330, double: true, map: 'fern', tint: true, bark: JUNGLE_BARK, sway: { name: 'island-treeFernB', top: 5.6, reach: 0.18, lean: 0.3, bend: 1.8, radial: 0.12, rate: 0.65, flutter: 0.014, shade: 0, push: 0 } },
+  treeFernA: { lod: STANDARD_LOD, draw: 330, double: true, map: 'fern', tint: true, bark: JUNGLE_BARK, sway: { name: 'island-treeFernA', top: 4.5, reach: 0.16, lean: 0.3, bend: 1.8, radial: 0.12, rate: 0.7, flutter: 0.014, shade: 0, push: 0 } },
+  treeFernB: { lod: STANDARD_LOD, draw: 330, double: true, map: 'fern', tint: true, bark: JUNGLE_BARK, sway: { name: 'island-treeFernB', top: 5.6, reach: 0.18, lean: 0.3, bend: 1.8, radial: 0.12, rate: 0.65, flutter: 0.014, shade: 0, push: 0 } },
   jungleA: { lod: [60, 150], draw: 645, double: true, map: 'canopy', tint: true, bark: JUNGLE_BARK, sway: { name: 'island-jungleA', top: 30, reach: 0.5, lean: 0.3, bend: 2.0, radial: 0, rate: 0.4, flutter: 0.05, shade: 0, push: 0 } },
   jungleB: { lod: [60, 150], draw: 645, double: true, map: 'canopy', tint: true, bark: JUNGLE_BARK, sway: { name: 'island-jungleB', top: 36, reach: 0.55, lean: 0.3, bend: 2.0, radial: 0, rate: 0.36, flutter: 0.05, shade: 0, push: 0 } },
   jungleC: { lod: [60, 150], draw: 645, double: true, map: 'canopy', tint: true, bark: JUNGLE_BARK, sway: { name: 'island-jungleC', top: 25, reach: 0.45, lean: 0.3, bend: 2.0, radial: 0, rate: 0.45, flutter: 0.05, shade: 0, push: 0 } },
