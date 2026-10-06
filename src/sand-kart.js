@@ -2,10 +2,13 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SPAWN, WATER } from './world.js';
 import { pulseHaptics } from './haptics.js';
+import { setHeldGripProfile, clearHeldGripProfile, GRIP_PROFILE } from './grip-poses.js';
 
-// The sand sail kart (the owner's model, public/models/sand-kart/sand_sail_kart.glb): it waits on the sand by the oasis start. Grab its handle and you sit
-// in it and it starts rolling; turn the handle like handlebars to steer (the sail rig swings on its mast pivot, up to 40 degrees, and heels into the turn);
-// let go and it coasts to a stop and you step off beside it. It follows the ground on its three wheels and stops against rocks.
+// The sand sail kart (the owner's model, public/models/sand-kart/sand_sail_kart.glb): it waits on the sand by the oasis start. Grab its handle (either grip,
+// one hand is enough) and you sit in it and it starts rolling; turn the handle like handlebars to steer (the sail rig swings on its mast pivot, up to 40
+// degrees, and heels into the turn); let go and it coasts to a stop and you step off beside it. While you hold a grip your hand is locked onto it (the
+// hand model sits on the bar, fingers closed round it). Seated, you are carried in the kart's own frame, so your view climbs, dips and rolls with it over
+// the dunes. It follows the ground on its three wheels and stops against rocks.
 // Desktop: F gets in (or lets go) when you stand by it, A and D steer.
 // The model's own markers drive all of it: Grip_Left / Grip_Right (where a hand takes the handle), Sail_Rig_Pivot (the rig's yaw about +Y and lean about
 // +Z), Seat_Anchor (where you sit), Wheel_Front / Wheel_Rear_L / Wheel_Rear_R (spin about +X). Forward is +Z, metres.
@@ -17,9 +20,10 @@ export const KART = Object.freeze({
   spawn: Object.freeze({ near: SPAWN, from: 5, to: 16, yaw: Math.atan2(SPAWN.x - WATER.x, SPAWN.z - WATER.z) }),
   grabRadius: 0.17,          // metres from a grip point that a squeezing hand takes the handle
   desktopReach: 4,           // metres: how near you must stand for F
-  cruise: 11,                // m/s while you hold the handle (about 40 km/h)
-  accel: 2.4,                // m/s per second, getting going
-  coast: 1.6,                // m/s per second, slowing once you let go (about 7 s from cruising)
+  cruise: 22,                // m/s while you hold the handle (about 80 km/h)
+  accel: 4.8,                // m/s per second, getting going (about 4.5 s to cruising)
+  coast: 3.2,                // m/s per second, slowing once you let go (about 7 s from cruising)
+  settle: 9,                 // how fast the kart's height and tilt follow the ground (1/s): smooth over ripples, so the carried view does not shake
   turn: 0.85,                // rad/s at full lock and cruising speed
   yawLimit: 40 * Math.PI / 180,
   leanLimit: 18 * Math.PI / 180,
@@ -80,26 +84,70 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
   };
   const gripDown = new Map();
   const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), hand = new THREE.Vector3();
-  const qYaw = new THREE.Quaternion(), qLean = new THREE.Quaternion(), qTilt = new THREE.Quaternion();
+  const qYaw = new THREE.Quaternion(), qLean = new THREE.Quaternion(), qTilt = new THREE.Quaternion(), qWant = new THREE.Quaternion();
+  const rigLocal = new THREE.Matrix4(), mat = new THREE.Matrix4(), mat2 = new THREE.Matrix4(), scl = new THREE.Vector3();
 
-  // The kart's place on the ground: height from its three wheels, tilted to lie on them.
-  function settle() {
+  // The kart's place on the ground: height from its three wheels, tilted to lie on them; eased toward it over `dt` (0: at once).
+  function settle(dt = 0) {
     const s = Math.sin(state.heading), c = Math.cos(state.heading);
     const at = (lx, lz) => { const x = state.x + lx * c + lz * s, z = state.z - lx * s + lz * c; return new THREE.Vector3(x, heightAt(x, z), z); };
     const front = at(0, 1.28), left = at(0.99, -0.74), right = at(-0.99, -0.74);
     const rear = left.clone().add(right).multiplyScalar(0.5);
     const normal = tmp.copy(right).sub(left).cross(tmp2.copy(front).sub(left)).normalize();
     if (normal.y < 0) normal.negate();
-    root.position.set(state.x, (front.y + rear.y * 2) / 3 - 0.0, state.z);
-    root.quaternion.setFromAxisAngle(up, state.heading);
+    const y = (front.y + rear.y * 2) / 3;
+    qWant.setFromAxisAngle(up, state.heading);
     qTilt.setFromUnitVectors(up, normal);
-    root.quaternion.premultiply(qTilt);
+    qWant.premultiply(qTilt);
+    const k = dt > 0 ? 1 - Math.exp(-dt * KART.settle) : 1;
+    root.position.set(state.x, dt > 0 ? root.position.y + (y - root.position.y) * k : y, state.z);
+    if (dt > 0) root.quaternion.slerp(qWant, k); else root.quaternion.copy(qWant);
     root.updateMatrixWorld(true);
   }
   settle();
 
   function gripWorld(i, target) { grips[i].updateWorldMatrix(true, false); return grips[i].getWorldPosition(target); }
   function handWorld(s, target) { s.objectGrip.updateWorldMatrix(true, false); return s.objectGrip.getWorldPosition(target); }
+  // the controller itself (the real hand): steering reads this, since the drawn hand is locked onto the grip while held
+  function controllerWorld(s, target) { s.grip.updateWorldMatrix(true, false); return s.grip.getWorldPosition(target); }
+
+  // ---- the drawn hand locked onto a grip: the hand model is moved so its grip socket (the palm, fingers wrapping a bar along the socket's Y) sits on the
+  // grip point, turned only as much as it takes to lay that bar along the handle (so the wrist keeps its own roll), and closed to a medium bar grip.
+  const homes = new Map();             // hand state -> the hand model's own offset on the controller, to put back on release
+  const anchorWorld = new THREE.Matrix4(), socketWorld = new THREE.Matrix4(), socketInAnchor = new THREE.Matrix4();
+  const sPos = new THREE.Vector3(), sQuat = new THREE.Quaternion(), barNow = new THREE.Vector3(), barWant = new THREE.Vector3(), qAlign = new THREE.Quaternion();
+  function lockHand(s, gripIndex) {
+    const anchor = s.handAnchor, socket = s.gripSocket;
+    if (!anchor || !socket) return;
+    if (!homes.has(s)) { homes.set(s, { position: anchor.position.clone(), quaternion: anchor.quaternion.clone() }); setHeldGripProfile(s, GRIP_PROFILE.MEDIUM); }
+    const home = homes.get(s);
+    anchor.position.copy(home.position); anchor.quaternion.copy(home.quaternion);    // start from where the hand really is
+    anchor.updateMatrixWorld(true);
+    anchorWorld.copy(anchor.matrixWorld);
+    socketWorld.copy(socket.matrixWorld);
+    socketInAnchor.copy(anchorWorld).invert().multiply(socketWorld);
+    socketWorld.decompose(sPos, sQuat, scl);
+    const g = grips[gripIndex];
+    g.updateWorldMatrix(true, false);
+    barNow.set(0, 1, 0).applyQuaternion(sQuat);
+    barWant.set(0, 0, 1).transformDirection(g.matrixWorld);                         // the handle's axis (+Z on the grip markers)
+    if (barWant.dot(barNow) < 0) barWant.negate();                                  // whichever way round needs the smaller turn
+    qAlign.setFromUnitVectors(barNow, barWant);
+    sQuat.premultiply(qAlign);
+    g.getWorldPosition(sPos);
+    mat.compose(sPos, sQuat, scl);                                                  // where the socket should be
+    mat2.copy(mat).multiply(socketInAnchor.invert());                               // so the hand model goes here
+    mat.copy(anchor.parent.matrixWorld).invert().multiply(mat2);                    // in the controller's space
+    mat.decompose(anchor.position, anchor.quaternion, scl);
+    anchor.updateMatrixWorld(true);
+  }
+  function unlockHand(s) {
+    const home = homes.get(s);
+    if (!home) return;
+    if (s.handAnchor) { s.handAnchor.position.copy(home.position); s.handAnchor.quaternion.copy(home.quaternion); }
+    clearHeldGripProfile(s);
+    homes.delete(s);
+  }
 
   // The rig yaw from the hands: the handle swings about the pivot's +Y axis, so a hand's angle round the pivot is the yaw. It is taken RELATIVE to where the
   // hand was when you sat down (sitting moves and turns you, so the hand rarely ends up exactly on the grip), plus the rig's yaw at that moment.
@@ -107,7 +155,7 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
     if (!holders.size) return null;
     let sum = 0;
     for (const [s, held] of holders) {
-      root.worldToLocal(handWorld(s, hand));
+      root.worldToLocal(controllerWorld(s, hand));
       const g = grips[held.grip].position;         // the grip in the pivot's frame at rest
       const dx = hand.x - pivot.position.x, dz = hand.z - pivot.position.z;
       // rotation about +Y by a carries (x, z) to (x cos a + z sin a, -x sin a + z cos a): the angle from g to d
@@ -132,10 +180,16 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
     const hx = rig.position.x + ox * c + oz * s, hz = rig.position.z - ox * s + oz * c;
     seatWorld(tmp);
     rig.position.x += tmp.x - hx; rig.position.z += tmp.z - hz;
+    rig.position.y = root.position.y - KART.seatDrop;
     head.x = tmp.x; head.z = tmp.z;
+    // from now on the rig rides in the kart's frame (so it climbs, dips and rolls with it)
+    // (square in its frame: turned half round about its up, the position wherever the seat put it)
+    const local = root.worldToLocal(rig.position.clone());
+    rigLocal.compose(local, qAlign.setFromAxisAngle(up, Math.PI), scl.set(1, 1, 1));
   }
   function dismount(rig, head) {
     riding = false;
+    rig.rotation.set(0, state.heading + Math.PI, 0);                                  // stand upright again, facing the way the kart points
     const s = Math.sin(state.heading), c = Math.cos(state.heading);
     const tx = state.x + c * KART.stepOff, tz = state.z - s * KART.stepOff;     // out to the kart's +X side
     rig.position.x += tx - head.x; rig.position.z += tz - head.z;
@@ -150,7 +204,7 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
     for (const s of states) {
       const squeeze = Boolean(s.inputSource?.gamepad?.buttons?.[GRIP_BUTTON]?.pressed);
       const was = gripDown.get(s) ?? false;
-      if (holders.has(s) && (!squeeze || !s.inputSource)) holders.delete(s);
+      if (holders.has(s) && (!squeeze || !s.inputSource)) { holders.delete(s); unlockHand(s); }
       else if (squeeze && !was && s.inputSource && s.objectGrip.children.length === 0) {
         handWorld(s, hand);
         let best = -1, bestD = KART.grabRadius;
@@ -177,13 +231,12 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
     if (holding) state.speed = Math.min(KART.cruise, state.speed + KART.accel * dt);
     else state.speed = Math.max(0, state.speed - KART.coast * dt);
     const turnRate = KART.turn * (state.rigYaw / KART.yawLimit) * Math.min(1, state.speed / KART.cruise) * (state.speed > 0.05 ? 1 : 0);
-    const before = { x: state.x, z: state.z, heading: state.heading };
     state.heading += turnRate * dt;
     state.x += Math.sin(state.heading) * state.speed * dt;
     state.z += Math.cos(state.heading) * state.speed * dt;
     const clear = pushOut(state.x, state.z);                         // a rock stops it dead
     if (clear) { state.x = clear[0]; state.z = clear[1]; state.speed = 0; }
-    settle();
+    settle(dt);
 
     // the sail heels into the turn, the wheels roll
     state.rigLean += (-(state.rigYaw / KART.yawLimit) * KART.leanLimit * Math.min(1, state.speed / KART.cruise) - state.rigLean) * (1 - Math.exp(-dt * 3));
@@ -195,12 +248,9 @@ export function createSandKart({ scene, states, heightAt, pushOut = () => null, 
     // ---- the rider is carried: moved and turned with the kart about its middle
     let stepOff = null;
     if (riding) {
-      const dh = state.heading - before.heading;
-      const rx = rig.position.x - before.x, rz = rig.position.z - before.z;
-      const c = Math.cos(dh), s = Math.sin(dh);
-      rig.position.x = state.x + rx * c + rz * s;
-      rig.position.z = state.z - rx * s + rz * c;
-      rig.rotation.y += dh;
+      mat.multiplyMatrices(root.matrixWorld, rigLocal).decompose(rig.position, rig.quaternion, scl);
+      rig.updateMatrixWorld(true);
+      for (const [h, held] of holders) lockHand(h, held.grip);
       rumbleIn -= dt;
       if (rumbleIn <= 0 && state.speed > 1) {
         rumbleIn = KART.rumble.every;
