@@ -32,6 +32,9 @@ import { createColossus } from './colossus.js';
 import { createSandKart, KART } from './sand-kart.js';
 import { createGlider } from './glider.js';
 import { createWatch } from './watch.js';
+import { createColossusAudio } from './colossus-audio.js';
+import { createWindAudio } from './wind-audio.js';
+import { setListener } from './audio.js';
 import { createSkyEnvironment, setSkyEnvironment } from './sky-environment.js';
 import { registerLooseFindDrops } from './loose-finds.js';
 import { createBackpack, PACK } from './backpack.js';
@@ -383,11 +386,17 @@ if (import.meta.env.DEV) window.__bones = giantBones; // dev only: for screensho
 // Colossus 01: a 55 m walker on the gravel plain north of the oasis. Passive: it paces, stands, breathes and looks about (src/colossus.js). Its feet raise
 // dust and leave prints, and a footfall near you is felt in the controllers (the only thing it does to you).
 const COLOSSUS_STEP_HAPTIC = Object.freeze({ range: 160, strength: 0.7, floor: 0.12, ms: 170 });
+// and heard: its footfalls boom (late from far off, as sound is) and it growls when you first come near (src/colossus-audio.js)
+const colossusAudio = createColossusAudio({ onError: message => console.warn(message) });
+// wind rushing past while gliding or on the sand kart (src/wind-audio.js)
+const windAudio = createWindAudio({ onError: message => console.warn(message) });
+const listenerForward = new THREE.Vector3(), listenerUp = new THREE.Vector3(), listenerQuat = new THREE.Quaternion();
 const colossus = createColossus({
   scene, renderer, camera, field, sun: materials.sand.uniforms.uSun, puffs: sandPuffs, prints: footprints,
   getExposure: () => renderer.toneMappingExposure,
   onError: message => console.warn(message),
   onFootfall: step => {
+    colossusAudio.footfall(step, head);
     const near = 1 - Math.hypot(head.x - step.x, head.z - step.z) / COLOSSUS_STEP_HAPTIC.range;
     if (near <= 0) return;
     for (const state of hands.states) pulseHaptics(state, COLOSSUS_STEP_HAPTIC.floor + COLOSSUS_STEP_HAPTIC.strength * near * near * step.power, COLOSSUS_STEP_HAPTIC.ms);
@@ -812,6 +821,11 @@ function frame(time) {
   footprints.update(time * 0.001);
   giantBones.update(head);
   colossus.update(dt, head);
+  // ---- sound: the listener is the headset; the Colossus's growl; the wind of your speed
+  activeCamera.getWorldQuaternion(listenerQuat);
+  setListener(head, listenerForward.set(0, 0, -1).applyQuaternion(listenerQuat), listenerUp.set(0, 1, 0).applyQuaternion(listenerQuat));
+  colossusAudio.update(dt, colossus.ready ? colossus.state : null, colossus.ready ? field.sample(colossus.state.x, colossus.state.z) : 0, head);
+  windAudio.update(dt, flight?.flying ? glider.state.speed : kartRide?.riding ? Math.abs(sandKart.state.speed) : 0);
   if (devBird && alienBirds.ready) {
     const params = devBirdParams;
     const spot = Number(params.get('birdd')) || (devBird === 'perch' ? 9 : 20);
