@@ -29,6 +29,7 @@ import { createMining } from './mining.js';
 import { createCrystalMotes } from './crystal-motes.js';
 import { createGiantBones } from './giant-bones.js';
 import { createColossus } from './colossus.js';
+import { createSandKart, KART } from './sand-kart.js';
 import { registerLooseFindDrops } from './loose-finds.js';
 import { createBackpack, PACK } from './backpack.js';
 import { SPEAR } from './spear.js';
@@ -433,6 +434,11 @@ const backpack = createBackpack({
   getExposure: () => renderer.toneMappingExposure,
   onError: message => console.warn(message),
 });
+// The sand sail kart (src/sand-kart.js): by the oasis start. Grab its handle to sit in it and set it rolling, turn the handle to steer, let go to coast
+// to a stop and step off. Desktop: F by the kart, A and D to steer.
+const sandKart = createSandKart({ scene, states: hands.states, heightAt: field.sample, pushOut: (x, z) => mining.pushOut(x, z), onError: message => console.warn(message) });
+let kartKeyDown = false, kartRide = null;
+if (import.meta.env.DEV) window.__kart = sandKart; // dev only: for screenshots
 // Development-only: ?pack=worn starts with the backpack already on.
 if (import.meta.env.DEV && new URLSearchParams(location.search).get('pack') === 'worn') backpack.debug.wear();
 // Development-only: ?camp=lit or ?camp=unlit puts a campfire in view near the spawn point.
@@ -539,7 +545,7 @@ window.addEventListener('keydown', e => {
   }
   if (e.code === 'Escape' && !renderer.xr.isPresenting) setPlaying(false);
   if (!playing || survivorMenu.isOpen() || renderer.xr.isPresenting) return;
-  if (['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight','Space'].includes(e.code)) {
+  if (['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','KeyF','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight','Space'].includes(e.code)) {
     e.preventDefault(); keys.add(e.code);
   }
 });
@@ -728,6 +734,13 @@ function frame(time) {
   backpack.update(dt); // after the hands, so a tool or stone in reach is grabbed first
   const activeCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
   activeCamera.getWorldPosition(head);
+  if ((playing || (import.meta.env.DEV && sandKart.debug.forced)) && !onIsland) {
+    const kartToggle = !renderer.xr.isPresenting && keys.has('KeyF') && !kartKeyDown;
+    kartKeyDown = keys.has('KeyF');
+    const steer = renderer.xr.isPresenting ? 0 : Number(keys.has('KeyD')) - Number(keys.has('KeyA'));
+    kartRide = sandKart.update(dt, { rig, head, desktopToggle: kartToggle, desktopSteer: steer, presenting: renderer.xr.isPresenting });
+    if (kartRide.stepOff) { groundY = groundAt(kartRide.stepOff.x, kartRide.stepOff.z); velocity.set(0, 0, 0); }
+  } else kartRide = null;
   // One wind clock for the sand and the swaying plants, so their gusts line up.
   windTime.value = devWindTime ?? time * 0.001;
   const viewHeight = renderer.xr.isPresenting ? WIND_SAND.vrViewHeight : renderer.getDrawingBufferSize(drawingSize).y;
@@ -820,77 +833,85 @@ function frame(time) {
       if (jumpHeight <= 0) { jumpHeight = 0; jumpVelocity = 0; }
     }
 
-    const turn = -input.turn * TURN_SPEED * dt;
-    if (turn) {
-      // Same smooth-turn model as dumbgame: rotate the rig around the physical head.
-      const rotated = pivotRig(rig.position.x, rig.position.z, head.x, head.z, turn);
-      rig.position.x = rotated.x; rig.position.z = rotated.z; rig.rotation.y += turn;
-    }
-
-    if (renderer.xr.isPresenting) {
-      // Movement follows the virtual body/turn yaw only. Head looking never steers locomotion.
-      movementForward.set(-Math.sin(rig.rotation.y), 0, -Math.cos(rig.rotation.y));
-      lastDirection.copy(movementForward);
+    if (kartRide?.riding) {
+      // seated in the sand kart: it carries the rig (src/sand-kart.js); no walking, turning or jumping, the floor lowered to a seated eye height
+      velocity.set(0, 0, 0); jumpHeight = 0; jumpVelocity = 0;
+      groundY = sandKart.rigFloorY() + KART.seatDrop;
+      rig.position.y = sandKart.rigFloorY() + seatedOffset;
+      updateSurvival(dt, { sprinting: false, inWater: false });
     } else {
-      activeCamera.getWorldDirection(direction);
-      direction.y = 0;
-      if (direction.lengthSq() < 0.001) direction.copy(lastDirection);
-      direction.normalize();
-      movementForward.copy(direction);
-      lastDirection.copy(direction);
-    }
-
-    right.crossVectors(movementForward, up).normalize();
-    target.copy(right).multiplyScalar(input.x).addScaledVector(movementForward, -input.z);
-    if (target.lengthSq() > 1) target.normalize();
-    const carrySpeedMultiplier = getCarrySpeedMultiplier();
-    // Out of stamina cancels the sprint toggle; it returns once stamina has recovered a little.
-    if (sprintActive && !canSprint()) sprintActive = false;
-    const sprinting = (renderer.xr.isPresenting ? sprintActive : input.fast) && canSprint();
-    target.multiplyScalar((sprinting ? FAST_SPEED : WALK_SPEED) * carrySpeedMultiplier * (turboActive ? TURBO.multiplier : 1));
-    velocity.lerp(target, 1 - Math.exp(-dt * (target.lengthSq() ? 18 : 28)));
-    const dx = velocity.x * dt, dz = velocity.z * dt;
-    const nextX = clamp(head.x + dx, WALK.minX, WALK.maxX), nextZ = clamp(head.z + dz, WALK.minZ, WALK.maxZ);
-    const movedX = nextX - head.x, movedZ = nextZ - head.z;
-    rig.position.x += movedX; rig.position.z += movedZ;
-    head.x = nextX; head.z = nextZ;
-    // rocks are solid: walk out of any you have walked into
-    const clear = onIsland ? null : mining.pushOut(head.x, head.z); // (the rocks are in the desert, 250 m below the island)
-    if (clear) {
-      rig.position.x += clear[0] - head.x; rig.position.z += clear[1] - head.z;
-      head.x = clear[0]; head.z = clear[1];
-    }
-
-    // Smooth the terrain-following base separately from seated height, crouch and jump height.
-    if (onIsland && skyIsland.groundHeight(head.x, head.z) === null) onIsland = false; // walked off the edge: the desert's ground is 250 m down
-    const ground = groundAt(head.x, head.z);
-    const falling = stepFall(fall, groundY, ground, dt); // the ground dropped away (the island's edge, a cliff): fall, then land
-    if (falling === null) groundY += (ground - groundY) * (1 - Math.exp(-dt * 24));
-    else groundY = falling;
-    if (fall.landed) {
-      const hurt = fallDamage(fall.landed);
-      if (hurt > 0) { damagePlayer(hurt); for (const state of hands.states) pulseHaptics(state, 1, 250); }
-    }
-    rig.position.y = groundY + seatedOffset + crouchOffset + jumpHeight;
-
-    // Survival: slow drain, sprint costs stamina, wading into the pond refills water.
-    const wading = isInPond(head.x, head.z, ground);
-    updateSurvival(dt, { sprinting: sprinting && Math.hypot(velocity.x, velocity.z) > 0.6, inWater: wading });
-    if (wading && getSurvivalStats().water < 99.5) {
-      drinkTick -= dt;
-      if (drinkTick <= 0) {
-        for (const state of hands.states) pulseHaptics(state, 0.12, 25);
-        drinkTick = 0.7;
+      const turn = -input.turn * TURN_SPEED * dt;
+      if (turn) {
+        // Same smooth-turn model as dumbgame: rotate the rig around the physical head.
+        const rotated = pivotRig(rig.position.x, rig.position.z, head.x, head.z, turn);
+        rig.position.x = rotated.x; rig.position.z = rotated.z; rig.rotation.y += turn;
       }
-    } else drinkTick = 0;
 
-    footsteps.update({
-      distance: Math.hypot(movedX, movedZ),
-      speed: Math.hypot(velocity.x, velocity.z),
-      grounded: jumpHeight <= 0.001,
-      active: true
-    });
-    footprints.walk(head.x, head.z, { onGround: jumpHeight <= 0.001, speed: Math.hypot(velocity.x, velocity.z) });
+      if (renderer.xr.isPresenting) {
+        // Movement follows the virtual body/turn yaw only. Head looking never steers locomotion.
+        movementForward.set(-Math.sin(rig.rotation.y), 0, -Math.cos(rig.rotation.y));
+        lastDirection.copy(movementForward);
+      } else {
+        activeCamera.getWorldDirection(direction);
+        direction.y = 0;
+        if (direction.lengthSq() < 0.001) direction.copy(lastDirection);
+        direction.normalize();
+        movementForward.copy(direction);
+        lastDirection.copy(direction);
+      }
+
+      right.crossVectors(movementForward, up).normalize();
+      target.copy(right).multiplyScalar(input.x).addScaledVector(movementForward, -input.z);
+      if (target.lengthSq() > 1) target.normalize();
+      const carrySpeedMultiplier = getCarrySpeedMultiplier();
+      // Out of stamina cancels the sprint toggle; it returns once stamina has recovered a little.
+      if (sprintActive && !canSprint()) sprintActive = false;
+      const sprinting = (renderer.xr.isPresenting ? sprintActive : input.fast) && canSprint();
+      target.multiplyScalar((sprinting ? FAST_SPEED : WALK_SPEED) * carrySpeedMultiplier * (turboActive ? TURBO.multiplier : 1));
+      velocity.lerp(target, 1 - Math.exp(-dt * (target.lengthSq() ? 18 : 28)));
+      const dx = velocity.x * dt, dz = velocity.z * dt;
+      const nextX = clamp(head.x + dx, WALK.minX, WALK.maxX), nextZ = clamp(head.z + dz, WALK.minZ, WALK.maxZ);
+      const movedX = nextX - head.x, movedZ = nextZ - head.z;
+      rig.position.x += movedX; rig.position.z += movedZ;
+      head.x = nextX; head.z = nextZ;
+      // rocks are solid: walk out of any you have walked into
+      const clear = onIsland ? null : mining.pushOut(head.x, head.z); // (the rocks are in the desert, 250 m below the island)
+      if (clear) {
+        rig.position.x += clear[0] - head.x; rig.position.z += clear[1] - head.z;
+        head.x = clear[0]; head.z = clear[1];
+      }
+
+      // Smooth the terrain-following base separately from seated height, crouch and jump height.
+      if (onIsland && skyIsland.groundHeight(head.x, head.z) === null) onIsland = false; // walked off the edge: the desert's ground is 250 m down
+      const ground = groundAt(head.x, head.z);
+      const falling = stepFall(fall, groundY, ground, dt); // the ground dropped away (the island's edge, a cliff): fall, then land
+      if (falling === null) groundY += (ground - groundY) * (1 - Math.exp(-dt * 24));
+      else groundY = falling;
+      if (fall.landed) {
+        const hurt = fallDamage(fall.landed);
+        if (hurt > 0) { damagePlayer(hurt); for (const state of hands.states) pulseHaptics(state, 1, 250); }
+      }
+      rig.position.y = groundY + seatedOffset + crouchOffset + jumpHeight;
+
+      // Survival: slow drain, sprint costs stamina, wading into the pond refills water.
+      const wading = isInPond(head.x, head.z, ground);
+      updateSurvival(dt, { sprinting: sprinting && Math.hypot(velocity.x, velocity.z) > 0.6, inWater: wading });
+      if (wading && getSurvivalStats().water < 99.5) {
+        drinkTick -= dt;
+        if (drinkTick <= 0) {
+          for (const state of hands.states) pulseHaptics(state, 0.12, 25);
+          drinkTick = 0.7;
+        }
+      } else drinkTick = 0;
+
+      footsteps.update({
+        distance: Math.hypot(movedX, movedZ),
+        speed: Math.hypot(velocity.x, velocity.z),
+        grounded: jumpHeight <= 0.001,
+        active: true
+      });
+      footprints.walk(head.x, head.z, { onGround: jumpHeight <= 0.001, speed: Math.hypot(velocity.x, velocity.z) });
+    }
   }
   if (time - lodTime > 100) { terrain.update(head.x, head.z, velocity.length()); skyScenery.update(head.x, head.z, head.y); farPickups.update(head.x, head.z); lodTime = time; }
   materials.water.uniforms.uTime.value = time * 0.001;
