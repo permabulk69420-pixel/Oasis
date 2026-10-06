@@ -28,7 +28,7 @@ p{font-size:14px;line-height:1.55;margin:18px 0 0;color:#f2e8d6}
 #inventory-toggle{position:fixed;top:max(18px,env(safe-area-inset-top));right:18px;font-size:14px;min-height:40px;padding:8px 13px;background:#142d31dd;color:#e7f2ec;border-color:#8ed4bf77}
 #survivor-menu{position:fixed;inset:0;z-index:20;background:#04101355;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
 .survivor-viewport{position:relative;width:min(1280px,calc(100vw - 32px),calc((100dvh - 32px) * 1.6));aspect-ratio:1280/800;flex-shrink:0}
-.survivor-viewport canvas{display:block;width:100%;height:100%}
+.survivor-viewport canvas{display:block;width:100%;height:100%;border-radius:22px;box-shadow:0 0 0 9px #0e1215,0 0 0 11px #2b343a,0 0 0 13px #0a0d0f,0 0 0 14px #7fe6f255,0 18px 50px #000a}
 .survivor-buttons{position:absolute;inset:0}
 .survivor-buttons button{position:absolute;padding:0;min-height:0;background:transparent;color:transparent;border:0;border-radius:0;font-size:0;opacity:1}
 .survivor-buttons button:hover{background:#ffffff06}

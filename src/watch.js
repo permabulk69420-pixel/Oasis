@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { getSurvivalStats, STAT_MAX } from './survival.js';
 import { exposureGlow } from './glow.js';
 import { pulseHaptics } from './haptics.js';
+import { reflectMetal, gadgetReflection } from './gadget-env.js';
 
 // The survival watch on the left wrist (the owner's note, 6 Oct): glance at it for health, hunger, water and stamina (bars, green to red) and the time
 // of day; tap it with the other hand's index finger and the menu opens in front of you. The model is built in Blender (tools/watch/build_watch.py) in
@@ -49,7 +50,7 @@ export function clockText(hours) {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 
-export function createWatch({ states, getDay, getExposure = () => 1, getHead, onTap = () => {}, onError = console.warn }) {
+export function createWatch({ states, getDay, getExposure = () => 1, getHead, onTap = () => {}, renderer = null, onError = console.warn }) {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = WATCH.canvas;
   const ctx = canvas.getContext('2d');
@@ -58,7 +59,7 @@ export function createWatch({ states, getDay, getExposure = () => 1, getHead, on
   texture.anisotropy = 4;
   texture.flipY = false;                   // the model's UVs are glTF's (v = 0 at 12 o'clock): the canvas's top row goes there
   const screenMaterial = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false });
-  let template = null, watch = null, face = null, trim = null, wornOn = null;
+  let template = null, watch = null, face = null, trim = null, wornOn = null, metal = [];
   new GLTFLoader().load(`${import.meta.env.BASE_URL}${WATCH.url}`, gltf => {
     template = gltf.scene;
     template.traverse(o => {
@@ -146,6 +147,7 @@ export function createWatch({ states, getDay, getExposure = () => 1, getHead, on
     face = watch.getObjectByName('watch_face');
     trim = [];
     watch.traverse(o => { if (o.isMesh && o.material?.name?.startsWith('Watch_Glow')) { o.material = o.material.clone(); trim.push(o.material); } });
+    metal = reflectMetal(watch, renderer);
     root.add(watch);
     return left;
   }
@@ -156,6 +158,7 @@ export function createWatch({ states, getDay, getExposure = () => 1, getHead, on
     if (!watch || !face) return { glancing: false };
     const exposure = getExposure();
     for (const m of trim) m.emissiveIntensity = exposureGlow(exposure, WATCH.trim);
+    for (const m of metal) m.envMapIntensity = gadgetReflection(exposure);
     // ---- glancing: the face toward the eyes and near them
     face.updateWorldMatrix(true, false);
     face.getWorldPosition(facePos);

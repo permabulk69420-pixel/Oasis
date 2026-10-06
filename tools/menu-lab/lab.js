@@ -44,7 +44,8 @@ if (params.get('vr')) {
   const fake3 = { xr, toneMappingExposure: 1 };
   const hands = createVRHands({ renderer: fake3, scene: s3, parent: rig, camera, onError: m => console.warn(m) });
   sources.forEach((data, i) => xrNodes[i].dispatchEvent({ type: 'connected', data }));
-  const vrMenu = createSurvivorMenu({ scene: s3, renderer: fake3, states: hands.states, tools, backpack, onPlace: () => ({ ok: true }), popOrigin: t => t.set(-0.12, 1.25, -0.32) });
+
+  const vrMenu = createSurvivorMenu({ scene: s3, renderer: Object.assign(r3, { xr: Object.assign(r3.xr, xr) }), states: hands.states, tools, backpack, onPlace: () => ({ ok: true }), popOrigin: t => t.set(-0.12, 1.25, -0.32) });
   const right = hands.states.find(s => s.handedness === 'right');
   right.pointing = true;
   xrGrips[0].position.set(-0.2, 1.1, -0.3); xrGrips[1].position.set(0.2, 1.1, -0.25);
@@ -68,6 +69,7 @@ if (params.get('vr')) {
   // and leave the finger hovering over the first recipe for the picture
   moveTipTo(at(44 + 70, 128 + 70, 0.02)); frames(3);
   r3.render(s3, camera);
+  if (params.get('angle')) camera.position.set(0.32, 1.42, -0.12);
   camera.lookAt(panel.position);
   r3.setAnimationLoop(() => { hands.update(1 / 60); vrMenu.update(); r3.render(s3, camera); });
   window.__menuLab = { state: afterTab };

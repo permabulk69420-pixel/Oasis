@@ -35,7 +35,7 @@ xrNodes[1].dispatchEvent({ type: 'connected', data: { handedness: 'right', gamep
 const head = new THREE.Vector3();
 let taps = 0;
 const watch = createWatch({ states: hands.states, getDay: () => ({ hours: hour, isDay: !night, daylight: night ? 0 : 1 }), getExposure: () => renderer.toneMappingExposure,
-  getHead: () => head, onTap: () => { taps++; } });
+  getHead: () => head, onTap: () => { taps++; }, renderer });
 
 // the left controller held up in front of the chest, the back of the wrist turned toward the eyes (or away)
 const L = xrGrips[0], R = xrGrips[1];
