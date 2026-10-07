@@ -70,7 +70,7 @@ function fixture(t, { side = 'left', targets = [], blockers = [], heightAt = () 
   return { scene, rig, renderer, camera, states, tools, archery, bow, bowHand, drawHand, tick, move, squeeze, takeArrow, load, draw };
 }
 
-test('nocking at the edge of reach keeps the arrow at the hand through sideways movement and overdraw', t => {
+test('nocking at the edge of reach leaves no snap offset and limits the string to the bow and arrow dimensions', t => {
   const f = fixture(t), arrow = f.takeArrow();
   const rest = f.bow.state.sockets.nock.clone();
   f.move(f.drawHand, f.bow.root.localToWorld(rest.clone().add(new THREE.Vector3(0.15, 0, 0))));
@@ -83,9 +83,16 @@ test('nocking at the edge of reach keeps the arrow at the hand through sideways 
     assert.ok(f.bow.root.localToWorld(string).distanceTo(nock) < 1e-6, 'string and arrow share the same nock');
   };
   checkContact();
+  f.draw(0.4, new THREE.Vector3(0.1, 0.04, 0)); checkContact();
   f.draw(1, new THREE.Vector3(0.45, 0.4, 0));
-  checkContact();
-  assert.equal(arrow.draw, BOW.fullDraw, 'power stops increasing while the arrow keeps following');
+  assert.equal(arrow.draw, BOW.fullDraw);
+  assert.ok(arrow.nock.distanceTo(f.bow.state.sockets.rest) <= ARCHERY.arrowLength - ARCHERY.restClearance + 1e-6, 'the shaft still reaches through the rest on a diagonal pull');
+  assert.ok(Math.abs(arrow.nock.x - rest.x) <= ARCHERY.drawSideLimit);
+  assert.ok(Math.abs(arrow.nock.y - rest.y) <= ARCHERY.drawSideLimit);
+  f.draw(-0.35);
+  assert.equal(arrow.draw, 0);
+  assert.ok(Math.abs(arrow.nock.z - rest.z) < 1e-6, 'pushing past the bow cannot invert the string');
+  f.draw(0.3);
   f.rig.position.set(4, 2, -7); f.rig.rotation.y = 1.2;
   f.drawHand.grip.rotation.set(0.3, -0.4, 0.7); f.tick(); checkContact();
 });
@@ -113,7 +120,7 @@ for (const side of ['left', 'right']) test(`the ${side} drawing hand's authored 
   const f = fixture(t, { side: side === 'left' ? 'right' : 'left' });
   const state = f.drawHand;
   const anchor = new THREE.Group(); anchor.rotation.z = side === 'left' ? Math.PI / 2 : -Math.PI / 2;
-  state.grip.add(anchor); anchor.add(gltf.scene); state.handRoot = gltf.scene;
+  state.grip.add(anchor); anchor.add(gltf.scene); state.handRoot = gltf.scene; state.handAnchor = anchor;
   state.indexTip = gltf.scene.getObjectByName(`b_${side[0]}_index_ignore`);
   const thumbTip = gltf.scene.getObjectByName(`b_${side[0]}_thumb_ignore`);
   const mixer = new THREE.AnimationMixer(gltf.scene);
@@ -128,6 +135,16 @@ for (const side of ['left', 'right']) test(`the ${side} drawing hand's authored 
   state.grip.rotation.set(0.25, -0.45, 0.8);
   f.draw(0.9, new THREE.Vector3(0.4, -0.4, 0)); checkContact();
   f.rig.position.set(-5, 1.2, 4); f.rig.rotation.y = -0.9; f.tick(); checkContact();
+  for (const distance of [1.05, -0.35, 0.3]) {
+    f.draw(distance, new THREE.Vector3(0.75, 0.6, 0)); checkContact();
+    assert.ok(arrow.draw >= 0 && arrow.draw <= BOW.fullDraw + 1e-6);
+    assert.ok(arrow.nock.distanceTo(f.bow.state.sockets.rest) <= ARCHERY.arrowLength - ARCHERY.restClearance + 1e-6);
+    const position = anchor.position.clone(); f.tick();
+    assert.ok(anchor.position.distanceTo(position) < 1e-6, 'holding still at the limit must not accumulate a hand offset');
+    checkContact();
+  }
+  f.squeeze(state, false);
+  assert.ok(anchor.position.length() < 1e-6, 'release restores the tracked hand immediately');
 });
 
 for (const side of ['left', 'right']) test(`a ${side}-handed bow nocks, bends and fires along the visible arrow`, t => {
