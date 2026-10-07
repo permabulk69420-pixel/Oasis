@@ -185,6 +185,7 @@ export function createOasisGrassRing({ field }) {
   const tint = new THREE.Color();
   let lastX = Infinity;
   let lastZ = Infinity;
+  let blocked = null;
   let stats = { rich: 0, lite: 0, extra: 0, triangles: 0 };
 
   function writeInstance(mesh, index, patch, lodScale, overrides = null) {
@@ -228,6 +229,7 @@ export function createOasisGrassRing({ field }) {
     const localEndSq = LOCAL_DENSITY_END_DISTANCE * LOCAL_DENSITY_END_DISTANCE;
 
     for (const patch of patches) {
+      if (blocked?.(patch.x, patch.y, patch.z)) continue;
       const dx = patch.x - playerX;
       const dz = patch.z - playerZ;
       const distanceSq = dx * dx + dz * dz;
@@ -258,6 +260,7 @@ export function createOasisGrassRing({ field }) {
         extraZ = patch.z - Math.sin(patch.extraAngle) * patch.extraOffset;
       }
       if (grassCover(extraX, extraZ) <= 0.04) continue;
+      if (blocked?.(extraX, field.sample(extraX, extraZ), extraZ)) continue;
 
       writeInstance(rich, richCount++, patch, 1.0, {
         x: extraX,
@@ -294,6 +297,7 @@ export function createOasisGrassRing({ field }) {
     group,
     update,
     dispose,
+    setBlocked(test) { blocked = test; lastX = lastZ = Infinity; },
     getStats: () => ({ ...stats, generated: patches.length }),
   };
 }

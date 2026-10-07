@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { pulseHaptics } from './haptics.js';
 
-// Placing a thing on the ground (the campfire): a see-through ghost follows where you aim, green where it can go and
+// Placing a campfire or a building piece: a see-through ghost follows where you aim, green where it can go and
 // red where it can't, with a line of text saying what to press or why not. Nothing is spent until you confirm.
 //
 //   VR:      the hand that pressed Place aims (a faint line runs from it), its trigger places. Open the menu (Y) to back out.
@@ -22,6 +22,11 @@ export const PLACEMENT = Object.freeze({
   hapticOk: { intensity: 0.35, ms: 45 },
   hapticNo: { intensity: 0.5, ms: 90 },
 });
+
+// X on the left controller and B on the right; Y remains the menu/cancel button.
+export function placementRotateDown(state) {
+  return Boolean(state?.inputSource?.gamepad?.buttons?.[state.handedness === 'left' ? 4 : 5]?.pressed);
+}
 
 // ---- pure helper (unit tested) ----
 
@@ -121,6 +126,7 @@ function createHint() {
 export function createPlacement({
   scene, renderer, camera, states = [], heightAt, siteAt, check, makePreview, yawAt = () => 0, onConfirm,
   inputMode = () => (renderer.xr.isPresenting ? 'vr' : 'desktop'), radius = 0.5,
+  resolve = null,
 }) {
   const materials = {
     good: new THREE.MeshBasicMaterial({ color: PLACEMENT.good.colour, transparent: true, opacity: PLACEMENT.good.opacity, depthWrite: false, toneMapped: false }),
@@ -153,7 +159,9 @@ export function createPlacement({
   let ghost = null, ghostMeshes = [];
   let active = false, hand = 'right', armed = false, age = 0, triggerWasDown = false;
   let valid = false, shownValid = null, message = '', haveSpot = false;
-  const spot = { x: 0, z: 0 }, shown = new THREE.Vector3();
+  let placementType = 'campfire', turn = 0, rotateWasDown = false;
+  let spot = { x: 0, z: 0 };
+  const shown = new THREE.Vector3();
   const origin = new THREE.Vector3(), direction = new THREE.Vector3(), head = new THREE.Vector3(), rotation = new THREE.Matrix4();
   const hintWorld = new THREE.Vector3(), aimed = { x: 0, z: 0, hit: false };
 
@@ -168,7 +176,7 @@ export function createPlacement({
 
   function ensureGhost() {
     if (ghost) return true;
-    const preview = makePreview?.();
+    const preview = makePreview?.(placementType);
     if (!preview) return false;
     ghost = preview;
     ghost.name = 'Placement preview';
@@ -208,14 +216,18 @@ export function createPlacement({
   }
 
   function wording(ok, why) {
-    if (!ok) return why || 'Can’t build a fire there.';
+    if (!ok) return why || 'Can’t place that here.';
     const mode = inputMode();
-    if (mode === 'vr') return 'Pull the trigger to place';
-    if (mode === 'touch') return 'Tap to place';
-    return 'Click to place';
+    const rotation = placementType !== 'campfire' ? (mode === 'vr' ? ' · B / X rotate' : mode === 'touch' ? ' · Rotate below' : ' · R rotates') : '';
+    if (mode === 'vr') return `Trigger to place${rotation}`;
+    if (mode === 'touch') return `Tap to place${rotation}`;
+    return `Click to place${rotation}`;
   }
 
-  function start({ hand: which = null } = {}) {
+  function start({ hand: which = null, type = 'campfire' } = {}) {
+    if (ghost) { root.remove(ghost); ghost = null; ghostMeshes = []; }
+    placementType = type; turn = 0; rotateWasDown = true;
+    ring.scale.setScalar(type === 'campfire' ? 1 : 3);
     active = true;
     hand = which === 'left' || which === 'right' ? which : 'right';
     armed = false; age = 0; triggerWasDown = true; haveSpot = false; shownValid = null;
@@ -238,8 +250,14 @@ export function createPlacement({
   function confirm() {
     if (!active || !haveSpot) return false;
     if (!valid) { buzz(PLACEMENT.hapticNo); return false; }
-    const result = onConfirm(spot.x, spot.z);
-    if (result?.ok) { buzz(PLACEMENT.hapticOk); stop(); return true; }
+    const result = onConfirm(spot.x, spot.z, spot, placementType);
+    if (result?.ok) {
+      buzz(PLACEMENT.hapticOk);
+      // Building can continue with the next identical piece; each click still spends only one.
+      if (result.repeat) { haveSpot = false; root.visible = false; }
+      else stop();
+      return true;
+    }
     // something changed under us (no item left, or the spot was taken): say so and carry on aiming
     message = result?.message || message;
     if (result && /No .* in your inventory/i.test(result.message || '')) stop();
@@ -253,30 +271,35 @@ export function createPlacement({
     const vr = inputMode() === 'vr';
     const source = aimSource();
     if (!source) { root.visible = false; aimLine.visible = false; return; }
+    if (vr) {
+      const rotateDown = placementRotateDown(source);
+      if (placementType !== 'campfire' && !rotateWasDown && rotateDown) rotate();
+      rotateWasDown = rotateDown;
+    }
 
     renderer.xr.isPresenting ? renderer.xr.getCamera().getWorldPosition(head) : camera.getWorldPosition(head);
     aimGroundPoint(origin, direction, heightAt, head, null, aimed);
-    spot.x = aimed.x; spot.z = aimed.z;
+    spot = resolve ? resolve({ type: placementType, origin, direction, head, ground: aimed, turn }) : { x: aimed.x, z: aimed.z };
     haveSpot = true;
 
     if (!ensureGhost()) { root.visible = false; return; }
-    const verdict = check(spot.x, spot.z);
+    const verdict = check(spot.x, spot.z, spot, placementType, head);
     valid = Boolean(verdict.ok);
     message = verdict.message;
     paint(valid);
 
-    const y = siteAt(spot.x, spot.z).y;
+    const y = spot.y ?? siteAt(spot.x, spot.z).y;
     if (root.visible === false) shown.set(spot.x, y, spot.z);
     else {
-      const k = 1 - Math.exp(-PLACEMENT.follow * dt);
+      const k = spot.snapped ? 1 : 1 - Math.exp(-PLACEMENT.follow * dt);
       shown.x += (spot.x - shown.x) * k; shown.z += (spot.z - shown.z) * k; shown.y += (y - shown.y) * k;
     }
     root.position.copy(shown);
     root.visible = true;
-    ghost.rotation.y = yawAt(spot.x, spot.z);
+    ghost.rotation.y = spot.yaw ?? yawAt(spot.x, spot.z);
 
     // the line of text floats above the fire and turns to face you, a little bigger the further it is
-    hintWorld.set(shown.x, shown.y + 0.95, shown.z);
+    hintWorld.set(shown.x, shown.y + (placementType === 'campfire' ? 0.95 : 1.35), shown.z);
     root.worldToLocal(hintWorld);
     hint.sprite.position.copy(hintWorld);
     hint.set(wording(valid, message), valid);
@@ -300,11 +323,17 @@ export function createPlacement({
   }
 
   return {
-    start, cancel, confirm, update,
+    start, cancel, confirm, update, rotate,
     isActive: () => active,
     get valid() { return valid; },
     get message() { return message; },
-    get spot() { return { x: spot.x, z: spot.z }; },
+    get spot() { return { ...spot }; },
+    get type() { return placementType; },
     root,
   };
+
+  function rotate() {
+    if (!active || placementType === 'campfire') return false;
+    turn = (turn + Math.PI / 2) % (Math.PI * 2); return true;
+  }
 }

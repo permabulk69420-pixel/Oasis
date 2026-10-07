@@ -122,6 +122,7 @@ export function createIslandGrass({ ground, cover, thick, spec = ISLAND_GRASS, s
   const chunks = new Map();
   const field = { ground, cover, thick };
   let lastX = Infinity, lastZ = Infinity, pending = false;
+  let blocked = null;
   let stats = { rich: 0, lite: 0, chunks: 0, triangles: 0 };
 
   function chunkAt(cx, cz, budget) {
@@ -162,6 +163,7 @@ export function createIslandGrass({ ground, cover, thick, spec = ISLAND_GRASS, s
       if (!chunk || !chunk.count) continue;
       const mats = chunk.matrices;
       for (let k = 0; k < chunk.count; k++) {
+        if (blocked?.(mats[k * 16 + 12], mats[k * 16 + 13], mats[k * 16 + 14])) continue;
         const px = mats[k * 16 + 12] - x, pz = mats[k * 16 + 14] - z, d2 = px * px + pz * pz;
         if (d2 > thinSq) continue;
         if (d2 > spec.fullTo * spec.fullTo && chunk.hash[k] > grassKeep(Math.sqrt(d2), spec)) continue;
@@ -194,5 +196,5 @@ export function createIslandGrass({ ground, cover, thick, spec = ISLAND_GRASS, s
   }
 
   function dispose() { richGeometry.dispose(); liteGeometry.dispose(); material.dispose(); }
-  return { group, update, dispose, material, getStats: () => ({ ...stats }), chunks };
+  return { group, update, dispose, material, getStats: () => ({ ...stats }), chunks, setBlocked(test) { blocked = test; lastX = lastZ = Infinity; } };
 }
