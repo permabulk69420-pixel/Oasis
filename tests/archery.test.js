@@ -112,7 +112,8 @@ test('cyan crystal arrowheads retain night emission and a halo at the true tip w
 
 test('daytime arrows remain emissive but do not render the night halo', t => {
   const f = fixture(t, { sunHeight: 1 });
-  const arrow = f.takeArrow();
+  const arrow = f.load();
+  f.draw(0.3);
   assert.equal(f.archery.debug.halos.mesh.visible, false);
   f.squeeze(f.drawHand, false); f.tick(0.02);
   assert.equal(arrow.phase, 'flying');
