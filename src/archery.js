@@ -10,6 +10,7 @@ const FORWARD = new THREE.Vector3(0, 0, -1);
 export const ARCHERY = Object.freeze({
   arrowUrl: `${BASE}models/bow/arrow.glb`, quiverUrl: `${BASE}models/bow/quiver.glb`,
   arrowLength: 0.75, nockRadius: 0.18, shoulderRadius: 0.32,
+  drawSideLimit: 0.25, restClearance: 0.03,
   pickupRadius: 0.25, hitRadius: 0.045, sweepStep: 0.06,
   maxArrows: 32, lifetime: 120, gravity: 9.81,
 });
@@ -36,6 +37,7 @@ export function createArchery({ scene, rig, states, tools, renderer, heightAt = 
   const body = { center: new THREE.Vector3(), yaw: 0 };
   const shoulder = new THREE.Vector3(), hand = new THREE.Vector3(), local = new THREE.Vector3();
   const thumb = new THREE.Vector3();
+  const trackedPinch = new THREE.Vector3(), constrainedPinch = new THREE.Vector3();
   const direction = new THREE.Vector3(), previousTip = new THREE.Vector3(), nextTip = new THREE.Vector3();
   const sample = new THREE.Vector3(), closest = new THREE.Vector3(), along = new THREE.Vector3();
   const opening = new THREE.Vector3(0, 0.12, -0.058);
@@ -67,7 +69,7 @@ export function createArchery({ scene, rig, states, tools, renderer, heightAt = 
     return out.copy(FORWARD).applyQuaternion(arrow.root.quaternion).multiplyScalar(ARCHERY.arrowLength).add(arrow.root.position);
   }
   function remove(arrow) {
-    arrow.token?.removeFromParent();
+    freeDrawHand(arrow);
     if (arrow.bow) { setBowDraw(arrow.bow); arrow.bow.state.arrow = null; }
     arrow.root.removeFromParent();
     const index = arrows.indexOf(arrow);
@@ -81,7 +83,8 @@ export function createArchery({ scene, rig, states, tools, renderer, heightAt = 
       remove(oldest);
     }
     const arrow = { root: template.clone(true), phase: 'ground', heldBy: null, bow: null, drawBy: null,
-      token: null, pinchIndex: null, pinchThumb: null, draw: 0, tick: 0, age: 0, damage: 0,
+      token: null, pinchIndex: null, pinchThumb: null, handAnchor: null, anchorHome: null,
+      draw: 0, tick: 0, age: 0, damage: 0,
       velocity: new THREE.Vector3(), nock: new THREE.Vector3() };
     arrow.root.name = 'Arrow';
     arrows.push(arrow);
@@ -94,8 +97,10 @@ export function createArchery({ scene, rig, states, tools, renderer, heightAt = 
     return true;
   }
   function freeDrawHand(arrow) {
+    restoreDrawHand(arrow);
     arrow.token?.removeFromParent();
     arrow.token = null; arrow.drawBy = null; arrow.pinchIndex = arrow.pinchThumb = null;
+    arrow.handAnchor = arrow.anchorHome = null;
   }
   function detachBow(arrow) {
     if (arrow.bow) { setBowDraw(arrow.bow); arrow.bow.state.arrow = null; }
@@ -112,7 +117,7 @@ export function createArchery({ scene, rig, states, tools, renderer, heightAt = 
     const bow = arrow.bow;
     arrow.root.position.copy(arrow.nock);
     direction.copy(bow.state.sockets.rest).sub(arrow.nock);
-    if (direction.z >= 0 || direction.lengthSq() < 0.0064) direction.copy(FORWARD);
+    if (direction.lengthSq() < 1e-8) direction.copy(FORWARD);
     else direction.normalize();
     arrow.root.quaternion.setFromUnitVectors(FORWARD, direction);
     setBowDraw(bow, arrow.draw, arrow.nock);
@@ -126,6 +131,8 @@ export function createArchery({ scene, rig, states, tools, renderer, heightAt = 
     const side = state.handedness === 'left' ? 'l' : 'r';
     arrow.pinchIndex = state.indexTip || state.handRoot?.getObjectByName(`b_${side}_index_ignore`) || null;
     arrow.pinchThumb = state.handRoot?.getObjectByName(`b_${side}_thumb_ignore`) || null;
+    arrow.handAnchor = state.handAnchor || null;
+    arrow.anchorHome = arrow.handAnchor?.position.clone() || null;
     arrow.draw = arrow.tick = 0;
     pulseHaptics(state, 0.35, 35);
   }
@@ -138,20 +145,51 @@ export function createArchery({ scene, rig, states, tools, renderer, heightAt = 
     beginDraw(arrow, state);
     placeNocked(arrow);
   }
+  function restoreDrawHand(arrow) {
+    if (arrow.handAnchor && arrow.anchorHome) {
+      arrow.handAnchor.position.copy(arrow.anchorHome);
+      arrow.handAnchor.updateWorldMatrix(true, true);
+    }
+  }
   function followDrawHand(arrow) {
     // Use the visible fingers, not the wrist or the distance at which the arrow
     // snapped onto the string. Both fingertips have already been animated when
     // updateDrawPose runs, including the first frame of the Pinch pose.
+    restoreDrawHand(arrow);
     if (arrow.pinchIndex && arrow.pinchThumb) {
       arrow.pinchIndex.getWorldPosition(local);
       arrow.pinchThumb.getWorldPosition(thumb);
       local.add(thumb).multiplyScalar(0.5);
     } else handPosition(arrow.drawBy, local);
+    trackedPinch.copy(local);
     arrow.bow.root.worldToLocal(local);
     arrow.nock.copy(local);
-    // The string follows the hand even beyond full draw. Only power and limb
-    // bending are capped; clamping the position would separate hand and arrow.
-    arrow.draw = THREE.MathUtils.clamp(arrow.nock.z - arrow.bow.state.sockets.nock.z, 0, BOW.fullDraw);
+    const rest = arrow.bow.state.sockets.nock;
+    arrow.nock.x = THREE.MathUtils.clamp(arrow.nock.x, rest.x - ARCHERY.drawSideLimit, rest.x + ARCHERY.drawSideLimit);
+    arrow.nock.y = THREE.MathUtils.clamp(arrow.nock.y, rest.y - ARCHERY.drawSideLimit, rest.y + ARCHERY.drawSideLimit);
+    arrow.nock.z = THREE.MathUtils.clamp(arrow.nock.z, rest.z, rest.z + BOW.fullDraw);
+    // The arrow must still reach through the rest. Limit diagonal pulls too,
+    // otherwise a finite arrow can hang entirely behind the bow at full draw.
+    const socket = arrow.bow.state.sockets.rest;
+    const shaftReach = ARCHERY.arrowLength - ARCHERY.restClearance;
+    const depth = arrow.nock.z - socket.z;
+    const sideReach = Math.sqrt(Math.max(0, shaftReach ** 2 - depth ** 2));
+    const sideways = Math.hypot(arrow.nock.x - socket.x, arrow.nock.y - socket.y);
+    if (sideways > sideReach) {
+      arrow.nock.x = socket.x + (arrow.nock.x - socket.x) * sideReach / sideways;
+      arrow.nock.y = socket.y + (arrow.nock.y - socket.y) * sideReach / sideways;
+    }
+    // Constrain the visible drawing hand with the string, rather than limiting
+    // the arrow alone and opening a gap. The tracked controller remains intact;
+    // releasing/cancelling restores the ordinary hand position immediately.
+    if (arrow.handAnchor?.parent) {
+      constrainedPinch.copy(arrow.nock); arrow.bow.root.localToWorld(constrainedPinch);
+      arrow.handAnchor.parent.worldToLocal(constrainedPinch);
+      arrow.handAnchor.parent.worldToLocal(trackedPinch);
+      arrow.handAnchor.position.add(constrainedPinch.sub(trackedPinch));
+      arrow.handAnchor.updateWorldMatrix(true, true);
+    }
+    arrow.draw = arrow.nock.z - rest.z;
     placeNocked(arrow);
   }
   function updateDrawPose() {
