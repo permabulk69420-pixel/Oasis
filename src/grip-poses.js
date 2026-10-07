@@ -4,12 +4,14 @@ export const GRIP_PROFILE = Object.freeze({
   THIN: 'thin',
   MEDIUM: 'medium',
   LARGE: 'large',
+  PINCH: 'pinch',
 });
 
 const GRIP_POSES = Object.freeze({
   thin: Object.freeze({ animation: 'Grip', amount: 0.86 }),
   medium: Object.freeze({ animation: 'Grip', amount: 0.72 }),
   large: Object.freeze({ animation: 'Grip', amount: 0.58 }),
+  pinch: Object.freeze({ animation: 'Pinch', amount: 1 }),
 });
 
 export function setHeldGripProfile(state, profile = GRIP_PROFILE.MEDIUM) {

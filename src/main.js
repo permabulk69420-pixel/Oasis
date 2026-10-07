@@ -40,6 +40,7 @@ import { setListener } from './audio.js';
 import { createSkyEnvironment, setSkyEnvironment } from './sky-environment.js';
 import { registerLooseFindDrops } from './loose-finds.js';
 import { createBackpack, PACK } from './backpack.js';
+import { createArchery } from './archery.js';
 import { SPEAR } from './spear.js';
 import { stepBody } from './falling.js';
 import { windTime, windStrength } from './wind.js';
@@ -472,6 +473,10 @@ function flightGround(x, z, y) {
   const height = skyIsland.groundHeight(x, z);
   return height !== null && y >= height - 0.5 ? height : field.sample(x, z);
 }
+const archery = createArchery({ scene, rig, states: hands.states, tools: hands.tools, renderer,
+  heightAt: flightGround, targets: [duneStinger], blockers: [mining], onError: message => console.warn(message) });
+hands.tools.setBeforeInput(archery.update);
+if (import.meta.env.DEV) window.__archery = archery;
 let gliderKeyDown = false, flight = null;
 if (import.meta.env.DEV) window.__glider = glider; // dev only: for screenshots and the flight check
 // Development-only: ?pack=worn starts with the backpack already on.
@@ -689,10 +694,12 @@ renderer.xr.addEventListener('sessionstart', () => {
   const session = renderer.xr.getSession();
   session.addEventListener('visibilitychange', () => {
     clearInput();
+    if (session.visibilityState !== 'visible') archery.cancel();
     if (session.visibilityState !== 'visible') autosave.flush(); // the headset came off
   });
 });
 renderer.xr.addEventListener('sessionend', () => {
+  archery.cancel();
   autosave.flush();
   if (savingEnabled) startPoint = { x: head.x, z: head.z, yaw: rig.rotation.y }; // the next session picks up from here, not from the start
   groundY = groundAt(head.x, head.z);

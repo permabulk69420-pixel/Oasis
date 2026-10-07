@@ -119,6 +119,7 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
   let bodyYawTarget = null;
   let wasWalking = false;
   let bodyCenter = null;
+  let beforeInput = null;
 
   // Empty hips get a small soft dot while a hand holds a tool. When that hand is in the
   // zone a faint ghost of the held tool shows exactly how it will sit on the hip.
@@ -467,6 +468,9 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
       handMotion.record(state, state.objectGrip, safeDt);
     }
 
+    // Two-handed equipment reserves its other hand before ordinary pickups run.
+    beforeInput?.(safeDt);
+
     for (const state of states) {
       const grip = Boolean(state.inputSource?.gamepad?.buttons?.[GRIP_BUTTON]?.pressed);
       const wasDown = Boolean(gripDown.get(state));
@@ -606,6 +610,7 @@ export function createTools({ scene, states, kinds, renderer = null, camera = nu
     equip,
     unequip,
     throwTool,
+    setBeforeInput: callback => { beforeInput = callback; },
     getBodyFrame,
     snapshot,
     restoreSnapshot,

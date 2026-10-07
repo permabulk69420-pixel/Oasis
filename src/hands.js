@@ -5,6 +5,7 @@ import { createTorchKind } from './torch.js';
 import { createAxeKind } from './axe.js';
 import { createSpearKind } from './spear.js';
 import { createPickaxeKind } from './pickaxe.js';
+import { createBowKind } from './bow.js';
 import { createTools } from './tools.js';
 import { createHeldSticks } from './sticks.js';
 import { createHeldStones } from './stones.js';
@@ -216,6 +217,7 @@ export function createVRHands({ renderer, scene, parent = null, camera = null, g
       createTorchKind({ scene, onError }), createAxeKind({ scene, onError }),
       createSpearKind({ getExposure: () => renderer.toneMappingExposure }),
       createPickaxeKind({ getExposure: () => renderer.toneMappingExposure }),
+      createBowKind(),
     ],
   });
   const firstTool = kind => ({ getObject: () => tools.getInstances(kind)[0]?.root || null });
