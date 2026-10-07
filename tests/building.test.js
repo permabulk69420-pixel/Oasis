@@ -68,7 +68,7 @@ test('adjoining foundations and walls join a rotated local grid at the same heig
     near(wall.y, base.y);
   }
   const terrain = foundationSite(0, 0, Math.PI / 2, (x, z) => x * 0.02 + z * 0.01);
-  assert.equal(terrain.ok, true); near(terrain.y, 0.165);
+  assert.equal(terrain.ok, true); near(terrain.y, 0.645);
   assert.equal(foundationSite(0, 0, 0, x => x).ok, false);
 });
 
@@ -87,15 +87,36 @@ test('upper floors and stair tops meet exactly, through every rotation', () => {
   }
 });
 
-test('opposite roofs meet at a ridge and side-by-side roof tiles have no gap', () => {
+test('flat roofs join edge to edge and remain level through every rotation', () => {
   for (const yaw of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
     const roof = part('roof', 4, 3.12, 6, yaw);
     const candidates = buildingCandidates('roof', [roof]);
     const opposite = candidates.find(p => Math.abs(p.x - roof.x) > 5 || Math.abs(p.z - roof.z) > 5);
-    const firstHigh = buildingPoint(roof, 0, Math.sqrt(3), -3);
-    const secondHigh = buildingPoint(opposite, 0, Math.sqrt(3), -3);
+    const firstHigh = buildingPoint(roof, 0, 0, -3);
+    const secondHigh = buildingPoint(opposite, 0, 0, -3);
     near(firstHigh.x, secondHigh.x); near(firstHigh.y, secondHigh.y); near(firstHigh.z, secondHigh.z);
     near(Math.hypot(candidates[0].x - roof.x, candidates[0].z - roof.z), 3);
+    for (const z of [-0.1, -1.5, -2.9]) {
+      const p = buildingPoint(roof, 0, 0, z);
+      near(buildingSurface([roof], p.x, p.z, roof.y, 0), roof.y);
+    }
+  }
+});
+
+test('the exported roof model and collider are flat, with level walking and arrow collision', async () => {
+  const world = await fixture();
+  for (const model of [world.createPreview('roof'), templates.roof.collider]) {
+    const bounds = new THREE.Box3().setFromObject(model);
+    near(bounds.max.y, 0); near(bounds.min.y, -0.16);
+    near(bounds.min.x, -1.5); near(bounds.max.x, 1.5);
+    near(bounds.min.z, -3); near(bounds.max.z, 0);
+  }
+  const roof = part('roof', 0, 3.6, 0);
+  world.place(roof, { restore: true });
+  for (const z of [-0.1, -1.5, -2.9]) {
+    near(world.surfaceAt(0, z, 3.6, 0), 3.6);
+    assert.ok(world.hitTest({ x: 0, y: 3.55, z }));
+    assert.equal(world.hitTest({ x: 0, y: 4, z }), null);
   }
 });
 
@@ -118,8 +139,8 @@ test('standing under an upper floor does not teleport you onto it; steps can be 
 
 test('aiming at a future surface selects its unoccupied snap, including an upper balcony', async () => {
   const world = await fixture();
-  world.place(part('foundation', 0, 0.12, 0, Math.PI / 2), { restore: true });
-  world.place(part('foundation', 3, 0.12, 0, Math.PI, 2), { restore: true });
+  world.place(part('foundation', 0, 0.6, 0, Math.PI / 2), { restore: true });
+  world.place(part('foundation', 3, 0.6, 0, Math.PI, 2), { restore: true });
   const origin = new THREE.Vector3(0, 1.68, -7);
   const direction = new THREE.Vector3(0, 0.12, -3).sub(origin).normalize();
   const aim = world.aimSite('foundation', { origin, direction, head: origin, ground: { x: 0, z: -2.6 } });
@@ -159,8 +180,10 @@ test('the actual kit loads, renders by instancing, rejects occupied or steep sit
   const world = await fixture();
   assert.equal(world.ready, true);
   for (const type of Object.keys(BUILDING_PIECES)) assert.ok(world.createPreview(type)?.isObject3D);
-  const site = part('foundation');
+  const site = part('foundation', 0, foundationSite(0, 0, 0, () => 0).y);
   assert.equal(world.canPlace(site).ok, true);
+  assert.equal(world.canPlace(part('foundation')).ok, false, 'reject a foundation whose stone base would be buried');
+  assert.equal(world.canPlace({ ...site, y: 1.1 }).ok, false, 'reject a base floating above the terrain');
   world.place(site);
   assert.equal(world.blocksGrass(0, 0, 0), true);
   assert.equal(world.blocksGrass(20, 0, 0), false);

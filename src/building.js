@@ -52,9 +52,9 @@ export function buildingCandidates(type, parts, turn = 0) {
       if (isWall(part.type)) add(part, 0, 3, 0, flip);
       if (part.type === 'floor') for (const edge of EDGES) add(part, edge.x, 0, edge.z, edge.yaw + flip);
       if (part.type === 'roof') {
-        for (const side of [-1, 1]) add(part, side * 3, 0, 0, 0, [side * 1.5, 0.866, -1.5]);
+        for (const side of [-1, 1]) add(part, side * 3, 0, 0, 0, [side * 1.5, 0, -1.5]);
         const yaw = Math.PI + flip;
-        add(part, Math.sin(yaw) * 3, 0, -3 + Math.cos(yaw) * 3, yaw, [0, Math.sqrt(3), -3]);
+        add(part, Math.sin(yaw) * 3, 0, -3 + Math.cos(yaw) * 3, yaw, [0, 0, -3]);
       }
     } else if (type === 'stairs' && isTile(part.type)) {
       for (const edge of EDGES) {
@@ -98,7 +98,7 @@ export function buildingSurface(parts, x, z, feetY = Infinity, base = -Infinity,
       y = part.y;
     } else {
       if (p.z > 0 || p.z < -3) continue;
-      y = part.y + (part.type === 'roof' ? -p.z / Math.sqrt(3) : Math.min(3, (Math.floor(-p.z / 0.25) + 1) * 0.25));
+      y = part.y + (part.type === 'roof' ? 0 : Math.min(3, (Math.floor(-p.z / 0.25) + 1) * 0.25));
     }
     if (y <= feetY + step + 1e-6 && y > highest) highest = y;
   }
@@ -174,7 +174,8 @@ export function createBuildings({ scene, heightAt, getFires = () => [], isWater 
   for (const type of Object.keys(BUILDING_PIECES)) {
     if (templates?.[type]) { install(type, templates[type].visual, templates[type].collider); continue; }
     const loader = new GLTFLoader();
-    Promise.all([loader.loadAsync(`${BASE}models/building/${type}.glb`), loader.loadAsync(`${BASE}models/building/${type}_collider.glb`)])
+    const revision = type === 'roof' ? '?v=flat-20261008' : '';
+    Promise.all([loader.loadAsync(`${BASE}models/building/${type}.glb${revision}`), loader.loadAsync(`${BASE}models/building/${type}_collider.glb${revision}`)])
       .then(([visual, collider]) => install(type, visual.scene, collider.scene))
       .catch(error => onError(`[Oasis building] ${type} failed to load: ${error?.message || error}`));
   }
@@ -199,7 +200,7 @@ export function createBuildings({ scene, heightAt, getFires = () => [], isWater 
     if (buildingOccupied(site, parts)) return { ok: false, message: 'There is already a piece there.' };
     if (site.type === 'foundation') {
       const ground = foundationSite(site.x, site.z, site.yaw, heightAt);
-      if (!ground.ok || ground.high > site.y - 0.02 || ground.low < site.y - 1) return { ok: false, message: 'Find flatter ground for the foundation.' };
+      if (!ground.ok || ground.high > site.y - BUILDING.foundationClearance + 1e-6 || ground.low < site.y - BUILDING.foundationDepth - 1e-6) return { ok: false, message: 'Find flatter ground for the foundation.' };
       for (const dx of [-1.5, 0, 1.5]) for (const dz of [-1.5, 0, 1.5]) {
         if (isWater(site.x + dx, site.z + dz, heightAt(site.x + dx, site.z + dz))) return { ok: false, message: 'Place foundations on dry land.' };
       }
@@ -297,7 +298,7 @@ export function createBuildings({ scene, heightAt, getFires = () => [], isWater 
         if (p.x >= minX - radius && p.x <= maxX + radius && p.z >= minZ - radius && p.z <= maxZ + radius && ly >= minY - radius && ly <= maxY + radius) return { building: part };
       }
       if (part.type === 'roof' && Math.abs(p.x) <= 1.5 + radius && p.z >= -3 - radius && p.z <= radius) {
-        const top = -p.z / Math.sqrt(3);
+        const top = 0;
         if (ly >= top - 0.16 - radius && ly <= top + radius) return { building: part };
       }
     }
