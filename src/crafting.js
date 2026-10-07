@@ -1,4 +1,5 @@
 import { getInventoryCount, exchangeInventoryItems } from './inventory.js';
+import { BUILDING_PIECES } from './building-kit.js';
 
 export const ITEMS = Object.freeze({
   stick: { name: 'Stick', category: 'RESOURCE', description: 'Gather loose sticks around the oasis.' },
@@ -13,15 +14,17 @@ export const ITEMS = Object.freeze({
   bow: { name: 'Bow', category: 'TOOL', description: 'Grip to hold. Reach over your free shoulder and grip for an arrow. Touch it to the string, pull back, then let go to shoot. The quiver appears with the bow; arrows are unlimited for now. Put the bow on a hip to carry it.', equippable: true },
   glider: { name: 'Glider', category: 'TOOL', description: 'A hang glider. Raise both hands above your head and squeeze both grips to open it, then step off a height. Lower a hand to turn, move your hands forward to dive, back to float. Let go to fold it away.' },
   campfire: { name: 'Campfire', category: 'STRUCTURE', description: 'A ring of stones around a stack of logs. Place it on the ground, then touch a lit torch to the logs to light it.', placeable: true },
+  ...Object.fromEntries(Object.entries(BUILDING_PIECES).map(([type, part]) => [type, { name: part.name, category: 'STRUCTURE', description: part.description, placeable: true }])),
 });
 
-// Use resources that can already be collected. Fibre and crystal have no recipe yet.
+// Use resources that can already be collected.
 export const RECIPES = Object.freeze([
   Object.freeze({ id: 'axe', name: 'Stone axe', description: 'Lash a stone head to a wooden handle.', ingredients: Object.freeze({ stick: 3, stone: 2 }), output: 'axe' }),
   Object.freeze({ id: 'torch', name: 'Torch', description: 'Bundle dry sticks with a striking stone.', ingredients: Object.freeze({ stick: 2, stone: 1 }), output: 'torch' }),
   Object.freeze({ id: 'spear', name: 'Stone-tipped spear', description: 'Lash a stone point to a long, straight shaft.', ingredients: Object.freeze({ stick: 3, stone: 1 }), output: 'spear' }),
   Object.freeze({ id: 'pickaxe', name: 'Stone pickaxe', description: 'Lash a pointed stone across a stout haft.', ingredients: Object.freeze({ stick: 3, stone: 3 }), output: 'pickaxe' }),
   Object.freeze({ id: 'campfire', name: 'Campfire', description: 'Stack sticks for kindling and ring them with stones. Light it with a torch.', ingredients: Object.freeze({ stick: 6, stone: 5 }), output: 'campfire' }),
+  ...Object.entries(BUILDING_PIECES).map(([id, part]) => Object.freeze({ id, name: part.name, description: part.description, ingredients: part.ingredients, output: id })),
 ]);
 
 export function getRecipeStatus(id) {

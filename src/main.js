@@ -48,6 +48,8 @@ import { createPlantPush, pushSettings } from './plant-push.js';
 import { installNightFill } from './night-fill.js';
 import { getSurvivalStats, updateSurvival, canSprint, restoreFood, restoreWater, damagePlayer, exportSurvival, importSurvival } from './survival.js';
 import { createPlacement } from './placement.js';
+import { createBuildings } from './building.js';
+import { BUILDING_START_KIT, isBuildingPiece } from './building-kit.js';
 import { createGlowGarden } from './glow-garden.js';
 import { pulseHaptics } from './haptics.js';
 import { createSurvivorMenu } from './survivor-menu.js';
@@ -98,6 +100,8 @@ rig.add(camera); scene.add(rig);
 // island, `groundAt` gives the island's top; everything else in the world stays on the desert's ground.
 const startsOnIsland = startPlace(location.search, import.meta.env.DEV) === 'island';
 let onIsland = startsOnIsland;
+let buildings = null;
+let playerFeetY = null;
 const hands = createVRHands({
   renderer,
   scene,
@@ -130,12 +134,16 @@ scene.add(skyScenery.group);
 if (import.meta.env.DEV) window.__skyIsland = Object.assign(skyIsland, { scenery: skyScenery }); // dev only: for screenshots
 // The ground under (x, z) for the player and what they carry: the island's top while you are on the island (and the point is over it),
 // the desert's ground otherwise. Desert systems (rocks, grass, the creatures) keep reading `field` directly.
-function groundAt(x, z) {
+function naturalGroundAt(x, z) {
   if (onIsland) {
     const height = skyIsland.groundHeight(x, z);
     if (height !== null) return height;
   }
   return field.sample(x, z);
+}
+function groundAt(x, z, feetY = playerFeetY ?? rig.position.y) {
+  const base = naturalGroundAt(x, z);
+  return buildings ? buildings.surfaceAt(x, z, feetY, base) : base;
 }
 scene.add(createWater(field, materials.water));
 const sticksGroup = createGroundSticks({
@@ -423,17 +431,38 @@ let devBird = devBirdParams?.get('bird') ?? null;
 if (devBirdParams?.has('birdseed')) alienBirds.debug.seed(Number(devBirdParams.get('birdseed')));
 // ?birdwait=<seconds>: with no fixture, the next bird turns up that many seconds into the day (instead of 12 to 22)
 if (devBirdParams?.has('birdwait')) alienBirds.debug.wait(Number(devBirdParams.get('birdwait')) || 0);
-// Placing a campfire: the menu's Place button starts a ghost that follows your aim (src/placement.js); the item is only spent when you confirm.
+// The existing Blender building kit, snapped to its 3 m grid; static pieces are instanced by material.
+const buildingGrass = (x, y, z) => buildings?.blocksGrass(x, y, z) || false;
+buildings = createBuildings({
+  scene, heightAt: naturalGroundAt, getFires: () => campfires.list(), isWater: isInPond,
+  onChange() { terrain.grassRing.setBlocked(buildingGrass); skyScenery.grass.setBlocked(buildingGrass); },
+});
+if (import.meta.env.DEV) window.__buildings = buildings;
+function checkCampfire(x, z) {
+  const check = campfires.canPlace(x, z);
+  if (!check.ok) return check;
+  if (buildings.pushOut(x, z, groundAt(x, z) + 0.02, 0.7, CAMPFIRE.footprint)) return { ok: false, message: 'Move the campfire clear of the building.' };
+  return check;
+}
+// The menu's Place button starts the same aiming ghost for campfires and buildings; spend only on a valid confirmation.
 const placement = createPlacement({
   scene, renderer, camera, states: hands.states, heightAt: groundAt,
-  check: (x, z) => campfires.canPlace(x, z),
+  resolve: ({ type, ...aim }) => type === 'campfire' ? { x: aim.ground.x, z: aim.ground.z } : buildings.aimSite(type, aim),
+  check: (x, z, site, type, head) => type === 'campfire' ? checkCampfire(x, z) : buildings.canPlace(site, head),
   siteAt: campfires.siteAt,
-  makePreview: campfires.createPreview,
+  makePreview: type => type === 'campfire' ? campfires.createPreview() : buildings.createPreview(type),
   yawAt: campfireYaw,
   radius: CAMPFIRE.footprint,
   inputMode: () => (renderer.xr.isPresenting ? 'vr' : touchDevice ? 'touch' : 'desktop'),
-  onConfirm(x, z) {
-    const check = campfires.canPlace(x, z);
+  onConfirm(x, z, site, type) {
+    if (isBuildingPiece(type)) {
+      const check = buildings.canPlace(site);
+      if (!check.ok) return check;
+      if (!removeInventoryItem(type, 1)) return { ok: false, message: `No ${type} in your inventory.` };
+      if (!buildings.place(site)) { addInventoryItem(type, 1); return { ok: false, message: 'That piece could not be placed.' }; }
+      return { ok: true, repeat: getInventoryCount(type) > 0 };
+    }
+    const check = checkCampfire(x, z);
     if (!check.ok) return check;
     if (!removeInventoryItem('campfire', 1)) return { ok: false, message: 'No campfire in your inventory.' };
     campfires.place(x, z);
@@ -441,10 +470,20 @@ const placement = createPlacement({
   },
 });
 if (import.meta.env.DEV) window.__placement = placement; // dev only: for screenshots
+const rotateBuild = document.createElement('button');
+rotateBuild.id = 'rotate-build'; rotateBuild.textContent = 'Rotate'; rotateBuild.hidden = true;
+rotateBuild.addEventListener('click', () => placement.rotate());
+document.body.append(rotateBuild);
+const doorOrigin = new THREE.Vector3(), doorDirection = new THREE.Vector3(), doorRotation = new THREE.Matrix4();
+const doorTriggerDown = new Map();
+function useDesktopDoor() {
+  camera.getWorldPosition(doorOrigin); camera.getWorldDirection(doorDirection);
+  return buildings.toggleDoor(doorOrigin, doorDirection);
+}
 function placeFromMenu(type, { hand = null } = {}) {
-  if (type !== 'campfire') return { ok: false, message: 'You can’t place that.' };
-  if (!campfires.ready) return { ok: false, message: 'The campfire is still loading. Try again in a moment.' };
-  placement.start({ hand });
+  if (type !== 'campfire' && !isBuildingPiece(type)) return { ok: false, message: 'You can’t place that.' };
+  if (type === 'campfire' ? !campfires.ready : !buildings.readyFor(type)) return { ok: false, message: 'The model is still loading. Try again in a moment.' };
+  placement.start({ hand, type });
   return { ok: true, message: '' };
 }
 // On the island start the one pack stands by the island's tools instead (the oasis keeps no pack then: there is only one).
@@ -471,10 +510,11 @@ const glider = createGlider({ scene, states: hands.states, onError: message => c
 // the ground for a flight: the island's top only while you are above it, the desert's otherwise
 function flightGround(x, z, y) {
   const height = skyIsland.groundHeight(x, z);
-  return height !== null && y >= height - 0.5 ? height : field.sample(x, z);
+  const base = height !== null && y >= height - 0.5 ? height : field.sample(x, z);
+  return buildings.surfaceAt(x, z, y, base);
 }
 const archery = createArchery({ scene, rig, states: hands.states, tools: hands.tools, renderer,
-  heightAt: flightGround, targets: [duneStinger], blockers: [mining], onError: message => console.warn(message) });
+  heightAt: flightGround, targets: [duneStinger], blockers: [mining, buildings], onError: message => console.warn(message) });
 hands.tools.setBeforeInput(archery.update);
 if (import.meta.env.DEV) window.__archery = archery;
 let gliderKeyDown = false, flight = null;
@@ -497,11 +537,11 @@ if (askedFresh) { // so reloading the page does not start another new game
 }
 // Where a VR session starts: the start of the world, or where the saved game left you (and from then on, where you left VR).
 let startPoint = { x: firstSpot.x, z: firstSpot.z, yaw: startsOnIsland ? ISLAND_START.yaw : 0 };
-function placePlayer({ x, z, yaw }) {
+function placePlayer({ x, y, z, yaw }) {
   footprints.reset();
   startPoint = { x, z, yaw };
   onIsland = startsOnIsland && skyIsland.groundHeight(x, z) !== null; // a saved game from the oasis puts you back in the oasis
-  groundY = groundAt(x, z);
+  groundY = groundAt(x, z, y ?? naturalGroundAt(x, z)); playerFeetY = groundY;
   rig.position.set(x, groundY, z);
   rig.rotation.y = yaw;
 }
@@ -509,10 +549,11 @@ const autosave = createAutosave({
   store: saveStore, save: saveStart.save, enabled: savingEnabled,
   onWarn: message => console.warn(message),
   slots: [
+    { key: 'buildings', ready: () => buildings.ready, read: () => buildings.snapshot(), write: data => buildings.restore(data) },
     { key: 'inventory', read: getInventoryItems, write: importInventoryItems },
     { key: 'survival', read: exportSurvival, write: importSurvival },
     { key: 'time', read: () => dayNight.getState().hours, write: hours => dayNight.setTimeOfDay(hours) },
-    { key: 'player', read: () => ({ x: head.x, z: head.z, yaw: rig.rotation.y }), write: placePlayer },
+    { key: 'player', ready: () => !saveStart.save?.buildings?.length || buildings.ready, read: () => ({ x: head.x, y: groundY + jumpHeight, z: head.z, yaw: rig.rotation.y }), write: placePlayer },
     // the models arrive a moment after the page: these wait for them
     { key: 'tools', ready: () => hands.tools.ready, read: () => hands.tools.snapshot(), write: data => hands.tools.restoreSnapshot(data) },
     { key: 'fires', ready: () => campfires.ready, read: () => campfires.list().map(fire => ({ x: fire.x, z: fire.z, lit: fire.lit })), write: fires => { for (const fire of fires) campfires.place(fire.x, fire.z, { lit: fire.lit }); } },
@@ -522,12 +563,12 @@ const autosave = createAutosave({
 });
 // TESTING (the owner, 5 Oct): a new game starts with a campfire in your pockets, so placing and lighting one needs no gathering first.
 // Reload the page for another (saving is off, so every load is a new game). Empty this list when the real start is wanted.
-const TESTING_START_KIT = Object.freeze({ campfire: 1, glider: 1 });
+const TESTING_START_KIT = Object.freeze({ campfire: 1, glider: 1, ...BUILDING_START_KIT });
 if (!saveStart.save) for (const [type, amount] of Object.entries(TESTING_START_KIT)) addInventoryItem(type, amount);
 autosave.update(); // what is already loaded goes back now, before the first frame
 // TESTING (the owner, 6 Oct): you always have the glider for now, a saved game included.
 if (getInventoryCount('glider') < 1) addInventoryItem('glider', 1);
-if (import.meta.env.DEV) window.__save = { autosave, store: saveStore, start: saveStart.note, world: { THREE, renderer, scene, camera, rig, campfires, tools: hands.tools, backpack, mining, dayNight } }; // dev only: for the save's browser test
+if (import.meta.env.DEV) window.__save = { autosave, store: saveStore, start: saveStart.note, world: { THREE, renderer, scene, camera, rig, campfires, tools: hands.tools, backpack, mining, dayNight, buildings, naturalGroundAt, placePlayer } }; // dev only: for browser checks
 document.addEventListener('visibilitychange', () => { if (document.hidden) autosave.flush(); });
 window.addEventListener('pagehide', () => autosave.flush());
 
@@ -594,6 +635,8 @@ document.addEventListener('pointerlockchange', () => {
 window.addEventListener('keydown', e => {
   if (e.code === 'KeyT' && !e.repeat && playing && !renderer.xr.isPresenting) { toggleTurbo(); return; }
   if (placement.isActive() && e.code === 'Enter' && !e.repeat && playing && !renderer.xr.isPresenting) { e.preventDefault(); placement.confirm(); return; }
+  if (placement.isActive() && e.code === 'KeyR' && !e.repeat && playing && !renderer.xr.isPresenting) { e.preventDefault(); placement.rotate(); return; }
+  if (e.code === 'KeyF' && !e.repeat && playing && !renderer.xr.isPresenting && !survivorMenu.isOpen() && !placement.isActive() && useDesktopDoor()) { e.preventDefault(); return; }
   if (playing && !renderer.xr.isPresenting && (e.code === 'KeyY' || (e.code === 'Escape' && survivorMenu.isOpen()))) {
     e.preventDefault(); if (!e.repeat) survivorMenu.toggle(); return;
   }
@@ -630,6 +673,7 @@ let tap = null;
 canvas.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') tap = { id: e.pointerId, x: e.clientX, y: e.clientY, time: performance.now() }; });
 canvas.addEventListener('pointerup', e => {
   if (tap && tap.id === e.pointerId && placement.isActive() && performance.now() - tap.time < 350 && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 14) placement.confirm();
+  else if (tap && tap.id === e.pointerId && playing && !survivorMenu.isOpen() && performance.now() - tap.time < 350 && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 14) useDesktopDoor();
   if (tap && tap.id === e.pointerId) tap = null;
 });
 for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(event, e => {
@@ -758,11 +802,14 @@ function readInput() {
 function frame(time) {
   const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0;
   lastTime = time;
+  playerFeetY = groundY + jumpHeight;
   autosave.update(); // first, so what a save puts back (where you stand, the tools) is in place before anything reads it
   dayNight.update(dt);
   skyEnvironment.update(dt);
   glowFruit.update(dt);
   campfires.update(dt, renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
+  buildings.update(dt);
+  rotateBuild.hidden = !touchDevice || renderer.xr.isPresenting || !placement.isActive() || placement.type === 'campfire';
   if (devCamp && campfires.ready) {
     // The flattest spot within a few metres of the spawn point, so the ring sits level.
     let cx = SPAWN.x + 4, cz = SPAWN.z - 4, flattest = Infinity;
@@ -786,6 +833,17 @@ function frame(time) {
   // Resource storage compares controller and headset WORLD positions. Refresh
   // the XR camera first; its raw pose at frame start is reference-space local.
   hands.update(dt);
+  for (const state of hands.states) {
+    const pressed = Boolean(state.inputSource?.gamepad?.buttons?.[0]?.pressed);
+    if (pressed && !doorTriggerDown.get(state) && playing && renderer.xr.isPresenting && !placement.isActive() && !survivorMenu.isOpen() && state.controller.visible) {
+      state.controller.updateWorldMatrix(true, false);
+      doorOrigin.setFromMatrixPosition(state.controller.matrixWorld);
+      doorRotation.extractRotation(state.controller.matrixWorld);
+      doorDirection.set(0, 0, -1).applyMatrix4(doorRotation);
+      if (buildings.toggleDoor(doorOrigin, doorDirection)) pulseHaptics(state, 0.2, 45);
+    }
+    doorTriggerDown.set(state, pressed);
+  }
   archery.updateDrawPose(); // Keep the nock at the fingers after their animation.
   placement.update(dt);
   if (import.meta.env.DEV && devThrows && devThrows()) devThrows = null;
@@ -974,7 +1032,9 @@ function frame(time) {
       target.multiplyScalar((sprinting ? FAST_SPEED : WALK_SPEED) * carrySpeedMultiplier * (turboActive ? TURBO.multiplier : 1));
       velocity.lerp(target, 1 - Math.exp(-dt * (target.lengthSq() ? 18 : 28)));
       const dx = velocity.x * dt, dz = velocity.z * dt;
-      const nextX = clamp(head.x + dx, WALK.minX, WALK.maxX), nextZ = clamp(head.z + dz, WALK.minZ, WALK.maxZ);
+      const desiredX = clamp(head.x + dx, WALK.minX, WALK.maxX), desiredZ = clamp(head.z + dz, WALK.minZ, WALK.maxZ);
+      const builtMove = buildings.move(head.x, head.z, desiredX, desiredZ, groundY + jumpHeight, Math.max(0.6, head.y - (groundY + jumpHeight)));
+      const nextX = builtMove.x, nextZ = builtMove.z;
       const movedX = nextX - head.x, movedZ = nextZ - head.z;
       rig.position.x += movedX; rig.position.z += movedZ;
       head.x = nextX; head.z = nextZ;
@@ -987,7 +1047,7 @@ function frame(time) {
 
       // Smooth the terrain-following base separately from seated height, crouch and jump height.
       if (onIsland && skyIsland.groundHeight(head.x, head.z) === null) onIsland = false; // walked off the edge: the desert's ground is 250 m down
-      const ground = groundAt(head.x, head.z);
+      const ground = groundAt(head.x, head.z, Math.max(groundY + jumpHeight, builtMove.y));
       const falling = stepFall(fall, groundY, ground, dt); // the ground dropped away (the island's edge, a cliff): fall, then land
       if (falling === null) groundY += (ground - groundY) * (1 - Math.exp(-dt * 24));
       else groundY = falling;
@@ -1018,6 +1078,7 @@ function frame(time) {
     }
   }
   if (time - lodTime > 100) { terrain.update(head.x, head.z, velocity.length()); skyScenery.update(head.x, head.z, head.y); farPickups.update(head.x, head.z); lodTime = time; }
+  playerFeetY = groundY + jumpHeight;
   materials.water.uniforms.uTime.value = time * 0.001;
   renderer.render(scene, camera);
   if (import.meta.env.DEV && time - telemetryTime > 1000) {

@@ -27,6 +27,7 @@ const goodSave = () => ({
     ],
   },
   fires: [{ x: 100.5, z: -20, lit: true }],
+  buildings: [],
   pack: { status: 'ground', x: 319, z: -292, yaw: 0.5 },
   mining: { version: 1, waiting: { 'rock-1': 30 } },
 });
