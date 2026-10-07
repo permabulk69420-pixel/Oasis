@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createTools } from '../src/tools.js';
-import { createBowKind, BOW } from '../src/bow.js';
+import { createBowKind, BOW, BOW_HELD_ROTATION } from '../src/bow.js';
 import { createArchery, ARCHERY, arrowSpeed } from '../src/archery.js';
 import { createBackpack } from '../src/backpack.js';
 import { setPackWorn } from '../src/inventory.js';
@@ -35,8 +35,8 @@ function fixture(t, { side = 'left', targets = [], blockers = [], heightAt = () 
   const renderer = { xr: { isPresenting: true, getCamera: () => camera } };
   const states = ['left', 'right'].map(handedness => {
     const grip = new THREE.Group(), objectGrip = new THREE.Group();
-    // The real socket's bar points down when the fist is upright. Mimic that frame.
-    objectGrip.rotation.x = Math.PI; grip.add(objectGrip); rig.add(grip);
+    // Hold the bow upright and aim down world -Z, using its current socket frame.
+    objectGrip.quaternion.copy(BOW_HELD_ROTATION).invert(); grip.add(objectGrip); rig.add(grip);
     return { handedness, grip, objectGrip, inputSource: { gamepad: { buttons: [{ pressed: false }, { pressed: false }] } } };
   });
   const kind = createBowKind(); kind.spawns = [{ x: 0, z: -0.8 }];
