@@ -786,6 +786,7 @@ function frame(time) {
   // Resource storage compares controller and headset WORLD positions. Refresh
   // the XR camera first; its raw pose at frame start is reference-space local.
   hands.update(dt);
+  archery.updateDrawPose(); // Keep the nock at the fingers after their animation.
   placement.update(dt);
   if (import.meta.env.DEV && devThrows && devThrows()) devThrows = null;
   backpack.update(dt); // after the hands, so a tool or stone in reach is grabbed first
