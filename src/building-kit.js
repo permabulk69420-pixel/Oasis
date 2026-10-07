@@ -1,5 +1,5 @@
 // Dimensions and origins belong to the existing Blender kit, in metres (+Y up, north -Z).
-export const BUILDING = Object.freeze({ grid: 3, wallHeight: 3, snapRange: 1.8, maxPieces: 256, perType: 128, stepHeight: 0.32, playerRadius: 0.23 });
+export const BUILDING = Object.freeze({ grid: 3, wallHeight: 3, foundationHeight: 0.6, foundationDepth: 1, foundationClearance: 0.25, snapRange: 1.8, maxPieces: 256, perType: 128, stepHeight: 0.32, playerRadius: 0.23 });
 
 const piece = (name, description, ingredients) => Object.freeze({ name, description, ingredients: Object.freeze(ingredients) });
 export const BUILDING_PIECES = Object.freeze({
@@ -9,7 +9,7 @@ export const BUILDING_PIECES = Object.freeze({
   wall_door: piece('Doorway', 'A wall with a door opening. Snap to a floor edge, then fit a door into it.', { wood: 3, fibre: 2 }),
   wall_window: piece('Window wall', 'A timber wall with a barred window. Snap to a foundation or floor edge.', { wood: 3, fibre: 2 }),
   door: piece('Door', 'Fit into a doorway. Point and pull the trigger to open or close it; desktop: F.', { wood: 2, fibre: 2 }),
-  roof: piece('Roof', 'A sloping timber roof. Snap onto a wall top; opposite slopes meet at the ridge.', { wood: 3, fibre: 3 }),
+  roof: piece('Roof', 'A flat timber roof. Snap onto wall tops or alongside another roof panel.', { wood: 3, fibre: 3 }),
   stairs: piece('Stairs', 'Timber stairs between storeys. Snap the bottom or top to a floor edge; rotate to choose the direction.', { wood: 4, fibre: 2 }),
   pillar: piece('Pillar', 'A timber support. Snap to floor corners or stack on another pillar.', { wood: 2, fibre: 1 }),
 });
@@ -33,7 +33,9 @@ export function foundationSite(x, z, yaw, heightAt) {
     if (!Number.isFinite(h)) return { low: 0, high: 0, y: 0, ok: false };
     low = Math.min(low, h); high = Math.max(high, h);
   }
-  return { low, high, y: high + 0.12, ok: high - low <= 0.85 };
+  // The kit origin is the deck: its metre of stone extends downwards. Keep the
+  // stone visible, with the remaining depth buried so slopes cannot leave it floating.
+  return { low, high, y: high + BUILDING.foundationHeight, ok: high - low <= BUILDING.foundationDepth - BUILDING.foundationHeight + 1e-6 };
 }
 
 // Keep the complete pose, including storey height and the hinge's current angle. Old saves have no building part.
