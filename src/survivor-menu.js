@@ -192,6 +192,13 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
       ctx.fillStyle = '#e5603b'; ctx.strokeStyle = '#9b3a22';
       ctx.beginPath(); ctx.moveTo(3, 2); ctx.quadraticCurveTo(15, 9, 16, 26); ctx.quadraticCurveTo(5, 20, 3, 10); ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(0, 5, 3.2, 0, Math.PI * 2); ctx.fill();
+    } else if (type === 'bow') {
+      ctx.strokeStyle = '#b48a5c'; ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.moveTo(-12, -42); ctx.bezierCurveTo(40, -24, 40, 24, -12, 42); ctx.stroke();
+      ctx.strokeStyle = '#e8dcc0'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-12, -42); ctx.lineTo(-12, 42); ctx.stroke();
+      ctx.strokeStyle = C.accent; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(-28, 0); ctx.lineTo(42, 0); ctx.lineTo(33, -6); ctx.moveTo(42, 0); ctx.lineTo(33, 6); ctx.stroke();
     } else if (type === 'pickaxe') {
       // a haft leaning right with a dark curved stone pick across the top: a long point one way, a short flat edge the other, cream lashing
       ctx.rotate(0.35);
