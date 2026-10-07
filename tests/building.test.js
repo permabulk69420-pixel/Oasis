@@ -87,6 +87,40 @@ test('upper floors and stair tops meet exactly, through every rotation', () => {
   }
 });
 
+
+test('flat roof panels offer all four neighbouring edges and reject flipped overlapping panels', () => {
+  const roof = part('roof', 0, 3.6, 0);
+  const neighbours = buildingCandidates('roof', [roof]);
+  assert.equal(neighbours.length, 4);
+  const centres = neighbours.map(p => buildingPoint(p, 0, 0, -1.5));
+  for (const [x, z] of [[-3, -1.5], [3, -1.5], [0, 1.5], [0, -4.5]]) {
+    assert.ok(centres.some(p => Math.abs(p.x - x) < 1e-6 && Math.abs(p.z - z) < 1e-6), `missing roof tile at ${x}, ${z}`);
+  }
+  assert.equal(buildingOccupied(part('roof', 0, 3.6, -3, Math.PI, 2), [roof]), true);
+  assert.equal(neighbours.every(candidate => !buildingOccupied(candidate, [roof])), true);
+});
+
+test('staircases can meet interior wall tops on either side', () => {
+  const wall = part('wall', 0, 0.6, -1.5, Math.PI);
+  const sites = buildingCandidates('stairs', [wall]);
+  assert.equal(sites.length, 2);
+  for (const site of sites) {
+    const top = buildingPoint(site, 0, 3, -3);
+    near(top.x, wall.x); near(top.y, wall.y + 3); near(top.z, wall.z);
+    assert.ok(site.aim && site.aimBase);
+  }
+});
+
+test('aiming at the open outside roof edge finds a free roof snap', async () => {
+  const world = await fixture();
+  world.place(part('roof', 0, 3.6, 0), { restore: true });
+  const origin = new THREE.Vector3(0, 4.5, 7);
+  const direction = new THREE.Vector3(0, 3.6, 1.5).sub(origin).normalize();
+  const snap = world.aimSite('roof', { origin, direction, head: origin, ground: { x: 0, z: 1.5 } });
+  near(snap.x, 0); near(snap.z, 3); near(snap.y, 3.6);
+  assert.equal(world.canPlace(snap).ok, true);
+});
+
 test('flat roofs join edge to edge and remain level through every rotation', () => {
   for (const yaw of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
     const roof = part('roof', 4, 3.12, 6, yaw);
