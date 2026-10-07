@@ -1,0 +1,1349 @@
+{
+  "files": [
+    {
+      "file": "foundation.glb",
+      "triangles": 1264,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          -1.5,
+          -1.0
+        ],
+        [
+          1.5,
+          1.5,
+          0.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        1.0,
+        3.0
+      ],
+      "nodes": [
+        "foundation_mesh",
+        "foundation_root",
+        "snap_e",
+        "snap_n",
+        "snap_s",
+        "snap_top",
+        "snap_w"
+      ],
+      "materials": [
+        "Oasis_Stone",
+        "Oasis_Wood_Dark",
+        "Oasis_Cord",
+        "Oasis_Fibre",
+        "Oasis_Wood_Light"
+      ],
+      "embedded_textures": 0,
+      "bytes": 139032,
+      "status": "PASS",
+      "snap_positions_blender_m": {
+        "snap_n": [
+          0.0,
+          1.5,
+          0.0
+        ],
+        "snap_s": [
+          0.0,
+          -1.5,
+          0.0
+        ],
+        "snap_e": [
+          1.5,
+          0.0,
+          0.0
+        ],
+        "snap_w": [
+          -1.5,
+          -0.0,
+          0.0
+        ],
+        "snap_top": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "metric_uv_max_error_m": 3.61e-07,
+      "ao_uv_overlap_check": "PASS (512px positive-area coverage)",
+      "snap_local_axis": "glTF +Y outward"
+    },
+    {
+      "file": "foundation_lod1.glb",
+      "triangles": 336,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          -1.5,
+          -1.0
+        ],
+        [
+          1.5,
+          1.5,
+          0.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        1.0,
+        3.0
+      ],
+      "nodes": [
+        "foundation_mesh",
+        "foundation_root",
+        "snap_e",
+        "snap_n",
+        "snap_s",
+        "snap_top",
+        "snap_w"
+      ],
+      "materials": [
+        "Oasis_Stone",
+        "Oasis_Wood_Dark",
+        "Oasis_Fibre",
+        "Oasis_Wood_Light"
+      ],
+      "embedded_textures": 0,
+      "bytes": 38956,
+      "status": "PASS",
+      "snap_positions_blender_m": {
+        "snap_n": [
+          0.0,
+          1.5,
+          0.0
+        ],
+        "snap_s": [
+          0.0,
+          -1.5,
+          0.0
+        ],
+        "snap_e": [
+          1.5,
+          0.0,
+          0.0
+        ],
+        "snap_w": [
+          -1.5,
+          -0.0,
+          0.0
+        ],
+        "snap_top": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "metric_uv_max_error_m": 2.92e-07,
+      "ao_uv_overlap_check": "PASS (512px positive-area coverage)",
+      "snap_local_axis": "glTF +Y outward",
+      "lod_fraction": 0.266
+    },
+    {
+      "file": "foundation_collider.glb",
+      "triangles": 12,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          -1.5,
+          -1.0
+        ],
+        [
+          1.5,
+          1.5,
+          0.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        1.0,
+        3.0
+      ],
+      "nodes": [
+        "foundation_collider",
+        "foundation_root"
+      ],
+      "materials": [
+        "Oasis_Stone"
+      ],
+      "embedded_textures": 0,
+      "bytes": 2112,
+      "status": "PASS",
+      "snap_positions_blender_m": {}
+    },
+    {
+      "file": "floor.glb",
+      "triangles": 568,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          -1.5,
+          -0.20000000298023224
+        ],
+        [
+          1.5,
+          1.5,
+          0.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        0.2,
+        3.0
+      ],
+      "nodes": [
+        "floor_mesh",
+        "floor_root",
+        "snap_e",
+        "snap_n",
+        "snap_s",
+        "snap_top",
+        "snap_w"
+      ],
+      "materials": [
+        "Oasis_Wood_Dark",
+        "Oasis_Cord",
+        "Oasis_Fibre",
+        "Oasis_Wood_Light"
+      ],
+      "embedded_textures": 0,
+      "bytes": 50856,
+      "status": "PASS",
+      "snap_positions_blender_m": {
+        "snap_n": [
+          0.0,
+          1.5,
+          0.0
+        ],
+        "snap_s": [
+          0.0,
+          -1.5,
+          0.0
+        ],
+        "snap_e": [
+          1.5,
+          0.0,
+          0.0
+        ],
+        "snap_w": [
+          -1.5,
+          -0.0,
+          0.0
+        ],
+        "snap_top": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "metric_uv_max_error_m": 1.78e-07,
+      "ao_uv_overlap_check": "PASS (512px positive-area coverage)",
+      "snap_local_axis": "glTF +Y outward"
+    },
+    {
+      "file": "floor_lod1.glb",
+      "triangles": 156,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          -1.5,
+          -0.20000000298023224
+        ],
+        [
+          1.5,
+          1.5,
+          0.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        0.2,
+        3.0
+      ],
+      "nodes": [
+        "floor_mesh",
+        "floor_root",
+        "snap_e",
+        "snap_n",
+        "snap_s",
+        "snap_top",
+        "snap_w"
+      ],
+      "materials": [
+        "Oasis_Wood_Dark",
+        "Oasis_Fibre",
+        "Oasis_Wood_Light"
+      ],
+      "embedded_textures": 0,
+      "bytes": 17572,
+      "status": "PASS",
+      "snap_positions_blender_m": {
+        "snap_n": [
+          0.0,
+          1.5,
+          0.0
+        ],
+        "snap_s": [
+          0.0,
+          -1.5,
+          0.0
+        ],
+        "snap_e": [
+          1.5,
+          0.0,
+          0.0
+        ],
+        "snap_w": [
+          -1.5,
+          -0.0,
+          0.0
+        ],
+        "snap_top": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "metric_uv_max_error_m": 1.15e-07,
+      "ao_uv_overlap_check": "PASS (512px positive-area coverage)",
+      "snap_local_axis": "glTF +Y outward",
+      "lod_fraction": 0.275
+    },
+    {
+      "file": "floor_collider.glb",
+      "triangles": 12,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          -1.5,
+          -0.20000000298023224
+        ],
+        [
+          1.5,
+          1.5,
+          0.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        0.2,
+        3.0
+      ],
+      "nodes": [
+        "floor_collider",
+        "floor_root"
+      ],
+      "materials": [
+        "Oasis_Stone"
+      ],
+      "embedded_textures": 0,
+      "bytes": 2112,
+      "status": "PASS",
+      "snap_positions_blender_m": {}
+    },
+    {
+      "file": "wall.glb",
+      "triangles": 540,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          -0.10000000149011612,
+          0.0
+        ],
+        [
+          1.5,
+          0.10000000149011612,
+          3.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        3.0,
+        0.2
+      ],
+      "nodes": [
+        "snap_bottom",
+        "snap_left",
+        "snap_right",
+        "snap_top",
+        "wall_mesh",
+        "wall_root"
+      ],
+      "materials": [
+        "Oasis_Wood_Dark",
+        "Oasis_Cord",
+        "Oasis_Wood_Light",
+        "Oasis_Fibre"
+      ],
+      "embedded_textures": 0,
+      "bytes": 47716,
+      "status": "PASS",
+      "snap_positions_blender_m": {
+        "snap_bottom": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "snap_top": [
+          0.0,
+          0.0,
+          3.0
+        ],
+        "snap_left": [
+          -1.5,
+          -0.0,
+          1.5
+        ],
+        "snap_right": [
+          1.5,
+          0.0,
+          1.5
+        ]
+      },
+      "metric_uv_max_error_m": 1.81e-07,
+      "ao_uv_overlap_check": "PASS (512px positive-area coverage)",
+      "snap_local_axis": "glTF +Y outward"
+    },
+    {
+      "file": "wall_lod1.glb",
+      "triangles": 144,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          -0.10000000149011612,
+          0.0
+        ],
+        [
+          1.5,
+          0.10000000149011612,
+          3.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        3.0,
+        0.2
+      ],
+      "nodes": [
+        "snap_bottom",
+        "snap_left",
+        "snap_right",
+        "snap_top",
+        "wall_mesh",
+        "wall_root"
+      ],
+      "materials": [
+        "Oasis_Wood_Dark",
+        "Oasis_Wood_Light",
+        "Oasis_Fibre",
+        "Oasis_Cord"
+      ],
+      "embedded_textures": 0,
+      "bytes": 17496,
+      "status": "PASS",
+      "snap_positions_blender_m": {
+        "snap_bottom": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "snap_top": [
+          0.0,
+          0.0,
+          3.0
+        ],
+        "snap_left": [
+          -1.5,
+          -0.0,
+          1.5
+        ],
+        "snap_right": [
+          1.5,
+          0.0,
+          1.5
+        ]
+      },
+      "metric_uv_max_error_m": 1.81e-07,
+      "ao_uv_overlap_check": "PASS (512px positive-area coverage)",
+      "snap_local_axis": "glTF +Y outward",
+      "lod_fraction": 0.267
+    },
+    {
+      "file": "wall_collider.glb",
+      "triangles": 12,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          -0.10000000149011612,
+          0.0
+        ],
+        [
+          1.5,
+          0.10000000149011612,
+          3.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        3.0,
+        0.2
+      ],
+      "nodes": [
+        "wall_collider",
+        "wall_root"
+      ],
+      "materials": [
+        "Oasis_Stone"
+      ],
+      "embedded_textures": 0,
+      "bytes": 2120,
+      "status": "PASS",
+      "snap_positions_blender_m": {}
+    },
+    {
+      "file": "wall_door.glb",
+      "triangles": 916,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          -0.10000000149011612,
+          0.0
+        ],
+        [
+          1.5,
+          0.10000000149011612,
+          3.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        3.0,
+        0.2
+      ],
+      "nodes": [
+        "snap_bottom",
+        "snap_left",
+        "snap_right",
+        "snap_top",
+        "wall_door_mesh",
+        "wall_door_root"
+      ],
+      "materials": [
+        "Oasis_Wood_Dark",
+        "Oasis_Cord",
+        "Oasis_Wood_Light",
+        "Oasis_Fibre"
+      ],
+      "embedded_textures": 0,
+      "bytes": 78800,
+      "status": "PASS",
+      "snap_positions_blender_m": {
+        "snap_bottom": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "snap_top": [
+          0.0,
+          0.0,
+          3.0
+        ],
+        "snap_left": [
+          -1.5,
+          -0.0,
+          1.5
+        ],
+        "snap_right": [
+          1.5,
+          0.0,
+          1.5
+        ]
+      },
+      "metric_uv_max_error_m": 1.81e-07,
+      "ao_uv_overlap_check": "PASS (512px positive-area coverage)",
+      "snap_local_axis": "glTF +Y outward"
+    },
+    {
+      "file": "wall_door_lod1.glb",
+      "triangles": 264,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          -0.10000000149011612,
+          0.0
+        ],
+        [
+          1.5,
+          0.10000000149011612,
+          3.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        3.0,
+        0.2
+      ],
+      "nodes": [
+        "snap_bottom",
+        "snap_left",
+        "snap_right",
+        "snap_top",
+        "wall_door_mesh",
+        "wall_door_root"
+      ],
+      "materials": [
+        "Oasis_Wood_Dark",
+        "Oasis_Wood_Light",
+        "Oasis_Fibre",
+        "Oasis_Cord"
+      ],
+      "embedded_textures": 0,
+      "bytes": 27852,
+      "status": "PASS",
+      "snap_positions_blender_m": {
+        "snap_bottom": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "snap_top": [
+          0.0,
+          0.0,
+          3.0
+        ],
+        "snap_left": [
+          -1.5,
+          -0.0,
+          1.5
+        ],
+        "snap_right": [
+          1.5,
+          0.0,
+          1.5
+        ]
+      },
+      "metric_uv_max_error_m": 1.81e-07,
+      "ao_uv_overlap_check": "PASS (512px positive-area coverage)",
+      "snap_local_axis": "glTF +Y outward",
+      "lod_fraction": 0.288
+    },
+    {
+      "file": "wall_door_collider.glb",
+      "triangles": 36,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          -0.10000000149011612,
+          0.0
+        ],
+        [
+          1.5,
+          0.10000000149011612,
+          3.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        3.0,
+        0.2
+      ],
+      "nodes": [
+        "wall_door_collider",
+        "wall_door_root"
+      ],
+      "materials": [
+        "Oasis_Stone"
+      ],
+      "embedded_textures": 0,
+      "bytes": 3824,
+      "status": "PASS",
+      "snap_positions_blender_m": {}
+    },
+    {
+      "file": "door.glb",
+      "triangles": 346,
+      "bounds_blender_m": [
+        [
+          0.0,
+          -0.05000000074505806,
+          0.0
+        ],
+        [
+          1.2000000476837158,
+          0.05000000074505806,
+          2.200000047683716
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        1.2,
+        2.2,
+        0.1
+      ],
+      "nodes": [
+        "door_mesh",
+        "door_root"
+      ],
+      "materials": [
+        "Oasis_Fibre",
+        "Oasis_Wood_Dark",
+        "Oasis_Wood_Light",
+        "Oasis_Cord",
+        "Oasis_Bone",
+        "Oasis_Crystal_Glow"
+      ],
+      "embedded_textures": 0,
+      "bytes": 34644,
+      "status": "PASS",
+      "snap_positions_blender_m": {},
+      "metric_uv_max_error_m": 1.7149e-05,
+      "ao_uv_overlap_check": "PASS (512px positive-area coverage)",
+      "snap_local_axis": "glTF +Y outward"
+    },
+    {
+      "file": "door_lod1.glb",
+      "triangles": 102,
+      "bounds_blender_m": [
+        [
+          0.0,
+          -0.05000000074505806,
+          0.0
+        ],
+        [
+          1.2000000476837158,
+          0.04999999701976776,
+          2.200000047683716
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        1.2,
+        2.2,
+        0.1
+      ],
+      "nodes": [
+        "door_mesh",
+        "door_root"
+      ],
+      "materials": [
+        "Oasis_Fibre",
+        "Oasis_Wood_Dark",
+        "Oasis_Wood_Light",
+        "Oasis_Bone",
+        "Oasis_Crystal_Glow"
+      ],
+      "embedded_textures": 0,
+      "bytes": 14788,
+      "status": "PASS",
+      "snap_positions_blender_m": {},
+      "metric_uv_max_error_m": 1.47e-07,
+      "ao_uv_overlap_check": "PASS (512px positive-area coverage)",
+      "snap_local_axis": "glTF +Y outward",
+      "lod_fraction": 0.295
+    },
+    {
+      "file": "door_collider.glb",
+      "triangles": 12,
+      "bounds_blender_m": [
+        [
+          0.0,
+          -0.05000000074505806,
+          0.0
+        ],
+        [
+          1.2000000476837158,
+          0.05000000074505806,
+          2.200000047683716
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        1.2,
+        2.2,
+        0.1
+      ],
+      "nodes": [
+        "door_collider",
+        "door_root"
+      ],
+      "materials": [
+        "Oasis_Stone"
+      ],
+      "embedded_textures": 0,
+      "bytes": 2148,
+      "status": "PASS",
+      "snap_positions_blender_m": {}
+    },
+    {
+      "file": "wall_window.glb",
+      "triangles": 1038,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          -0.10000000149011612,
+          0.0
+        ],
+        [
+          1.5,
+          0.10000000149011612,
+          3.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        3.0,
+        0.2
+      ],
+      "nodes": [
+        "snap_bottom",
+        "snap_left",
+        "snap_right",
+        "snap_top",
+        "wall_window_mesh",
+        "wall_window_root"
+      ],
+      "materials": [
+        "Oasis_Wood_Dark",
+        "Oasis_Cord",
+        "Oasis_Wood_Light",
+        "Oasis_Fibre",
+        "Oasis_Bone",
+        "Oasis_Crystal_Glow"
+      ],
+      "embedded_textures": 0,
+      "bytes": 91160,
+      "status": "PASS",
+      "snap_positions_blender_m": {
+        "snap_bottom": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "snap_top": [
+          0.0,
+          0.0,
+          3.0
+        ],
+        "snap_left": [
+          -1.5,
+          -0.0,
+          1.5
+        ],
+        "snap_right": [
+          1.5,
+          0.0,
+          1.5
+        ]
+      },
+      "metric_uv_max_error_m": 1.81e-07,
+      "ao_uv_overlap_check": "PASS (512px positive-area coverage)",
+      "snap_local_axis": "glTF +Y outward"
+    },
+    {
+      "file": "wall_window_lod1.glb",
+      "triangles": 294,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          -0.10000000149011612,
+          0.0
+        ],
+        [
+          1.5,
+          0.10000000149011612,
+          3.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        3.0,
+        0.2
+      ],
+      "nodes": [
+        "snap_bottom",
+        "snap_left",
+        "snap_right",
+        "snap_top",
+        "wall_window_mesh",
+        "wall_window_root"
+      ],
+      "materials": [
+        "Oasis_Wood_Dark",
+        "Oasis_Wood_Light",
+        "Oasis_Fibre",
+        "Oasis_Cord",
+        "Oasis_Bone",
+        "Oasis_Crystal_Glow"
+      ],
+      "embedded_textures": 0,
+      "bytes": 32944,
+      "status": "PASS",
+      "snap_positions_blender_m": {
+        "snap_bottom": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "snap_top": [
+          0.0,
+          0.0,
+          3.0
+        ],
+        "snap_left": [
+          -1.5,
+          -0.0,
+          1.5
+        ],
+        "snap_right": [
+          1.5,
+          0.0,
+          1.5
+        ]
+      },
+      "metric_uv_max_error_m": 1.81e-07,
+      "ao_uv_overlap_check": "PASS (512px positive-area coverage)",
+      "snap_local_axis": "glTF +Y outward",
+      "lod_fraction": 0.283
+    },
+    {
+      "file": "wall_window_collider.glb",
+      "triangles": 48,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          -0.10000000149011612,
+          0.0
+        ],
+        [
+          1.5,
+          0.10000000149011612,
+          3.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        3.0,
+        0.2
+      ],
+      "nodes": [
+        "wall_window_collider",
+        "wall_window_root"
+      ],
+      "materials": [
+        "Oasis_Stone"
+      ],
+      "embedded_textures": 0,
+      "bytes": 4676,
+      "status": "PASS",
+      "snap_positions_blender_m": {}
+    },
+    {
+      "file": "stairs.glb",
+      "triangles": 888,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          0.0,
+          0.0
+        ],
+        [
+          1.5,
+          3.0,
+          3.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        3.0,
+        3.0
+      ],
+      "nodes": [
+        "snap_bottom",
+        "snap_top",
+        "stairs_mesh",
+        "stairs_root"
+      ],
+      "materials": [
+        "Oasis_Wood_Light",
+        "Oasis_Cord",
+        "Oasis_Fibre",
+        "Oasis_Wood_Dark"
+      ],
+      "embedded_textures": 0,
+      "bytes": 81260,
+      "status": "PASS",
+      "snap_positions_blender_m": {
+        "snap_bottom": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "snap_top": [
+          0.0,
+          3.0,
+          3.0
+        ]
+      },
+      "metric_uv_max_error_m": 2.59e-07,
+      "ao_uv_overlap_check": "PASS (512px positive-area coverage)",
+      "snap_local_axis": "glTF +Y outward"
+    },
+    {
+      "file": "stairs_lod1.glb",
+      "triangles": 264,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          0.0,
+          0.0
+        ],
+        [
+          1.5,
+          3.0,
+          3.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        3.0,
+        3.0
+      ],
+      "nodes": [
+        "snap_bottom",
+        "snap_top",
+        "stairs_mesh",
+        "stairs_root"
+      ],
+      "materials": [
+        "Oasis_Wood_Light",
+        "Oasis_Cord",
+        "Oasis_Wood_Dark"
+      ],
+      "embedded_textures": 0,
+      "bytes": 26560,
+      "status": "PASS",
+      "snap_positions_blender_m": {
+        "snap_bottom": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "snap_top": [
+          0.0,
+          3.0,
+          3.0
+        ]
+      },
+      "metric_uv_max_error_m": 2.59e-07,
+      "ao_uv_overlap_check": "PASS (512px positive-area coverage)",
+      "snap_local_axis": "glTF +Y outward",
+      "lod_fraction": 0.297
+    },
+    {
+      "file": "stairs_collider.glb",
+      "triangles": 100,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          0.0,
+          0.0
+        ],
+        [
+          1.5,
+          3.0,
+          3.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        3.0,
+        3.0
+      ],
+      "nodes": [
+        "stairs_collider",
+        "stairs_root"
+      ],
+      "materials": [
+        "Oasis_Stone"
+      ],
+      "embedded_textures": 0,
+      "bytes": 6856,
+      "status": "PASS",
+      "snap_positions_blender_m": {}
+    },
+    {
+      "file": "roof.glb",
+      "triangles": 912,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          0.0,
+          -0.1599999964237213
+        ],
+        [
+          1.5,
+          3.0,
+          1.7320507764816284
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        1.892051,
+        3.0
+      ],
+      "nodes": [
+        "roof_mesh",
+        "roof_root",
+        "snap_high",
+        "snap_low"
+      ],
+      "materials": [
+        "Oasis_Fibre",
+        "Oasis_Cord",
+        "Oasis_Wood_Dark",
+        "Oasis_Wood_Light"
+      ],
+      "embedded_textures": 0,
+      "bytes": 83360,
+      "status": "PASS",
+      "snap_positions_blender_m": {
+        "snap_low": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "snap_high": [
+          0.0,
+          3.0,
+          1.7320507764816284
+        ]
+      },
+      "metric_uv_max_error_m": 4.14e-07,
+      "ao_uv_overlap_check": "PASS (512px positive-area coverage)",
+      "snap_local_axis": "glTF +Y outward"
+    },
+    {
+      "file": "roof_lod1.glb",
+      "triangles": 252,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          0.0,
+          -0.1599999964237213
+        ],
+        [
+          1.5,
+          3.0,
+          1.7320507764816284
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        1.892051,
+        3.0
+      ],
+      "nodes": [
+        "roof_mesh",
+        "roof_root",
+        "snap_high",
+        "snap_low"
+      ],
+      "materials": [
+        "Oasis_Fibre",
+        "Oasis_Cord",
+        "Oasis_Wood_Dark",
+        "Oasis_Wood_Light"
+      ],
+      "embedded_textures": 0,
+      "bytes": 26592,
+      "status": "PASS",
+      "snap_positions_blender_m": {
+        "snap_low": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "snap_high": [
+          0.0,
+          3.0,
+          1.7320507764816284
+        ]
+      },
+      "metric_uv_max_error_m": 4.14e-07,
+      "ao_uv_overlap_check": "PASS (512px positive-area coverage)",
+      "snap_local_axis": "glTF +Y outward",
+      "lod_fraction": 0.276
+    },
+    {
+      "file": "roof_collider.glb",
+      "triangles": 12,
+      "bounds_blender_m": [
+        [
+          -1.5,
+          0.0,
+          -0.1599999964237213
+        ],
+        [
+          1.5,
+          3.0,
+          1.7320507764816284
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        3.0,
+        1.892051,
+        3.0
+      ],
+      "nodes": [
+        "roof_collider",
+        "roof_root"
+      ],
+      "materials": [
+        "Oasis_Stone"
+      ],
+      "embedded_textures": 0,
+      "bytes": 2120,
+      "status": "PASS",
+      "snap_positions_blender_m": {}
+    },
+    {
+      "file": "pillar.glb",
+      "triangles": 404,
+      "bounds_blender_m": [
+        [
+          -0.15000000596046448,
+          -0.15000000596046448,
+          0.0
+        ],
+        [
+          0.15000000596046448,
+          0.15000000596046448,
+          3.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        0.3,
+        3.0,
+        0.3
+      ],
+      "nodes": [
+        "pillar_mesh",
+        "pillar_root",
+        "snap_bottom",
+        "snap_top"
+      ],
+      "materials": [
+        "Oasis_Wood_Dark",
+        "Oasis_Wood_Light",
+        "Oasis_Cord",
+        "Oasis_Bone"
+      ],
+      "embedded_textures": 0,
+      "bytes": 38172,
+      "status": "PASS",
+      "snap_positions_blender_m": {
+        "snap_bottom": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "snap_top": [
+          0.0,
+          0.0,
+          3.0
+        ]
+      },
+      "metric_uv_max_error_m": 8.9e-08,
+      "ao_uv_overlap_check": "PASS (512px positive-area coverage)",
+      "snap_local_axis": "glTF +Y outward"
+    },
+    {
+      "file": "pillar_lod1.glb",
+      "triangles": 120,
+      "bounds_blender_m": [
+        [
+          -0.15000000596046448,
+          -0.15000000596046448,
+          0.0
+        ],
+        [
+          0.15000000596046448,
+          0.15000000596046448,
+          3.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        0.3,
+        3.0,
+        0.3
+      ],
+      "nodes": [
+        "pillar_mesh",
+        "pillar_root",
+        "snap_bottom",
+        "snap_top"
+      ],
+      "materials": [
+        "Oasis_Wood_Dark",
+        "Oasis_Cord",
+        "Oasis_Bone"
+      ],
+      "embedded_textures": 0,
+      "bytes": 14216,
+      "status": "PASS",
+      "snap_positions_blender_m": {
+        "snap_bottom": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "snap_top": [
+          0.0,
+          0.0,
+          3.0
+        ]
+      },
+      "metric_uv_max_error_m": 7.1e-08,
+      "ao_uv_overlap_check": "PASS (512px positive-area coverage)",
+      "snap_local_axis": "glTF +Y outward",
+      "lod_fraction": 0.297
+    },
+    {
+      "file": "pillar_collider.glb",
+      "triangles": 12,
+      "bounds_blender_m": [
+        [
+          -0.15000000596046448,
+          -0.15000000596046448,
+          0.0
+        ],
+        [
+          0.15000000596046448,
+          0.15000000596046448,
+          3.0
+        ]
+      ],
+      "size_gltf_xyz_m": [
+        0.3,
+        3.0,
+        0.3
+      ],
+      "nodes": [
+        "pillar_collider",
+        "pillar_root"
+      ],
+      "materials": [
+        "Oasis_Stone"
+      ],
+      "embedded_textures": 0,
+      "bytes": 2160,
+      "status": "PASS",
+      "snap_positions_blender_m": {}
+    }
+  ],
+  "joins": {
+    "adjacent_foundations_gap_or_overlap_m": 0.0,
+    "wall_bottom_to_foundation_top_m": 0.0,
+    "stairs_top_to_floor_top_m": 0.0,
+    "roof_ridge_gap_m": 0.0,
+    "status": "PASS"
+  }
+}
