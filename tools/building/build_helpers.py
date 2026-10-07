@@ -96,7 +96,7 @@ for n in ['foundation','floor']:
 for n in ['wall','wall_door','wall_window']:
     SNAP[n]=[('snap_bottom',(0,0,0),(0,0,-1)),('snap_top',(0,0,3),(0,0,1)),('snap_left',(-1.5,0,1.5),(-1,0,0)),('snap_right',(1.5,0,1.5),(1,0,0))]
 SNAP['stairs']=[('snap_bottom',(0,0,0),(0,-1,0)),('snap_top',(0,3,3),(0,1,0))]
-SNAP['roof']=[('snap_low',(0,0,0),(0,-1,0)),('snap_high',(0,3,3*math.tan(math.pi/6)),(0,1,0))]
+SNAP['roof']=[('snap_low',(0,0,0),(0,-1,0)),('snap_high',(0,3,0),(0,1,0))]
 SNAP['pillar']=[('snap_bottom',(0,0,0),(0,0,-1)),('snap_top',(0,0,3),(0,0,1))]
 
 def panel(x0,x1,z0,z1,lod):
@@ -181,7 +181,7 @@ def build_visual(name,lod):
             vs=[(x-.10,.005,0),(x+.10,.005,0),(x-.10,3,2.75),(x+.10,3,2.75),(x-.10,3,2.89),(x+.10,3,2.89),(x-.10,.005,.14),(x+.10,.005,.14)]
             mesh('stair_stringer',vs,[(0,1,3,2),(6,4,5,7),(0,2,4,6),(1,7,5,3),(2,3,5,4),(0,6,7,1)],W,(0,1,1))
     elif name=='roof':
-        slope=math.tan(math.pi/6)
+        slope=0
         box('roof_underlay',(0,1.5,-.067),(3,3,.066),F,(0,1,0))
         # Thatch and binding strips partition the top surface: no coplanar overlays.
         count=3 if lod else 10;bands=[-.95,.95] if lod else [-1.2,0,1.2]
@@ -194,10 +194,10 @@ def build_visual(name,lod):
                 x0,x1=cuts[k:k+2];box('roof_binding' if k%2 else 'thatch_course',((x0+x1)/2,y,-.017),(x1-x0,3/count,.034),C if k%2 else F,(0,1,0))
         for x in [-1.40,0,1.40]:box('roof_rafter',(x,1.5,-.13),(.20,2.74,.06),W,(0,1,0))
         for y in [.065,2.935]:box('roof_edge_rail',(0,y,-.13),(3,.13,.06),L,(1,0,0))
-        # Shear sets the exact 3m plan and 30-degree top, without protruding rails.
+        # Flat 3m roof panel, without protruding rails.
         for ob in PARTS:
             for v in ob.data.vertices:v.co.z+=v.co.y*slope
-        # Recompute metric UVs on the sloped faces after shaping.
+        # Recompute metric UVs on the flat faces after shaping.
         for ob in PARTS:metric_reproject(ob,(0,1,slope))
     elif name=='pillar':
         beam('pillar_core',(0,0,0),(0,0,3),.27,.27,W,lod)
@@ -245,7 +245,6 @@ def build_collider(name):
     elif name=='pillar':box('pillar',(0,0,1.5),(.3,.3,3),S)
     elif name=='roof':
         ob=box('roof',(0,1.5,-.08),(3,3,.16),S)
-        for v in ob.data.vertices:v.co.z+=v.co.y*math.tan(math.pi/6)
     elif name=='stairs':
         # One closed stepped prism: the collider matches every tread exactly.
         profile=[(0,0),(3,0),(3,3)]
