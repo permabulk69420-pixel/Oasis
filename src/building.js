@@ -28,7 +28,15 @@ export function buildingCandidates(type, parts, turn = 0) {
   const candidates = [];
   const add = (part, x, y, z, yaw, pick = null) => {
     const p = buildingPoint(part, x, y, z);
-    candidates.push({ type, ...p, yaw: quarterTurn(part.yaw + yaw), support: part.id, snapped: true, pick: pick ? buildingPoint(part, ...pick) : p });
+    const site = { type, ...p, yaw: quarterTurn(part.yaw + yaw), support: part.id, snapped: true, pick: pick ? buildingPoint(part, ...pick) : p };
+    // Roof origins sit on an edge; stair origins sit at the bottom step. Aim at
+    // their usable footprint as well as at the joining snap point.
+    if (type === 'roof') site.aim = buildingPoint(site, 0, 0, -1.5);
+    if (type === 'stairs') {
+      site.aim = buildingPoint(site, 0, 1.5, -1.5);
+      site.aimBase = buildingPoint(site, 0, 0, -1.5);
+    }
+    candidates.push(site);
   };
   for (const part of parts) {
     if (type === 'foundation' && part.type === 'foundation') {
@@ -53,15 +61,22 @@ export function buildingCandidates(type, parts, turn = 0) {
       if (part.type === 'floor') for (const edge of EDGES) add(part, edge.x, 0, edge.z, edge.yaw + flip);
       if (part.type === 'roof') {
         for (const side of [-1, 1]) add(part, side * 3, 0, 0, 0, [side * 1.5, 0, -1.5]);
+        // Roof origins are on their leading edges: the open front needs a
+        // separate neighbour, just as the other three edges do.
+        add(part, 0, 0, 3, 0, [0, 0, 0]);
         const yaw = Math.PI + flip;
         add(part, Math.sin(yaw) * 3, 0, -3 + Math.cos(yaw) * 3, yaw, [0, 0, -3]);
       }
-    } else if (type === 'stairs' && isTile(part.type)) {
-      for (const edge of EDGES) {
+    } else if (type === 'stairs') {
+      if (isTile(part.type)) for (const edge of EDGES) {
         add(part, edge.x, 0, edge.z, edge.yaw + turn);
         // The top can join an existing upper floor, with the staircase extending outside it.
         const yaw = edge.yaw + turn;
         add(part, edge.x + Math.sin(yaw) * 3, -3, edge.z + Math.cos(yaw) * 3, yaw, [edge.x, 0, edge.z]);
+      }
+      // Interior wall tops are valid stair landings, on either side of a wall.
+      if (isWall(part.type)) for (const side of [-1, 1]) {
+        add(part, 0, 0, side * 3, side === 1 ? 0 : Math.PI, [0, 3, 0]);
       }
     } else if (type === 'pillar') {
       if (isTile(part.type)) for (const x of [-1.5, 1.5]) for (const z of [-1.5, 1.5]) add(part, x, 0, z, turn);
@@ -80,7 +95,11 @@ export function buildingOccupied(site, parts) {
       const p = localPoint(part, site.x, site.z), a = angleDistance(site.yaw, part.yaw);
       if (Math.min(a, Math.abs(Math.PI - a)) < 0.1 && Math.abs(p.x) < 2.98 && Math.abs(p.z) < 0.15) return true;
       if (Math.abs(a - Math.PI / 2) < 0.1 && Math.abs(p.x) < 1.4 && Math.abs(p.z) < 1.4) return true;
-    } else if (site.type === part.type && samePosition(site, part) && (site.type !== 'roof' || angleDistance(site.yaw, part.yaw) < 0.1)) return true;
+    } else if (site.type === 'roof' && part.type === 'roof' && Math.abs(site.y - part.y) < 0.15) {
+      // Two roofs can cover the same square from opposite edges/orientations.
+      const a = buildingPoint(site, 0, 0, -1.5), b = buildingPoint(part, 0, 0, -1.5);
+      if (Math.abs(a.x - b.x) < 2.98 && Math.abs(a.z - b.z) < 2.98) return true;
+    } else if (site.type === part.type && samePosition(site, part)) return true;
   }
   return false;
 }
@@ -221,22 +240,39 @@ export function createBuildings({ scene, heightAt, getFires = () => [], isWater 
     hitPoint.set(ground.x, heightAt(ground.x, ground.z), ground.z);
     if (hit && hit.point.distanceTo(head) <= 8) hitPoint.copy(hit.point);
     const candidates = buildingCandidates(type, parts, turn);
-    let best = null, score = Infinity;
-    for (const site of candidates) {
-      if (Math.hypot(site.x - head.x, site.z - head.z) > 8 || Math.abs(site.y - head.y) > 6) continue;
-      pick.set(site.pick.x, site.pick.y, site.pick.z);
+    let best = null, score = Infinity, blocked = null, blockedScore = Infinity;
+    const aimDistance = target => {
+      pick.set(target.x, target.y, target.z);
       let d = hitPoint.distanceTo(pick);
-      // Aim at the future surface, too. Ground beneath a low foundation lies farther along the
-      // ray; using only that hit can wrongly select the occupied tile behind the intended snap.
+      // Compare both direct ray proximity and the intersection with the
+      // candidate's horizontal plane. Do not snap far behind a hit surface.
+      const along = (pick.x - origin.x) * direction.x + (pick.y - origin.y) * direction.y + (pick.z - origin.z) * direction.z;
+      if (along >= 0 && along <= 10 && (!hit || along <= hit.distance + BUILDING.snapRange)) {
+        projected.copy(origin).addScaledVector(direction, along);
+        d = Math.min(d, projected.distanceTo(pick));
+      }
       const t = Math.abs(direction.y) > 1e-4 ? (pick.y - origin.y) / direction.y : -1;
       if (t >= 0 && t <= 10 && (!hit || t <= hit.distance + BUILDING.snapRange)) {
         projected.copy(origin).addScaledVector(direction, t);
-        d = projected.distanceTo(pick);
+        d = Math.min(d, projected.distanceTo(pick));
       }
-      const tie = Math.hypot(site.x - head.x, site.z - head.z) * 0.002;
-      if (d + tie < score) { best = site; score = d + tie; }
+      return d;
+    };
+    for (const site of candidates) {
+      if (Math.hypot(site.x - head.x, site.z - head.z) > 8 || Math.abs(site.y - head.y) > 6) continue;
+      let d = aimDistance(site.pick);
+      if (site.aim) d = Math.min(d, aimDistance(site.aim));
+      if (site.aimBase) d = Math.min(d, aimDistance(site.aimBase));
+      const value = d + Math.hypot(site.x - head.x, site.z - head.z) * 0.002;
+      if (value > BUILDING.snapRange) continue;
+      // An occupied socket must not mask a neighbouring free socket.
+      const occupied = buildingOccupied(site, parts) || (type === 'stairs' && site.y < heightAt(site.x, site.z) - 0.15);
+      if (occupied) {
+        if (value < blockedScore) { blocked = site; blockedScore = value; }
+      } else if (value < score) { best = site; score = value; }
     }
-    if (best && score <= BUILDING.snapRange) return best;
+    if (best) return best;
+    if (blocked) return blocked;
     const yaw = quarterTurn(Math.atan2(-direction.x, -direction.z)) + turn;
     const foundation = foundationSite(ground.x, ground.z, yaw, heightAt);
     return { type, x: ground.x, y: type === 'foundation' ? foundation.y : heightAt(ground.x, ground.z), z: ground.z, yaw, snapped: false, support: null };
