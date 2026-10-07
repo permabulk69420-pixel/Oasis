@@ -1,3 +1,5 @@
+import { BUILDING_PIECES } from './building-kit.js';
+
 const counts = new Map();
 
 // Abstract carry-weight units. Everything you carry is one shared pool; what changes is how much of it you can
@@ -24,6 +26,9 @@ const ITEM_WEIGHTS = Object.freeze({
   campfire: 25,
   glider: 15,
   bow: 8,
+  // The owner is testing buildings with a starter kit. Its pieces must not immobilise the player
+  // (the existing campfire and glider already fill the pockets). Balance their carry weight later.
+  ...Object.fromEntries(Object.keys(BUILDING_PIECES).map(type => [type, 0])),
 });
 
 export function addInventoryItem(type, amount = 1) {

@@ -9,6 +9,7 @@ import { statColour } from './watch.js';
 import { exposureGlow } from './glow.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { reflectMetal, gadgetReflection } from './gadget-env.js';
+import { isBuildingPiece } from './building-kit.js';
 
 // The watch menu (the owner, 6 Oct: the Ark-style menu was ugly; it now comes out of the survival watch; then: make it look part of the watch). It is
 // the watch, scaled up: the screen is drawn like the watch's (dark teal, a faint instrument grid, green for what is chosen and the button to press,
@@ -163,7 +164,36 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
       ctx.strokeStyle = '#6e4f33'; ctx.lineWidth = width + 3; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
       ctx.strokeStyle = '#b48a5c'; ctx.lineWidth = width; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
     };
-    if (type === 'stick') {
+    if (isBuildingPiece(type)) {
+      ctx.strokeStyle = '#c3a274'; ctx.lineWidth = 3;
+      if (type === 'foundation' || type === 'floor') {
+        const depth = type === 'foundation' ? 20 : 7;
+        ctx.fillStyle = '#756b61'; ctx.beginPath(); ctx.moveTo(-36, 7); ctx.lineTo(0, 25); ctx.lineTo(36, 7); ctx.lineTo(36, 7 + depth); ctx.lineTo(0, 25 + depth); ctx.lineTo(-36, 7 + depth); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#78604b'; ctx.beginPath(); ctx.moveTo(-36, 7); ctx.lineTo(0, -13); ctx.lineTo(36, 7); ctx.lineTo(0, 25); ctx.closePath(); ctx.fill(); ctx.stroke();
+        for (const n of [-18, 0, 18]) { ctx.beginPath(); ctx.moveTo(n - 18, 7 + n / 2); ctx.lineTo(n + 18, -13 + n / 2); ctx.stroke(); }
+      } else if (type === 'roof') {
+        ctx.fillStyle = '#806b50'; ctx.beginPath(); ctx.moveTo(-36, 17); ctx.lineTo(-13, -26); ctx.lineTo(36, -11); ctx.lineTo(13, 32); ctx.closePath(); ctx.fill(); ctx.stroke();
+        for (const n of [0, 12, 24, 36]) { ctx.beginPath(); ctx.moveTo(-30 + n, 15 + n / 3); ctx.lineTo(-8 + n, -23 + n / 3); ctx.stroke(); }
+      } else if (type === 'stairs') {
+        ctx.fillStyle = '#78604b'; ctx.beginPath(); ctx.moveTo(-34, 34); ctx.lineTo(-34, 21);
+        for (let n = 0; n < 6; n++) { ctx.lineTo(-34 + (n + 1) * 11, 21 - n * 11); ctx.lineTo(-34 + (n + 1) * 11, 10 - n * 11); }
+        ctx.lineTo(32, 34); ctx.closePath(); ctx.fill(); ctx.stroke();
+      } else if (type === 'pillar') {
+        ctx.fillStyle = '#78604b'; ctx.fillRect(-9, -37, 18, 74); ctx.strokeRect(-9, -37, 18, 74);
+        ctx.strokeStyle = '#c3a274'; ctx.lineWidth = 6; for (const y of [-29, 0, 29]) { ctx.beginPath(); ctx.moveTo(-11, y); ctx.lineTo(11, y); ctx.stroke(); }
+      } else {
+        const width = type === 'door' ? 22 : 34;
+        ctx.fillStyle = '#78604b'; ctx.fillRect(-width, -35, width * 2, 70); ctx.strokeRect(-width, -35, width * 2, 70);
+        ctx.strokeStyle = '#af8b61'; ctx.lineWidth = 2;
+        for (let x = -width + 10; x < width; x += 10) { ctx.beginPath(); ctx.moveTo(x, -32); ctx.lineTo(x, 32); ctx.stroke(); }
+        if (type === 'wall_door' || type === 'wall_window') {
+          const y = type === 'wall_door' ? -17 : -12, h = type === 'wall_door' ? 52 : 25;
+          ctx.fillStyle = '#123034'; ctx.fillRect(-13, y, 26, h); ctx.strokeStyle = C.accent; ctx.strokeRect(-13, y, 26, h);
+          if (type === 'wall_window') for (const x of [-6, 6]) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + h); ctx.stroke(); }
+        }
+        if (type === 'door') { ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(13, 3, 3, 0, Math.PI * 2); ctx.fill(); }
+      }
+    } else if (type === 'stick') {
       handle(-26, 24, 24, -24, 7);
       ctx.strokeStyle = '#b48a5c'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(4, -4); ctx.lineTo(-6, -24); ctx.stroke();
     } else if (type === 'axe') {
