@@ -12,6 +12,8 @@
 // This file knows nothing about the game's parts. It holds the format, the checks and the storage; src/main.js says what to read and
 // write. Every number in a save is checked on the way in, so a damaged save can lose a part of the game but cannot break it.
 
+import { cleanBuildings } from './building-kit.js';
+
 export const SAVE = Object.freeze({
   key: 'oasis-save',
   keepKey: 'oasis-save-kept', // the last save that was set aside (a fresh start, a crash, or one that could not be read)
@@ -71,6 +73,7 @@ function cleanPlayer(data) {
     x: clamp(data.x, -SAVE.limit, SAVE.limit),
     z: clamp(data.z, -SAVE.limit, SAVE.limit),
     yaw: isNumber(data.yaw) ? Math.atan2(Math.sin(data.yaw), Math.cos(data.yaw)) : 0,
+    ...(isNumber(data.y) ? { y: clamp(data.y, -100, 1000) } : {}),
   };
 }
 
@@ -147,7 +150,7 @@ function cleanMining(data) {
 
 const CLEANERS = Object.freeze({
   inventory: cleanInventory, survival: cleanSurvival, time: cleanTime, player: cleanPlayer,
-  tools: cleanTools, fires: cleanFires, pack: cleanPack, mining: cleanMining,
+  tools: cleanTools, fires: cleanFires, buildings: cleanBuildings, pack: cleanPack, mining: cleanMining,
 });
 export const SAVE_PARTS = Object.freeze(Object.keys(CLEANERS));
 

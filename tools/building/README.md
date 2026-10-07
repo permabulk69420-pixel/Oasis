@@ -4,7 +4,12 @@ Made for Oasis by a separate model (OpenAI Codex) from the owner's brief, 7 Oct,
 (each writes its main, `_lod1` and `_collider` GLBs; they share `build_helpers.py`), `build_all.py` for all nine, checked and rendered by
 `check_and_render.py`. Their report is `report.md`, the measurements `verification.json`, the renders `preview_overview.png` and
 `preview_assembly.jpg` (a 2 × 2 hut). The scripts write next to themselves; the game's copies are in `public/models/building/`.
-Not used in the game yet.
+Used by `src/building.js`: the watch menu's Pack tab places these pieces through the existing placement ghost; Craft has their recipes.
+Foundations establish a 3 m local grid. Floors, walls, doorway/window walls, pillars, stairs and roofs snap to adjoining pieces; doors fit doorway hinges and swing open.
+Static pieces share materials and use instanced draws. The `_collider` models serve aim rays, with matching simple volumes for movement and arrow collision.
+New games have a small building test kit; its carry weight is disabled during this test phase. Saving remains opt in (`?save=1`) and includes building poses and door state.
+VR: aim with the hand that chose Place, trigger to confirm, B (right) / X (left) to rotate, Y to cancel. Desktop: click / Enter, R rotates; touch has a Rotate button.
+Point and trigger a door to open/close it (desktop F, touch a quick tap while aiming). The material colours below remain the existing kit's flat colours.
 
 ```sh
 blender -b --python-exit-code 1 -P tools/building/build_all.py
