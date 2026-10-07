@@ -514,7 +514,9 @@ function flightGround(x, z, y) {
   return buildings.surfaceAt(x, z, y, base);
 }
 const archery = createArchery({ scene, rig, states: hands.states, tools: hands.tools, renderer,
-  heightAt: flightGround, targets: [duneStinger], blockers: [mining, buildings], onError: message => console.warn(message) });
+  heightAt: flightGround, targets: [duneStinger], blockers: [mining, buildings],
+  getExposure: () => renderer.toneMappingExposure, sunDirection: materials.sand.uniforms.uSun.value,
+  onError: message => console.warn(message) });
 hands.tools.setBeforeInput(archery.update);
 if (import.meta.env.DEV) window.__archery = archery;
 let gliderKeyDown = false, flight = null;
@@ -845,6 +847,7 @@ function frame(time) {
     doorTriggerDown.set(state, pressed);
   }
   archery.updateDrawPose(); // Keep the nock at the fingers after their animation.
+  archery.updateGlow(); // Glow follows the final crystal-tip pose, including flight.
   placement.update(dt);
   if (import.meta.env.DEV && devThrows && devThrows()) devThrows = null;
   backpack.update(dt); // after the hands, so a tool or stone in reach is grabbed first
