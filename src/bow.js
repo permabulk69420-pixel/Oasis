@@ -9,10 +9,10 @@ export const BOW = Object.freeze({
   minDraw: 0.08,
 });
 export const BOW_GRIP = Object.freeze({ meshes: ['bow_mesh'], axis: [0, 1, 0], point: [0, 0, 0], halfLength: 0.052 });
-export const ARROW_HELD_ROTATION = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI);
 // Turn the bow half a turn around its handle, putting the string toward the archer.
-export const BOW_HELD_ROTATION = ARROW_HELD_ROTATION.clone()
+export const BOW_HELD_ROTATION = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI)
   .multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI));
+export const ARROW_HELD_ROTATION = BOW_HELD_ROTATION.clone();
 
 function socket(root, name) {
   const marker = root.getObjectByName(name);
