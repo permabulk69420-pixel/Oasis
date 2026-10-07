@@ -4,6 +4,8 @@ import { BOW, ARROW_HELD_ROTATION, setBowDraw } from './bow.js';
 import { attachHeldObject, setGripSurface } from './grip-contact.js';
 import { pulseHaptics } from './haptics.js';
 import { skyLight } from './sky-environment.js';
+import { exposureGlow } from './glow.js';
+import { createHaloInstances } from './glow-halos.js';
 
 const BASE = import.meta.env?.BASE_URL ?? '/';
 const FORWARD = new THREE.Vector3(0, 0, -1);
@@ -13,6 +15,7 @@ export const ARCHERY = Object.freeze({
   drawSideLimit: 0.25, restClearance: 0.03,
   pickupRadius: 0.25, hitRadius: 0.045, sweepStep: 0.06,
   maxArrows: 32, lifetime: 120, gravity: 9.81,
+  glow: Object.freeze({ day: 1.5, night: 1.0, radius: 0.15, haloIntensity: 0.8 }),
 });
 export function arrowSpeed(draw) {
   return 8 + 44 * THREE.MathUtils.clamp(draw / BOW.fullDraw, 0, 1);
@@ -25,11 +28,20 @@ export function arrowDamage(draw) {
 // to the string, pull, release. A nocked arrow reserves the drawing hand so pickups,
 // the backpack, the glider and climbing cannot also claim it. Unlimited test ammo;
 // old loose arrows are bounded and expire, with geometry/textures shared by all shots.
-export function createArchery({ scene, rig, states, tools, renderer, heightAt = () => 0, targets = [], blockers = [], onError = console.warn }) {
+export function createArchery({ scene, rig, states, tools, renderer, heightAt = () => 0, targets = [], blockers = [],
+  getExposure = () => 1, sunDirection = null, onError = console.warn }) {
   const loader = new GLTFLoader();
   let template = null, quiver = null;
   const arrows = [];
   const gripDown = new Map();
+  // Single instanced billboard draw for every cyan arrow tip, in world space.
+  const halos = createHaloInstances(ARCHERY.maxArrows, {
+    name: 'Arrow crystal tip halos', color: 0x25d0ff, maxIntensity: ARCHERY.glow.haloIntensity,
+  });
+  scene.add(halos.mesh);
+  const glowMaterials = new Set();
+  const glowTip = new THREE.Vector3();
+  let previousHaloCount = 0;
   const mount = new THREE.Group();
   mount.name = 'Bow quiver';
   mount.visible = false;
@@ -46,6 +58,14 @@ export function createArchery({ scene, rig, states, tools, renderer, heightAt = 
   loader.load(ARCHERY.arrowUrl, gltf => {
     template = gltf.scene;
     skyLight(template);
+    // The PBR atlas already has emission baked onto the cyan head only.
+    // Cloned arrows share this material, so one intensity update covers all.
+    template.traverse(node => {
+      if (!node.isMesh) return;
+      for (const material of Array.isArray(node.material) ? node.material : [node.material]) {
+        if (material?.emissiveMap) glowMaterials.add(material);
+      }
+    });
     template.userData.gripProfile = 'thin';
     setGripSurface(template, { meshes: ['arrow_mesh'], axis: [0, 0, -1], point: [0, 0, -0.04], halfLength: 0.035 });
   }, undefined, error => onError(`[Oasis bow] Arrow failed to load: ${error?.message || error}`));
@@ -87,6 +107,7 @@ export function createArchery({ scene, rig, states, tools, renderer, heightAt = 
       draw: 0, tick: 0, age: 0, damage: 0,
       velocity: new THREE.Vector3(), nock: new THREE.Vector3() };
     arrow.root.name = 'Arrow';
+    arrow.tipMarker = arrow.root.getObjectByName('tip');
     arrows.push(arrow);
     return arrow;
   }
@@ -281,6 +302,26 @@ export function createArchery({ scene, rig, states, tools, renderer, heightAt = 
     }
   }
 
+  // Called after final hand posing so glow remains fixed to the visible tip.
+  function updateGlow() {
+    const intensity = exposureGlow(getExposure(), ARCHERY.glow);
+    for (const material of glowMaterials) material.emissiveIntensity = intensity;
+    const night = 1 - THREE.MathUtils.smoothstep(sunDirection?.y ?? 1, -0.05, 0.25);
+    if (night > 0.01) {
+      for (let i = 0; i < arrows.length; i++) {
+        const arrow = arrows[i];
+        arrow.root.updateWorldMatrix(true, true);
+        if (arrow.tipMarker) arrow.tipMarker.getWorldPosition(glowTip);
+        else arrow.root.localToWorld(glowTip.set(0, 0, -ARCHERY.arrowLength));
+        halos.setInstance(i, glowTip, ARCHERY.glow.radius);
+      }
+      // Compact slots and clear arrows returned to quiver or removed on expiry.
+      for (let i = arrows.length; i < previousHaloCount; i++) halos.setInstance(i, glowTip, 0);
+      previousHaloCount = arrows.length;
+    }
+    halos.setNight(arrows.length ? night : 0);
+  }
+
   function update(dt = 0) {
     const presenting = Boolean(renderer?.xr?.isPresenting);
     const visible = !renderer?.xr?.getSession?.() || renderer.xr.getSession().visibilityState === 'visible';
@@ -349,8 +390,8 @@ export function createArchery({ scene, rig, states, tools, renderer, heightAt = 
     for (const state of states) gripDown.set(state, true);
   }
   return {
-    update, updateDrawPose, cancel, get ready() { return Boolean(template && quiver); },
+    update, updateDrawPose, updateGlow, cancel, get ready() { return Boolean(template && quiver); },
     list: () => ({ shots, hits, quiver: mount.visible, arrows: arrows.map(arrow => ({ phase: arrow.phase, draw: arrow.draw })) }),
-    debug: { arrows, mount, getShoulder: out => out.copy(shoulder) },
+    debug: { arrows, mount, halos, glowMaterials, getShoulder: out => out.copy(shoulder) },
   };
 }

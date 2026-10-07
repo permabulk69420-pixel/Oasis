@@ -6,6 +6,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createTools } from '../src/tools.js';
 import { createBowKind, BOW, BOW_HELD_ROTATION } from '../src/bow.js';
 import { createArchery, ARCHERY, arrowSpeed } from '../src/archery.js';
+import { exposureGlow } from '../src/glow.js';
 import { createBackpack } from '../src/backpack.js';
 import { setPackWorn } from '../src/inventory.js';
 import { getHeldGripPose } from '../src/grip-poses.js';
@@ -23,13 +24,20 @@ function model(url) {
   } else if (url.endsWith('/quiver.glb')) {
     const opening = new THREE.Group(); opening.name = 'opening'; opening.position.set(0, 0.12, -0.058); root.add(opening);
   } else {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.015, 0.75));
-    mesh.name = url.includes('backpack') ? 'CarryHandle' : 'arrow_mesh'; root.add(mesh);
+    const isArrow = !url.includes('backpack');
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.015, 0.75),
+      isArrow ? new THREE.MeshStandardMaterial({ emissive: 0x25d0ff, emissiveMap: new THREE.Texture(), emissiveIntensity: 1.8 })
+        : new THREE.MeshStandardMaterial());
+    mesh.name = isArrow ? 'arrow_mesh' : 'CarryHandle'; root.add(mesh);
+    if (isArrow) {
+      const tip = new THREE.Group(); tip.name = 'tip'; tip.position.z = -ARCHERY.arrowLength; root.add(tip);
+    }
   }
   return root;
 }
 
-function fixture(t, { side = 'left', targets = [], blockers = [], heightAt = () => 0 } = {}) {
+function fixture(t, { side = 'left', targets = [], blockers = [], heightAt = () => 0,
+  exposure = 1, sunHeight = 1 } = {}) {
   t.mock.method(GLTFLoader.prototype, 'load', (url, done) => done({ scene: model(url) }));
   const scene = new THREE.Scene(), rig = new THREE.Group(); scene.add(rig);
   const camera = new THREE.PerspectiveCamera(); camera.position.set(0, 1.7, 0); rig.add(camera); scene.updateMatrixWorld(true);
@@ -42,9 +50,11 @@ function fixture(t, { side = 'left', targets = [], blockers = [], heightAt = () 
   });
   const kind = createBowKind(); kind.spawns = [{ x: 0, z: -0.8 }];
   const tools = createTools({ scene, rig, states, renderer, camera, kinds: [kind], heightAt });
-  const archery = createArchery({ scene, rig, states, tools, renderer, heightAt, targets, blockers });
+  const sunDirection = new THREE.Vector3(0, sunHeight, 0);
+  const archery = createArchery({ scene, rig, states, tools, renderer, heightAt, targets, blockers,
+    getExposure: () => exposure, sunDirection });
   tools.setBeforeInput(archery.update);
-  const tick = (dt = 1 / 90) => { rig.updateMatrixWorld(true); tools.update(dt); archery.updateDrawPose(); };
+  const tick = (dt = 1 / 90) => { rig.updateMatrixWorld(true); tools.update(dt); archery.updateDrawPose(); archery.updateGlow(); };
   const move = (state, point) => { state.grip.position.copy(point); tick(); };
   const squeeze = (state, pressed) => { state.inputSource.gamepad.buttons[1].pressed = pressed; tick(); };
   const bowHand = states.find(s => s.handedness === side), drawHand = states.find(s => s !== bowHand);
@@ -69,6 +79,55 @@ function fixture(t, { side = 'left', targets = [], blockers = [], heightAt = () 
   }
   return { scene, rig, renderer, camera, states, tools, archery, bow, bowHand, drawHand, tick, move, squeeze, takeArrow, load, draw };
 }
+
+
+test('cyan crystal arrowheads retain night emission and a halo at the true tip while drawn and flying', t => {
+  const f = fixture(t, { exposure: 0.04, sunHeight: -1 });
+  const { halos, glowMaterials } = f.archery.debug;
+  assert.equal(halos.count, ARCHERY.maxArrows);
+  assert.equal(halos.mesh.parent, f.scene);
+  assert.equal(halos.mesh.visible, false, 'empty bow has no visible halo');
+  const arrow = f.load(); f.tick();
+  assert.equal(halos.mesh.visible, true);
+  assert.equal(glowMaterials.size, 1, 'shared emissive atlas, not cloned materials');
+  for (const material of glowMaterials) {
+    assert.ok(Math.abs(material.emissiveIntensity - exposureGlow(0.04, ARCHERY.glow)) < 1e-6);
+  }
+  const matrix = new THREE.Matrix4(), position = new THREE.Vector3(), scale = new THREE.Vector3();
+  const rotation = new THREE.Quaternion();
+  const expectTip = () => {
+    halos.mesh.getMatrixAt(0, matrix);
+    matrix.decompose(position, rotation, scale);
+    const tip = arrow.tipMarker.getWorldPosition(new THREE.Vector3());
+    assert.ok(position.distanceTo(tip) < 1e-6, 'glow tracks the true world-space arrow tip');
+    assert.ok(Math.abs(scale.x - ARCHERY.glow.radius) < 1e-6);
+  };
+  expectTip();
+  f.draw(0.4, new THREE.Vector3(0.07, 0.02, 0)); expectTip();
+  f.squeeze(f.drawHand, false);
+  f.tick(0.04);
+  assert.equal(arrow.phase, 'flying'); expectTip();
+  f.rig.position.set(3, 1.7, -2); f.tick(0.01); expectTip();
+});
+
+test('daytime arrows remain emissive but do not render the night halo', t => {
+  const f = fixture(t, { sunHeight: 1 });
+  const arrow = f.takeArrow();
+  assert.equal(f.archery.debug.halos.mesh.visible, false);
+  f.squeeze(f.drawHand, false); f.tick(0.02);
+  assert.equal(arrow.phase, 'flying');
+  assert.equal(f.archery.debug.halos.mesh.visible, false);
+});
+
+test('returning an arrow to the quiver clears its cyan halo', t => {
+  const f = fixture(t, { sunHeight: -1 });
+  f.takeArrow();
+  assert.equal(f.archery.debug.halos.mesh.visible, true);
+  f.move(f.drawHand, f.archery.debug.getShoulder(new THREE.Vector3()));
+  f.squeeze(f.drawHand, false);
+  assert.equal(f.archery.debug.arrows.length, 0);
+  assert.equal(f.archery.debug.halos.mesh.visible, false);
+});
 
 test('nocking at the edge of reach leaves no snap offset and limits the string to the bow and arrow dimensions', t => {
   const f = fixture(t), arrow = f.takeArrow();
