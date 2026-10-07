@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { BOW, BOW_HELD_ROTATION, setBowDraw } from './bow.js';
+import { BOW, ARROW_HELD_ROTATION, setBowDraw } from './bow.js';
 import { attachHeldObject, setGripSurface } from './grip-contact.js';
 import { pulseHaptics } from './haptics.js';
 import { skyLight } from './sky-environment.js';
@@ -86,7 +86,7 @@ export function createArchery({ scene, rig, states, tools, renderer, heightAt = 
     return arrow;
   }
   function grab(arrow, state) {
-    if (!attachHeldObject(state, arrow.root, BOW_HELD_ROTATION)) return false;
+    if (!attachHeldObject(state, arrow.root, ARROW_HELD_ROTATION)) return false;
     arrow.phase = 'held'; arrow.heldBy = state; arrow.age = 0;
     pulseHaptics(state, 0.25, 30);
     return true;
