@@ -113,6 +113,7 @@ def main():
     scene.render.resolution_percentage = 100
     scene.render.image_settings.file_format = 'PNG'
     scene.render.filepath = str(OUT / "foundation_lod1_preview.png")
+    scene.world = bpy.data.worlds.new('Preview world')
     scene.world.color = (.15, .15, .15)
 
     # Reopenable Blender workspace, with the asset kept distinct from the render rig.
