@@ -12,6 +12,7 @@ import { WALK } from './zones.js';
 import { TURBO, createTurboChord } from './turbo.js';
 import { createMaterials, createWater } from './materials.js';
 import { createVRHands } from './hands.js';
+import { createHeadTorch } from './head-torch.js';
 import { createDayNightCycle } from './day-night.js';
 import { createSandFootsteps } from './footsteps.js';
 import { createGroundSticks } from './sticks.js';
@@ -146,6 +147,10 @@ function groundAt(x, z, feetY = playerFeetY ?? rig.position.y) {
   return buildings ? buildings.surfaceAt(x, z, feetY, base) : base;
 }
 scene.add(createWater(field, materials.water));
+const headTorch = createHeadTorch({
+  scene, states: hands.states, sand: materials.sand, water: materials.water,
+  getExposure: () => renderer.toneMappingExposure,
+});
 const sticksGroup = createGroundSticks({
   field,
   onError: (message) => console.warn(message)
@@ -1083,6 +1088,13 @@ function frame(time) {
   if (time - lodTime > 100) { terrain.update(head.x, head.z, velocity.length()); skyScenery.update(head.x, head.z, head.y); farPickups.update(head.x, head.z); lodTime = time; }
   playerFeetY = groundY + jumpHeight;
   materials.water.uniforms.uTime.value = time * 0.001;
+  rig.updateMatrixWorld(true);
+  if (renderer.xr.isPresenting) renderer.xr.updateCamera(camera);
+  headTorch.update(activeCamera, {
+    active: playing && (!renderer.xr.isPresenting || renderer.xr.getSession().visibilityState === 'visible'),
+    interactive: playing && renderer.xr.isPresenting && renderer.xr.getSession().visibilityState === 'visible' && !survivorMenu.isOpen(),
+    time,
+  });
   renderer.render(scene, camera);
   if (import.meta.env.DEV && time - telemetryTime > 1000) {
     canvas.dataset.position = JSON.stringify({ x: +head.x.toFixed(2), z: +head.z.toFixed(2), ground: +groundAt(head.x, head.z).toFixed(2), onIsland, yaw: +rig.rotation.y.toFixed(3) });
