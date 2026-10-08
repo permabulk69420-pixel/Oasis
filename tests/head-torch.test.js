@@ -86,3 +86,18 @@ test('ground/water share the live beam and exposure compensation; handheld torch
   f.away(); f.update(600); f.reach(); f.update(700);
   for (const material of f.materials) assert.equal(material.uniforms.uHeadTorchPower.value, 0);
 });
+
+test('head torch has a focused, long-range beam shared by terrain and water', () => {
+  const f = setup(); f.update(0); f.reach(); f.update(100);
+  const { light } = f.torch;
+  assert.ok(light.angle <= Math.PI / 12, 'the full beam should be no wider than 30 degrees');
+  assert.ok(light.distance >= 60, 'beam should extend well beyond the original 18 metres');
+  assert.ok(light.intensity >= 200, 'the longer beam needs enough light to reach distant surfaces');
+  assert.ok(light.penumbra <= 0.3, 'beam edge should stay relatively crisp');
+
+  const sharedCone = `smoothstep(${Math.cos(light.angle)}, ${Math.cos(light.angle * (1 - light.penumbra))},`;
+  for (const material of f.materials) {
+    assert.ok(material.fragmentShader.includes(sharedCone), 'custom shaders should match spotlight focus');
+    assert.ok(material.fragmentShader.includes(`d / ${light.distance.toFixed(1)}`), 'custom shaders should match spotlight range');
+  }
+});
