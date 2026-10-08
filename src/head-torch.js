@@ -10,8 +10,8 @@ import { TORCH_SHADER_MARKERS } from './night-fill.js';
 const BEAM = Object.freeze({ angle: Math.PI / 10, range: 120, power: 1.10, penumbra: 0.78 });
 const SPILL = Object.freeze({ angle: Math.PI * 52 / 180, range: 42, power: 0.25, penumbra: 0.88 });
 const DECAY = 0;
-// A deliberate tap near the upper headset, not a broad zone around the face.
-const CONTACT = 0.11, RELEASE = 0.22, COOLDOWN_MS = 400;
+// Only the contact radius is reduced; keep the original release threshold and tap rules.
+const CONTACT = 0.11, RELEASE = 0.33, COOLDOWN_MS = 400;
 
 // No mesh: a head-following beam, plus the same beam on the custom ground/water shaders.
 export function createHeadTorch({ scene, states, sand, water, getExposure = () => 1, startEnabled = false }) {
@@ -91,20 +91,13 @@ export function createHeadTorch({ scene, states, sand, water, getExposure = () =
         touching.set(state, true); // A resumed/reconnected hand must move away before tapping.
         continue;
       }
-      // Drawing/releasing a bowstring or handling an arrow/tool near the face
-      // must not toggle the head torch. Require the hand to leave the zone
-      // before a later, empty-handed tap can register.
-      if (state.inputSource.gamepad?.buttons?.[1]?.pressed || state.objectGrip?.children?.length) {
-        touching.set(state, true);
-        continue;
-      }
       state.grip.updateWorldMatrix(true, false);
       state.grip.getWorldPosition(hand);
       localHand.copy(hand).sub(head).applyQuaternion(inverseRotation);
       const distance = hand.distanceTo(light.position);
       if (distance >= RELEASE) touching.set(state, false);
       // Keep eating and reaching under the chin out of the head-tap zone.
-      else if (distance <= CONTACT && localHand.y >= 0.04 && !touching.get(state)) {
+      else if (distance <= CONTACT && localHand.y >= -0.06 && !touching.get(state)) {
         touching.set(state, true);
         if (time - lastTap >= COOLDOWN_MS) {
           enabled = !enabled;
