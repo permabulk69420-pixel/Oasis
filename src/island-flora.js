@@ -49,7 +49,7 @@ export const FLORA_RENDER = Object.freeze({
   // The tall growth (public/models/island/): the trunk wears a tiling bark photo (a second material on the same mesh), the leaves are cards of the canopy and fern atlases.
   treeFernA: { lod: STANDARD_LOD, draw: 330, double: true, map: 'fern', tint: true, bark: JUNGLE_BARK, sway: { name: 'island-treeFernA', top: 4.5, reach: 0.16, lean: 0.3, bend: 1.8, radial: 0.12, rate: 0.7, flutter: 0.014, shade: 0, push: 0 } },
   treeFernB: { lod: STANDARD_LOD, draw: 330, double: true, map: 'fern', tint: true, bark: JUNGLE_BARK, sway: { name: 'island-treeFernB', top: 5.6, reach: 0.18, lean: 0.3, bend: 1.8, radial: 0.12, rate: 0.65, flutter: 0.014, shade: 0, push: 0 } },
-  jungleA: { lod: [60, 150], draw: 645, double: true, solidLeaves: true, color: [0.13, 0.30, 0.075], tint: true, bark: ROUGH_WOOD_BARK, sway: { name: 'island-jungleA', top: 31.15, reach: 0.5, lean: 0.3, bend: 2.0, radial: 0, rate: 0.4, flutter: 0.05, shade: 0, push: 0 } },
+  jungleA: { lod: [60, 150], draw: 645, double: true, map: 'canopy', tint: true, bark: ROUGH_WOOD_BARK, sway: { name: 'island-jungleA', top: 30, reach: 0.5, lean: 0.3, bend: 2.0, radial: 0, rate: 0.4, flutter: 0.05, shade: 0, push: 0 } },
   jungleB: { lod: [60, 150], draw: 645, double: true, map: 'canopy', tint: true, bark: ROUGH_WOOD_BARK, sway: { name: 'island-jungleB', top: 36, reach: 0.55, lean: 0.3, bend: 2.0, radial: 0, rate: 0.36, flutter: 0.05, shade: 0, push: 0 } },
   jungleC: { lod: [60, 150], draw: 645, double: true, map: 'canopy', tint: true, bark: ROUGH_WOOD_BARK, sway: { name: 'island-jungleC', top: 25, reach: 0.45, lean: 0.3, bend: 2.0, radial: 0, rate: 0.45, flutter: 0.05, shade: 0, push: 0 } },
 });
@@ -137,8 +137,8 @@ function leafTexture(name) {
 }
 
 export function createFloraMaterial(name, render = {}) {
-  // Leaves are matte (Lambert); A's modeled blades use their own color instead of an alpha atlas.
-  const material = render.map || render.solidLeaves
+  // Painted leaf cards are matte (Lambert): a standard material's sheen caught the low warm sun at a glancing angle and turned green ferns tan.
+  const material = render.map
     ? new THREE.MeshLambertMaterial({
       name: `Island ${name}`, vertexColors: true, emissive: new THREE.Color(1, 1, 1), emissiveIntensity: 0, side: render.double ? THREE.DoubleSide : THREE.FrontSide,
     })
@@ -146,7 +146,6 @@ export function createFloraMaterial(name, render = {}) {
       name: `Island ${name}`, vertexColors: true, roughness: render.roughness ?? 0.88, metalness: 0,
       emissive: new THREE.Color(1, 1, 1), emissiveIntensity: 0, side: render.double ? THREE.DoubleSide : THREE.FrontSide,
     });
-  if (render.color) material.color.setRGB(...render.color);
   patchEmit(material);
   if (render.sway) addWindSway(material, render.sway);
   if (render.hang) patchHangSway(material, render.hang);
@@ -156,8 +155,8 @@ export function createFloraMaterial(name, render = {}) {
     // dusk and by day; the same scene with a cut-out is clean, so the cut-out it is. The cut-off sits a little under a half so far-off cards, whose mip levels average the
     // cut-outs toward a faint alpha, keep most of their leaf.)
     if (map) { material.map = map; material.alphaTest = LEAF_ALPHA_TEST; }
+    patchFoliage(material);
   }
-  if (render.map || render.solidLeaves) patchFoliage(material);
   return material;
 }
 
