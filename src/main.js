@@ -150,8 +150,6 @@ scene.add(createWater(field, materials.water));
 const headTorch = createHeadTorch({
   scene, states: hands.states, sand: materials.sand, water: materials.water,
   getExposure: () => renderer.toneMappingExposure,
-  // Browser screenshot fixture only; production and headset behaviour remain unchanged.
-  startEnabled: import.meta.env.DEV && new URLSearchParams(location.search).get('headlamp') === 'on',
 });
 const sticksGroup = createGroundSticks({
   field,
