@@ -2,12 +2,13 @@ import * as THREE from 'three';
 import { pulseHaptics } from './haptics.js';
 import { TORCH_SHADER_MARKERS } from './night-fill.js';
 
-const ANGLE = Math.PI / 5, RANGE = 18, POWER = 40;
+// A focused headlamp beam with useful distance for night exploration.
+const ANGLE = Math.PI / 18, RANGE = 80, POWER = 280, PENUMBRA = 0.22;
 const CONTACT = 0.23, RELEASE = 0.33, COOLDOWN_MS = 400;
 
 // No mesh: a head-following beam, plus the same beam on the custom ground/water shaders.
 export function createHeadTorch({ scene, states, sand, water, getExposure = () => 1 }) {
-  const light = new THREE.SpotLight(0xfff1da, 0, RANGE, ANGLE, 0.35, 2);
+  const light = new THREE.SpotLight(0xfff1da, 0, RANGE, ANGLE, PENUMBRA, 2);
   light.name = 'Head torch';
   light.castShadow = false;
   scene.add(light, light.target);
@@ -23,7 +24,7 @@ export function createHeadTorch({ scene, states, sand, water, getExposure = () =
     float headTorchBeam(vec3 point) {
       vec3 ray = point - uHeadTorchPosition;
       float d = length(ray);
-      float cone = smoothstep(${Math.cos(ANGLE)}, ${Math.cos(ANGLE * 0.65)},
+      float cone = smoothstep(${Math.cos(ANGLE)}, ${Math.cos(ANGLE * (1 - PENUMBRA))},
         dot(ray / max(d, 0.001), uHeadTorchDirection));
       float fade = pow(clamp(1.0 - pow(d / ${RANGE.toFixed(1)}, 4.0), 0.0, 1.0), 2.0);
       return uHeadTorchPower * cone * fade / max(d * d, 0.25);
