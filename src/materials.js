@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SUN, WATER, GRID_STEP, HALF_WORLD } from './world.js';
 import { attachSandPBR } from './sand-pbr.js';
 import { attachGrassTexture, GRASS_TILE_METRES } from './grass-texture.js';
+import { GRASS_PBR_GLSL } from './grass-pbr.js';
 import { NIGHT_SKY_GLSL } from './night-sky.js';
 
 const CLOUD_TEXTURE_SIZE = 256;
@@ -227,17 +228,12 @@ export function createMaterials(renderer, field) {
       uWater: { value: new THREE.Vector3(WATER.x, WATER.y, WATER.z) },
       uWaterRadii: { value: new THREE.Vector2(WATER.radiusX, WATER.radiusZ) },
       uGrassBase: { value: solidTexture(255, 255, 255) },
-      uGrassNormal: { value: solidTexture(128, 128, 255) },
-      uGrassRoughness: { value: solidTexture(255, 242, 0) }, // R: AO, G: roughness, B: metallic
-      uGrassHeight: { value: solidTexture(128, 128, 128) },
+      uGrassNormal: { value: solidTexture(128, 128, 242, 128) },
       uGrassPatch: { value: solidTexture(255, 255, 255) },
-      uGrassPatchNormal: { value: solidTexture(128, 128, 255) },
-      uGrassPatchRoughness: { value: solidTexture(255, 242, 0) },
-      uGrassPatchHeight: { value: solidTexture(128, 128, 128) },
+      uGrassPatchNormal: { value: solidTexture(128, 128, 242, 128) },
       uHasGrassPatch: { value: 0 },
       uGrassLitter: { value: solidTexture(64, 60, 36) },
-      uGrassLitterNormal: { value: solidTexture(128, 128, 255) },
-      uGrassLitterRoughness: { value: solidTexture(255, 230, 0) },
+      uGrassLitterNormal: { value: solidTexture(128, 128, 230, 128) },
       uHasGrassLitter: { value: 0 },
       uHasGrassLitterNormal: { value: 0 },
       uHasGrassBase: { value: 0 },
@@ -245,6 +241,12 @@ export function createMaterials(renderer, field) {
       uHasGrassRoughness: { value: 0 },
       uHasGrassHeight: { value: 0 },
       uGrassTileMetres: { value: GRASS_TILE_METRES },
+      uGrassSkyMap: { value: solidTexture(0, 0, 0) },
+      uGrassSkyTexel: { value: new THREE.Vector2(1 / 336, 1 / 128) },
+      uGrassSkyMaxMip: { value: 5 },
+      uGrassSkyStrength: { value: 0 },
+      uHasGrassSky: { value: 0 },
+      uGrassSunRadiance: { value: new THREE.Vector3() },
       // Cyan light spilling from the veil tree's pods onto the ground (see glow-halos.js).
       uPodLights: { value: Array.from({ length: POD_LIGHT_SLOTS }, () => new THREE.Vector4(0, -1000, 0, 1)) },
       uPodLightStrength: { value: new Array(POD_LIGHT_SLOTS).fill(0) },
@@ -289,16 +291,11 @@ export function createMaterials(renderer, field) {
       uniform vec4 uPodLightArea;
       uniform sampler2D uGrassBase;
       uniform sampler2D uGrassNormal;
-      uniform sampler2D uGrassRoughness;
-      uniform sampler2D uGrassHeight;
       uniform sampler2D uGrassPatch;
       uniform sampler2D uGrassPatchNormal;
-      uniform sampler2D uGrassPatchRoughness;
-      uniform sampler2D uGrassPatchHeight;
       uniform float uHasGrassPatch;
       uniform sampler2D uGrassLitter;
       uniform sampler2D uGrassLitterNormal;
-      uniform sampler2D uGrassLitterRoughness;
       uniform float uHasGrassLitter;
       uniform float uHasGrassLitterNormal;
       uniform float uHasGrassBase;
@@ -311,6 +308,7 @@ export function createMaterials(renderer, field) {
       varying vec3 vData;
       varying vec3 vZone;
       ${atmosphere}
+      ${GRASS_PBR_GLSL}
       void main() {
         vec3 toEye = cameraPosition - vWorld;
         float distance = length(toEye);
@@ -331,8 +329,8 @@ export function createMaterials(renderer, field) {
         float grassHeight = 0.5;
         float patchHeight = 0.5;
         if (grass > 0.001 && uHasGrassBase > 0.5 && uHasGrassPatch > 0.5) {
-          grassHeight = texture2D(uGrassHeight, grassUv).r;
-          patchHeight = texture2D(uGrassPatchHeight, patchUv).r;
+          grassHeight = texture2D(uGrassNormal, grassUv).a;
+          patchHeight = texture2D(uGrassPatchNormal, patchUv).a;
           // Raised blades survive across the transition instead of dissolving
           // two unrelated surfaces into a flat crossfade.
           float blendFloor = max(grassHeight + 1.0 - patchMask, patchHeight + patchMask) - 0.24;
@@ -377,7 +375,8 @@ export function createMaterials(renderer, field) {
         vec3 patchBitangent = normalize(cross(patchTangent, baseNormal));
         float grassHeightFade = (1.0 - smoothstep(5.0, 22.0, distance)) * grass;
         if (uHasGrassHeight > 0.5 && grassHeightFade > 0.001) {
-          float blendedHeight = mix(grassHeight, patchHeight, patchAmt) - 0.5;
+          float blendedHeight = mix(grassHeight - 0.75, patchHeight - 0.72, patchAmt);
+          if (litterAmt > 0.001) blendedHeight = mix(blendedHeight, texture2D(uGrassLitterNormal, litterUv).a - 0.365, litterAmt);
           vec3 grassViewTangent = vec3(
             dot(view, grassTangent),
             dot(view, grassBitangent),
@@ -387,6 +386,7 @@ export function createMaterials(renderer, field) {
           vec2 parallax = (grassViewTangent.xy / grassGrazing) * blendedHeight * 0.025 * grassHeightFade;
           grassUv -= parallax;
           patchUv -= vec2(dot(parallax, vec2(0.6, 0.8)), dot(parallax, vec2(-0.8, 0.6)));
+          litterUv -= vec2(dot(parallax, vec2(0.84, 0.54)), dot(parallax, vec2(-0.54, 0.84)));
         }
 
         vec3 mapNormal = texture2D(uPbrNormal, pbrUv).xyz * 2.0 - 1.0;
@@ -395,19 +395,19 @@ export function createMaterials(renderer, field) {
         vec3 sandNormal = normalize(mix(baseNormal, mappedNormal, uHasPbrNormal * normalFade * (1.0 - grass) * (1.0 - max(max(max(rockAmt, saltAmt), gravelAmt), stoneAmt))));
         vec3 grassNormal = baseNormal;
         if (grass > 0.001 && uHasGrassNormal > 0.5 && normalFade > 0.001) {
-          vec3 grassMapNormal = texture2D(uGrassNormal, grassUv).xyz * 2.0 - 1.0;
+          vec3 grassMapNormal = grassPbrNormal(texture2D(uGrassNormal, grassUv).rg);
           vec3 grassMappedNormal = normalize(
             grassTangent * grassMapNormal.x
             + grassBitangent * grassMapNormal.y
             + baseNormal * max(grassMapNormal.z, 0.05)
           );
           if (patchAmt > 0.001) {
-            vec3 patchMapNormal = texture2D(uGrassPatchNormal, patchUv).xyz * 2.0 - 1.0;
+            vec3 patchMapNormal = grassPbrNormal(texture2D(uGrassPatchNormal, patchUv).rg);
             vec3 patchMappedNormal = normalize(patchTangent * patchMapNormal.x + patchBitangent * patchMapNormal.y + baseNormal * max(patchMapNormal.z, 0.05));
             grassMappedNormal = normalize(mix(grassMappedNormal, patchMappedNormal, patchAmt));
           }
           if (litterAmt > 0.001 && uHasGrassLitterNormal > 0.5) {
-            vec3 litterMapNormal = texture2D(uGrassLitterNormal, litterUv).xyz * 2.0 - 1.0;
+            vec3 litterMapNormal = grassPbrNormal(texture2D(uGrassLitterNormal, litterUv).rg);
             vec3 litterMappedNormal = normalize(tangent * litterMapNormal.x + bitangent * litterMapNormal.y + baseNormal * max(litterMapNormal.z, 0.05));
             grassMappedNormal = normalize(mix(grassMappedNormal, litterMappedNormal, litterAmt));
           }
@@ -476,11 +476,11 @@ export function createMaterials(renderer, field) {
         float grassRoughness = 0.95;
         float grassAO = 1.0;
         if (grass > 0.001 && uHasGrassRoughness > 0.5) {
-          vec2 surface = texture2D(uGrassRoughness, grassUv).rg;
-          if (patchAmt > 0.001) surface = mix(surface, texture2D(uGrassPatchRoughness, patchUv).rg, patchAmt);
-          if (litterAmt > 0.001) surface = mix(surface, texture2D(uGrassLitterRoughness, litterUv).rg, litterAmt);
-          grassAO = mix(1.0, surface.r, 0.65);
-          grassRoughness = clamp(surface.g, 0.55, 1.0);
+          vec2 surface = vec2(texture2D(uGrassBase, grassUv).a, texture2D(uGrassNormal, grassUv).b);
+          if (patchAmt > 0.001) surface = mix(surface, vec2(texture2D(uGrassPatch, patchUv).a, texture2D(uGrassPatchNormal, patchUv).b), patchAmt);
+          if (litterAmt > 0.001) surface = mix(surface, vec2(texture2D(uGrassLitter, litterUv).a, texture2D(uGrassLitterNormal, litterUv).b), litterAmt);
+          grassAO = clamp(surface.r, 0.0, 1.0);
+          grassRoughness = clamp(surface.g, 0.0525, 1.0);
         }
         roughness = mix(roughness, grassRoughness, grass);
         roughness = mix(roughness, 0.95, max(max(rockAmt, gravelAmt), stoneAmt));
@@ -495,12 +495,23 @@ export function createMaterials(renderer, field) {
         vec3 nightAmbient = mix(vec3(0.006, 0.009, 0.015), vec3(0.012, 0.018, 0.029), max(n.y, 0.0));
         vec3 ambient = mix(nightAmbient, dayAmbient, environmentDay);
         ambient *= mix(1.0, grassAO, grass);
+        // All grass lights use the same non-metallic GGX BRDF. Existing light
+        // hooks keep their original response on sand and stone.
+        vec3 normalDerivative = max(abs(dFdx(baseNormal)), abs(dFdy(baseNormal)));
+        float grassPerceptualRoughness = min(roughness + max(max(normalDerivative.x, normalDerivative.y), normalDerivative.z), 1.0);
+        vec3 grassDirectLighting = grassPbrDirect(base, grassPerceptualRoughness, n, view, uSun)
+          * uGrassSunRadiance * mix(0.10, 1.0, vData.r) * cloudLight;
         vec3 light = ambient + sunColour() * sun;
         vec3 halfVector = normalize(view + uSun);
         float specPower = mix(82.0, 7.0, roughness);
         float specStrength = mix(0.24, 0.018, roughness);
         float specular = pow(max(dot(n, halfVector), 0.0), specPower) * specStrength * mix(0.25, 1.0, vData.r) * cloudLight * environmentDay;
         vec3 color = base * light + vec3(1.0, 0.88, 0.70) * specular;
+        if (grass > 0.001) {
+          vec3 grassIndirect = base * ambient;
+          if (uHasGrassSky > 0.5) grassIndirect = grassPbrIndirect(base, grassPerceptualRoughness, grassAO, n, view);
+          color = mix(color, grassDirectLighting + grassIndirect, grass);
+        }
         color = air(color, -view, distance);
         gl_FragColor = vec4(color, 1.0);
         #include <tonemapping_fragment>

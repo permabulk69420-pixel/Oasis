@@ -1,20 +1,15 @@
 import * as THREE from 'three';
 
-// Two coordinated 2K grass materials from Game Piggs, with a 2K leaf-litter layer
-// from Poly Haven. All layers have matched colour, normal and AO/roughness maps;
-// the two grass layers also provide height for terrain blending. See CREDITS.md.
+// Three materials in six 2K files. Albedo RGB uses sRGB and alpha is linear AO.
+// Surface RG is the OpenGL normal's XY, B is roughness, A is height. Normal Z
+// is reconstructed in the shader. See CREDITS.md for the original sources.
 export const GRASS_TEXTURES = {
-  base: 'grass-short_albedo.jpg',
-  normal: 'grass-short_normal.jpg',
-  roughness: 'grass-short_arm.jpg',
-  height: 'grass-short_height.png',
-  patch: 'grass-loose_albedo.jpg',
-  patchNormal: 'grass-loose_normal.jpg',
-  patchRoughness: 'grass-loose_arm.jpg',
-  patchHeight: 'grass-loose_height.png',
-  litter: 'ground-litter_albedo.jpg',
-  litterNormal: 'ground-litter_normal.jpg',
-  litterRoughness: 'ground-litter_arm.jpg',
+  base: 'grass-short_albedo.webp',
+  normal: 'grass-short_surface.webp',
+  patch: 'grass-loose_albedo.webp',
+  patchNormal: 'grass-loose_surface.webp',
+  litter: 'ground-litter_albedo.webp',
+  litterNormal: 'ground-litter_surface.webp',
 };
 export const GRASS_TILE_METRES = 2.4;
 
@@ -40,9 +35,9 @@ export function attachGrassTexture(renderer, uniforms) {
   const loader = new THREE.TextureLoader();
   const basePath = `${import.meta.env.BASE_URL}textures/grass/`;
   const layers = [
-    [['base', 'Base', true], ['normal', 'Normal'], ['roughness', 'Roughness'], ['height', 'Height']],
-    [['patch', 'Patch', true], ['patchNormal', 'PatchNormal'], ['patchRoughness', 'PatchRoughness'], ['patchHeight', 'PatchHeight']],
-    [['litter', 'Litter', true], ['litterNormal', 'LitterNormal'], ['litterRoughness', 'LitterRoughness']],
+    [['base', 'Base', true], ['normal', 'Normal']],
+    [['patch', 'Patch', true], ['patchNormal', 'PatchNormal']],
+    [['litter', 'Litter', true], ['litterNormal', 'LitterNormal']],
   ];
   // Install each layer together so its colour never appears with another layer's
   // normal or roughness while downloads are still arriving.
@@ -57,6 +52,10 @@ export function attachGrassTexture(renderer, uniforms) {
         uniforms, `uGrass${name}`, `uHasGrass${name}`,
         configureTexture(results[index].value, renderer, color),
       ));
+      if (layer[0][0] === 'base') {
+        uniforms.uHasGrassRoughness.value = 1;
+        uniforms.uHasGrassHeight.value = 1;
+      }
     });
   }
 }
