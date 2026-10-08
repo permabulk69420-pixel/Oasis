@@ -2,13 +2,13 @@ import * as THREE from 'three';
 import { pulseHaptics } from './haptics.js';
 import { TORCH_SHADER_MARKERS } from './night-fill.js';
 
-// A focused headlamp beam with useful distance for night exploration.
-const ANGLE = Math.PI / 18, RANGE = 80, POWER = 280, PENUMBRA = 0.22;
+// A focused beam with slower falloff so distant ground remains visible at night.
+const ANGLE = Math.PI / 18, RANGE = 100, POWER = 140, PENUMBRA = 0.22, DECAY = 1;
 const CONTACT = 0.23, RELEASE = 0.33, COOLDOWN_MS = 400;
 
 // No mesh: a head-following beam, plus the same beam on the custom ground/water shaders.
 export function createHeadTorch({ scene, states, sand, water, getExposure = () => 1 }) {
-  const light = new THREE.SpotLight(0xfff1da, 0, RANGE, ANGLE, PENUMBRA, 2);
+  const light = new THREE.SpotLight(0xfff1da, 0, RANGE, ANGLE, PENUMBRA, DECAY);
   light.name = 'Head torch';
   light.castShadow = false;
   scene.add(light, light.target);
@@ -27,14 +27,15 @@ export function createHeadTorch({ scene, states, sand, water, getExposure = () =
       float cone = smoothstep(${Math.cos(ANGLE)}, ${Math.cos(ANGLE * (1 - PENUMBRA))},
         dot(ray / max(d, 0.001), uHeadTorchDirection));
       float fade = pow(clamp(1.0 - pow(d / ${RANGE.toFixed(1)}, 4.0), 0.0, 1.0), 2.0);
-      return uHeadTorchPower * cone * fade / max(d * d, 0.25);
+      return uHeadTorchPower * cone * fade / max(pow(d, ${DECAY.toFixed(1)}), 1.0);
     }`;
   const colour = `vec3(${light.color.r}, ${light.color.g}, ${light.color.b})`;
   for (const [material, markers, code] of [
     [sand, TORCH_SHADER_MARKERS.terrain, /* glsl */`
       if (uHeadTorchPower > 0.0) {
         vec3 toHead = normalize(uHeadTorchPosition - vWorld);
-        light += ${colour} * headTorchBeam(vWorld) * max(dot(n, toHead), 0.0);
+        // A grazing beam must still illuminate distant, nearly horizontal ground.
+        light += ${colour} * headTorchBeam(vWorld) * (0.28 + 0.72 * max(dot(n, toHead), 0.0));
       }`],
     [water, TORCH_SHADER_MARKERS.water, /* glsl */`
       if (uHeadTorchPower > 0.0) {
