@@ -1,16 +1,13 @@
-# Credits
+# Grass material credits
 
-- `ground-grass_*`: "Grass004" from ambientCG (https://ambientcg.com/view?id=Grass004), CC0.
+Three 2K materials, stored in six active lossless WebP files:
 
-The original `ground-grass_*` maps were toned and resized by `tools/textures/make_ground.py`; they are retained but are no longer loaded by the ground material.
+- `grass-short_*`: Grass 01 by Mykhailo Ohorodnichuk / Game Piggs, https://game-piggs.com/textures/grass-01/, CC0.
+- `grass-loose_*`: Grass 02 from the same material group, https://game-piggs.com/textures/grass-02/, CC0.
+- `ground-litter_*`: Leafy Grass by Charlotte Baglioni / Poly Haven, https://polyhaven.com/a/leafy_grass, CC0.
 
-## Layered 2K ground materials
+Game Piggs license: https://game-piggs.com/license/.
 
-- `grass-short_*`: **Grass 01** by Mykhailo Ohorodnichuk / Game Piggs, https://game-piggs.com/textures/grass-01/.
-- `grass-loose_*`: **Grass 02**, the second style in the same Substance Sampler material group, https://game-piggs.com/textures/grass-02/.
-- Both Game Piggs materials are **CC0**: https://game-piggs.com/license/.
-- `ground-litter_*`: **Leafy Grass** by Charlotte Baglioni / Poly Haven, https://polyhaven.com/a/leafy_grass, **CC0**. Updated from the source's native 2K maps; albedo is darkened and desaturated to suit Oasis.
+Every file is 2048 × 2048. `*_albedo.webp`: original merged albedo in RGB (sRGB), matching AO in alpha (linear). `*_surface.webp`: matching OpenGL normal XY in RG, roughness in B, height/displacement in A (all linear). The shader reconstructs positive normal Z. Grass normals retain the DirectX-to-OpenGL green inversion from the merged maps. The leaf-litter height is the source's native 2K displacement map. These are non-metallic materials.
 
-All active layer maps are 2048 × 2048. Albedos retain the source detail and are toned to Oasis's dark green/olive palette. The grass normal maps were converted from DirectX to OpenGL by inverting green; the leaf-litter normal is supplied as OpenGL. `*_arm.jpg` uses red = ambient occlusion, green = roughness, blue = metallic (the ground is non-metallic). Grass heights retain the source's absolute range, converted from 16-bit to 8-bit PNG for WebGL image loading. Colour and data maps use separate colour spaces in the loader.
-
-The layers blend by fixed world-space masks and the grass materials' heights in `src/materials.js`. Camera distance does not select the grass layer.
+Packing preserves the merged albedo colours and each layer's matching maps. All six files are loaded. The grass uses GGX direct lighting, the scene's filtered PMREM sky, and the same material response for the headset torch, handheld torch and campfire. Camera distance does not select the layer.

@@ -1,3 +1,4 @@
+import { updateGrassPBRLighting } from './grass-pbr.js';
 import * as THREE from 'three';
 import './style.css';
 import { installAssetVersioning } from './asset-version.js';
@@ -813,6 +814,7 @@ function frame(time) {
   autosave.update(); // first, so what a save puts back (where you stand, the tools) is in place before anything reads it
   dayNight.update(dt);
   skyEnvironment.update(dt);
+  updateGrassPBRLighting(materials.sand, skyEnvironment, dayNight);
   glowFruit.update(dt);
   campfires.update(dt, renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   buildings.update(dt);

@@ -111,6 +111,7 @@ const TERRAIN_BLOCK = `
             fireFade *= 0.55 + 0.45 * fireFade;
             float fireDiffuse = max(dot(n, fireDirection), 0.0);
             light += vec3(13.0, 5.2, 1.5) * uFireStrengths[fi] * fireFade * (0.35 + 0.65 * fireDiffuse);
+            if (grass > 0.001) grassDirectLighting += vec3(13.0, 5.2, 1.5) * uFireStrengths[fi] * fireFade * grassPbrDirect(base, grassPerceptualRoughness, n, view, fireDirection);
           }
         }`;
 
