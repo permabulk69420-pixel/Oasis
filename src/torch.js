@@ -107,7 +107,7 @@ function installTerrainTorchLight(material, positionUniform, strengthUniform) {
   );
   material.fragmentShader = material.fragmentShader.replace(
     lightMarker,
-    `${lightMarker}\n        if (uTorchStrength > 0.001) {\n          vec3 torchVector = uTorchPosition - vWorld;\n          float torchDistance = length(torchVector);\n          vec3 torchDirection = torchVector / max(torchDistance, 0.001);\n          float torchFade = 1.0 - smoothstep(0.8, 13.5, torchDistance);\n          torchFade *= 0.55 + 0.45 * torchFade;\n          float torchDiffuse = max(dot(n, torchDirection), 0.0);\n          float torchAmount = uTorchStrength * torchFade * (0.35 + 0.65 * torchDiffuse);\n          light += vec3(11.0, 4.6, 1.3) * torchAmount * (1.0 + 3.0 * grass);\n        }`
+    `${lightMarker}\n        if (uTorchStrength > 0.001) {\n          vec3 torchVector = uTorchPosition - vWorld;\n          float torchDistance = length(torchVector);\n          vec3 torchDirection = torchVector / max(torchDistance, 0.001);\n          float torchFade = 1.0 - smoothstep(0.8, 13.5, torchDistance);\n          torchFade *= 0.55 + 0.45 * torchFade;\n          float torchDiffuse = max(dot(n, torchDirection), 0.0);\n          float torchAmount = uTorchStrength * torchFade * (0.35 + 0.65 * torchDiffuse);\n          light += vec3(11.0, 4.6, 1.3) * torchAmount * (1.0 + 3.0 * grass);\n          if (grass > 0.001) grassDirectLighting += vec3(11.0, 4.6, 1.3) * uTorchStrength * torchFade * (1.0 + 3.0 * grass) * grassPbrDirect(base, grassPerceptualRoughness, n, view, torchDirection);\n        }`
   );
   material.userData.torchLightInstalled = true;
   material.needsUpdate = true;
