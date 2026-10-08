@@ -92,7 +92,7 @@ test('head torch has a focused, long-range beam shared by terrain and water', ()
   const { light } = f.torch;
   assert.ok(light.angle <= Math.PI / 12, 'the full beam should be no wider than 30 degrees');
   assert.ok(light.distance >= 60, 'beam should extend well beyond the original 18 metres');
-  assert.ok(light.intensity >= 200, 'the longer beam needs enough light to reach distant surfaces');
+  assert.ok(light.intensity >= 100, 'the longer beam needs enough light to reach distant surfaces');
   assert.ok(light.penumbra <= 0.3, 'beam edge should stay relatively crisp');
 
   const sharedCone = `smoothstep(${Math.cos(light.angle)}, ${Math.cos(light.angle * (1 - light.penumbra))},`;
@@ -100,4 +100,28 @@ test('head torch has a focused, long-range beam shared by terrain and water', ()
     assert.ok(material.fragmentShader.includes(sharedCone), 'custom shaders should match spotlight focus');
     assert.ok(material.fragmentShader.includes(`d / ${light.distance.toFixed(1)}`), 'custom shaders should match spotlight range');
   }
+});
+
+test('slower attenuation makes distant ground visible without losing the focused beam', () => {
+  const f = setup(); f.update(0); f.reach(); f.update(100);
+  f.setExposure(0.035); f.update(500); // darkest night
+  const { light } = f.torch;
+  assert.equal(light.decay, 1, 'the standard-material spotlight must not use inverse-square falloff');
+  assert.ok(light.distance >= 100);
+
+  const terrainShader = f.materials[0].fragmentShader;
+  const waterShader = f.materials[1].fragmentShader;
+  for (const shader of [terrainShader, waterShader]) {
+    assert.ok(shader.includes('max(pow(d, 1.0), 1.0)'), 'custom light falloff must match the spotlight decay');
+  }
+  assert.ok(terrainShader.includes('0.28 + 0.72 * max(dot(n, toHead), 0.0)'),
+    'terrain should retain a minimum diffuse response at grazing angles');
+
+  const farGroundLight = distance => {
+    const fade = Math.pow(Math.max(1 - Math.pow(distance / light.distance, 4), 0), 2);
+    const nearHorizontalFacing = 0.28 + 0.72 * (1.68 / Math.hypot(distance, 1.68));
+    return light.intensity * fade / Math.max(Math.pow(distance, light.decay), 1) * nearHorizontalFacing;
+  };
+  assert.ok(farGroundLight(60) > 10, 'beam should remain substantial at 60 metres');
+  assert.ok(farGroundLight(80) > 4, 'beam should remain visible beyond 80 metres');
 });
