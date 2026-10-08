@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { pulseHaptics } from './haptics.js';
 import { TORCH_SHADER_MARKERS } from './night-fill.js';
 
-// A focused beam with slower falloff so distant ground remains visible at night.
-const ANGLE = Math.PI / 18, RANGE = 100, POWER = 140, PENUMBRA = 0.22, DECAY = 1;
+// A softer, slightly wider beam: uniform illumination avoids a near-field hotspot
+// without sacrificing the light reaching distant terrain at night.
+const ANGLE = Math.PI * 7 / 90, RANGE = 100, POWER = 1.8, PENUMBRA = 0.35, DECAY = 0;
 // A deliberate tap near the upper headset, not a broad zone around the face.
 const CONTACT = 0.11, RELEASE = 0.22, COOLDOWN_MS = 400;
 
