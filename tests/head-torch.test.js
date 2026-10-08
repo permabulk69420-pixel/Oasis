@@ -19,7 +19,7 @@ function setup() {
   let exposure = 1;
   const torch = createHeadTorch({ scene, states, sand: materials[0], water: materials[1], getExposure: () => exposure });
   const update = (time, options = {}) => torch.update(view, { active: true, interactive: true, time, ...options });
-  const reach = (index = 0) => states[index].grip.position.set(0.16, 1.78, -0.03);
+  const reach = (index = 0) => states[index].grip.position.set(0.07, 1.78, -0.03);
   const away = (index = 0) => states[index].grip.position.set(0.5, 1, -0.4);
   return { scene, rig, view, states, materials, torch, update, reach, away, setExposure: value => { exposure = value; } };
 }
@@ -29,7 +29,7 @@ test('either hand toggles once per head tap; holding and contact jitter do not r
   f.update(0); assert.equal(f.torch.enabled, false);
   f.reach(); f.update(100); assert.equal(f.torch.enabled, true);
   f.update(700); assert.equal(f.torch.enabled, true);
-  f.states[0].grip.position.x = 0.26; f.update(800);
+  f.states[0].grip.position.x = 0.16; f.update(800);
   f.reach(); f.update(900); assert.equal(f.torch.enabled, true);
   f.away(); f.update(1000);
   f.reach(); f.update(1100); assert.equal(f.torch.enabled, false);
@@ -124,4 +124,39 @@ test('slower attenuation makes distant ground visible without losing the focused
   };
   assert.ok(farGroundLight(60) > 10, 'beam should remain substantial at 60 metres');
   assert.ok(farGroundLight(80) > 4, 'beam should remain visible beyond 80 metres');
+});
+
+test('head tap requires a small, upper-head contact zone', () => {
+  const f = setup(); f.update(0);
+  // Both are inside the old 23 cm zone but outside the reduced 11 cm contact.
+  f.states[0].grip.position.set(0.16, 1.78, -0.03);
+  f.update(100); assert.equal(f.torch.enabled, false);
+  f.states[0].grip.position.set(0, 1.70, -0.03); // close to face, below tap region
+  f.update(200); assert.equal(f.torch.enabled, false);
+  f.away(); f.update(300);
+  f.reach(); f.update(400); assert.equal(f.torch.enabled, true);
+});
+
+test('drawing and releasing an arrow beside the headset cannot toggle the torch', () => {
+  const f = setup(); f.update(0);
+  const state = f.states[0];
+  state.inputSource.gamepad.buttons = [{ pressed: false }, { pressed: true }];
+  f.reach(); f.update(100); assert.equal(f.torch.enabled, false);
+  state.inputSource.gamepad.buttons[1].pressed = false;
+  f.update(700); assert.equal(f.torch.enabled, false); // release while still next to headset
+  f.away(); f.update(800); // only moving away rearms the tap
+  f.reach(); f.update(900); assert.equal(f.torch.enabled, true);
+});
+
+test('a held arrow or bowstring prevents head taps until the hand leaves the zone', () => {
+  const f = setup(); f.update(0);
+  const state = f.states[0];
+  state.objectGrip = new THREE.Group();
+  const arrow = new THREE.Group();
+  state.objectGrip.add(arrow);
+  f.reach(); f.update(100); assert.equal(f.torch.enabled, false);
+  state.objectGrip.remove(arrow);
+  f.update(700); assert.equal(f.torch.enabled, false);
+  f.away(); f.update(800);
+  f.reach(); f.update(900); assert.equal(f.torch.enabled, true);
 });
