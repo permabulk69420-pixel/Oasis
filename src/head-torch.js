@@ -51,7 +51,9 @@ export function createHeadTorch({ scene, states, sand, water, getExposure = () =
       if (uHeadTorchPower > 0.0) {
         vec3 toHead = normalize(uHeadTorchPosition - vWorld);
         // A grazing beam must still illuminate distant, nearly horizontal ground.
-        light += headTorchBeam(vWorld) * (0.38 + 0.62 * max(dot(n, toHead), 0.0));
+        vec3 beam = headTorchBeam(vWorld);
+        light += beam * (0.38 + 0.62 * max(dot(n, toHead), 0.0));
+        if (grass > 0.001) grassDirectLighting += beam * grassPbrDirect(base, grassPerceptualRoughness, n, view, toHead);
       }`],
     [water, TORCH_SHADER_MARKERS.water, /* glsl */`
       if (uHeadTorchPower > 0.0) {
