@@ -149,10 +149,12 @@ test('close-range brightness is bounded while off-axis ground receives spill', (
   assert.ok(sample(35, 12) < sample(0, 12) / 3, 'spill must remain softer and dimmer than the centre');
   assert.ok(sample(35, 65) < 0.01, 'spill should fade before becoming a distant broad searchlight');
 
+  const coreAtNormalExposure = light.intensity;
+  const spillAtNormalExposure = spill.intensity;
   f.setExposure(0.035); f.update(500); // darkest night
-  assert.ok(Math.abs(f.torch.light.intensity * 0.035 - light.intensity * 1) < 1e-8,
+  assert.ok(Math.abs(light.intensity * 0.035 - coreAtNormalExposure) < 1e-8,
     'exposure change should preserve the effective core brightness');
-  assert.ok(Math.abs(f.torch.spill.intensity * 0.035 - spill.intensity * 1) < 1e-8,
+  assert.ok(Math.abs(spill.intensity * 0.035 - spillAtNormalExposure) < 1e-8,
     'exposure change should preserve the effective spill brightness');
 });
 
