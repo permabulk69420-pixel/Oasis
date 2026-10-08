@@ -28,12 +28,14 @@ export function createHeadTorch({ scene, states, sand, water, getExposure = () =
     uHeadTorchPower: { value: 0 },
     uHeadTorchSpillPower: { value: 0 },
   };
+  const coreColour = `vec3(${light.color.r}, ${light.color.g}, ${light.color.b})`;
+  const spillColour = `vec3(${spill.color.r}, ${spill.color.g}, ${spill.color.b})`;
   const declarations = /* glsl */`
     uniform vec3 uHeadTorchPosition;
     uniform vec3 uHeadTorchDirection;
     uniform float uHeadTorchPower;
     uniform float uHeadTorchSpillPower;
-    float headTorchBeam(vec3 point) {
+    vec3 headTorchBeam(vec3 point) {
       vec3 ray = point - uHeadTorchPosition;
       float d = length(ray);
       float alignment = dot(ray / max(d, 0.001), uHeadTorchDirection);
@@ -41,23 +43,22 @@ export function createHeadTorch({ scene, states, sand, water, getExposure = () =
       float halo = smoothstep(${Math.cos(SPILL.angle)}, ${Math.cos(SPILL.angle * (1 - SPILL.penumbra))}, alignment);
       float coreFade = pow(clamp(1.0 - pow(d / ${BEAM.range.toFixed(1)}, 4.0), 0.0, 1.0), 2.0);
       float spillFade = pow(clamp(1.0 - pow(d / ${SPILL.range.toFixed(1)}, 4.0), 0.0, 1.0), 2.0);
-      return uHeadTorchPower * core * coreFade
-        + uHeadTorchSpillPower * halo * spillFade;
+      return ${coreColour} * uHeadTorchPower * core * coreFade
+        + ${spillColour} * uHeadTorchSpillPower * halo * spillFade;
     }`;
-  const colour = `vec3(${light.color.r}, ${light.color.g}, ${light.color.b})`;
   for (const [material, markers, code] of [
     [sand, TORCH_SHADER_MARKERS.terrain, /* glsl */`
       if (uHeadTorchPower > 0.0) {
         vec3 toHead = normalize(uHeadTorchPosition - vWorld);
         // A grazing beam must still illuminate distant, nearly horizontal ground.
-        light += ${colour} * headTorchBeam(vWorld) * (0.28 + 0.72 * max(dot(n, toHead), 0.0));
+        light += headTorchBeam(vWorld) * (0.38 + 0.62 * max(dot(n, toHead), 0.0));
       }`],
     [water, TORCH_SHADER_MARKERS.water, /* glsl */`
       if (uHeadTorchPower > 0.0) {
         vec3 toHead = normalize(uHeadTorchPosition - vWorld);
-        float beam = headTorchBeam(vWorld);
-        transmission += ${colour} * beam * 0.1 * max(dot(normal, toHead), 0.0);
-        reflectedColor += ${colour} * beam * pow(max(dot(reflect(-toHead, normal), view), 0.0), 92.0);
+        vec3 beam = headTorchBeam(vWorld);
+        transmission += beam * 0.1 * (0.25 + 0.75 * max(dot(normal, toHead), 0.0));
+        reflectedColor += beam * pow(max(dot(reflect(-toHead, normal), view), 0.0), 92.0);
       }`],
   ]) {
     const marker = markers.light ?? markers.colour;
