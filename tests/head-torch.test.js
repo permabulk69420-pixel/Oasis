@@ -158,37 +158,30 @@ test('close-range brightness is bounded while off-axis ground receives spill', (
     'exposure change should preserve the effective spill brightness');
 });
 
-test('head tap requires a small, upper-head contact zone', () => {
+test('only the head-tap contact radius is reduced', () => {
   const f = setup(); f.update(0);
-  // Both are inside the old 23 cm zone but outside the reduced 11 cm contact.
+  // Previously in the 23 cm contact zone, but outside the 11 cm zone.
   f.states[0].grip.position.set(0.16, 1.78, -0.03);
   f.update(100); assert.equal(f.torch.enabled, false);
-  f.states[0].grip.position.set(0, 1.70, -0.03); // close to face, below tap region
-  f.update(200); assert.equal(f.torch.enabled, false);
-  f.away(); f.update(300);
-  f.reach(); f.update(400); assert.equal(f.torch.enabled, true);
+  // The original height rule is unchanged: lower-head taps remain valid.
+  f.states[0].grip.position.set(0, 1.70, -0.03);
+  f.update(200); assert.equal(f.torch.enabled, true);
+  // Preserve the original 33 cm re-arm threshold.
+  f.states[0].grip.position.set(0.26, 1.78, -0.03);
+  f.update(700); f.reach(); f.update(800);
+  assert.equal(f.torch.enabled, true);
+  f.away(); f.update(900); f.reach(); f.update(1000);
+  assert.equal(f.torch.enabled, false);
 });
 
-test('drawing and releasing an arrow beside the headset cannot toggle the torch', () => {
+test('holding an object or squeezing the grip does not change original tap behaviour', () => {
   const f = setup(); f.update(0);
   const state = f.states[0];
   state.inputSource.gamepad.buttons = [{ pressed: false }, { pressed: true }];
-  f.reach(); f.update(100); assert.equal(f.torch.enabled, false);
-  state.inputSource.gamepad.buttons[1].pressed = false;
-  f.update(700); assert.equal(f.torch.enabled, false); // release while still next to headset
-  f.away(); f.update(800); // only moving away rearms the tap
-  f.reach(); f.update(900); assert.equal(f.torch.enabled, true);
-});
-
-test('a held arrow or bowstring prevents head taps until the hand leaves the zone', () => {
-  const f = setup(); f.update(0);
-  const state = f.states[0];
   state.objectGrip = new THREE.Group();
-  const arrow = new THREE.Group();
-  state.objectGrip.add(arrow);
-  f.reach(); f.update(100); assert.equal(f.torch.enabled, false);
-  state.objectGrip.remove(arrow);
-  f.update(700); assert.equal(f.torch.enabled, false);
-  f.away(); f.update(800);
-  f.reach(); f.update(900); assert.equal(f.torch.enabled, true);
+  state.objectGrip.add(new THREE.Group());
+  f.reach(); f.update(100);
+  assert.equal(f.torch.enabled, true, 'grip and held objects must not suppress a legitimate tap');
+  f.away(); f.update(700); f.reach(); f.update(800);
+  assert.equal(f.torch.enabled, false, 'a second tap must also work while the grip is held');
 });
