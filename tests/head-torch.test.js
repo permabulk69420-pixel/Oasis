@@ -77,7 +77,7 @@ test('beam follows the world head pose after movement and turning, with no meshe
 test('ground/water share the live beam and exposure compensation; handheld torch markers remain', () => {
   const f = setup(); f.update(0); f.reach(); f.update(100);
   f.setExposure(0.035); f.update(500);
-  assert.ok(f.torch.light.intensity > 1000);
+  assert.ok(Math.abs(f.torch.light.intensity * 0.035 - 1.8) < 1e-8);
   for (const [index, material] of f.materials.entries()) {
     assert.equal(material.uniforms.uHeadTorchPower.value, f.torch.light.intensity);
     assert.equal(material.uniforms.uHeadTorchPosition.value, f.torch.light.position);
@@ -90,10 +90,10 @@ test('ground/water share the live beam and exposure compensation; handheld torch
 test('head torch has a focused, long-range beam shared by terrain and water', () => {
   const f = setup(); f.update(0); f.reach(); f.update(100);
   const { light } = f.torch;
-  assert.ok(light.angle <= Math.PI / 12, 'the full beam should be no wider than 30 degrees');
+  assert.ok(light.angle > Math.PI / 18 && light.angle <= Math.PI / 12, 'the full beam should be wider than 20 degrees but no wider than 30 degrees');
   assert.ok(light.distance >= 60, 'beam should extend well beyond the original 18 metres');
-  assert.ok(light.intensity >= 100, 'the longer beam needs enough light to reach distant surfaces');
-  assert.ok(light.penumbra <= 0.3, 'beam edge should stay relatively crisp');
+  assert.ok(light.intensity >= 1.5 && light.intensity <= 2.5, 'the longer beam should be useful without blowing out nearby objects');
+  assert.ok(light.penumbra >= 0.3 && light.penumbra <= 0.4, 'beam edge should be softened rather than a hard white circle');
 
   const sharedCone = `smoothstep(${Math.cos(light.angle)}, ${Math.cos(light.angle * (1 - light.penumbra))},`;
   for (const material of f.materials) {
@@ -102,17 +102,17 @@ test('head torch has a focused, long-range beam shared by terrain and water', ()
   }
 });
 
-test('slower attenuation makes distant ground visible without losing the focused beam', () => {
+test('balanced attenuation keeps distant ground visible without the close-range hotspot', () => {
   const f = setup(); f.update(0); f.reach(); f.update(100);
   f.setExposure(0.035); f.update(500); // darkest night
   const { light } = f.torch;
-  assert.equal(light.decay, 1, 'the standard-material spotlight must not use inverse-square falloff');
+  assert.equal(light.decay, 0, 'the spotlight should not amplify close-range surfaces relative to distant ones');
   assert.ok(light.distance >= 100);
 
   const terrainShader = f.materials[0].fragmentShader;
   const waterShader = f.materials[1].fragmentShader;
   for (const shader of [terrainShader, waterShader]) {
-    assert.ok(shader.includes('max(pow(d, 1.0), 1.0)'), 'custom light falloff must match the spotlight decay');
+    assert.ok(shader.includes('max(pow(d, 0.0), 1.0)'), 'custom light falloff must match the spotlight decay');
   }
   assert.ok(terrainShader.includes('0.28 + 0.72 * max(dot(n, toHead), 0.0)'),
     'terrain should retain a minimum diffuse response at grazing angles');
@@ -122,6 +122,14 @@ test('slower attenuation makes distant ground visible without losing the focused
     const nearHorizontalFacing = 0.28 + 0.72 * (1.68 / Math.hypot(distance, 1.68));
     return light.intensity * fade / Math.max(Math.pow(distance, light.decay), 1) * nearHorizontalFacing;
   };
+  // Exposure-compensated brightness no longer spikes into a white disc near the eyes.
+  const exposedBeam = distance => light.intensity * 0.035
+    * Math.pow(Math.max(1 - Math.pow(distance / light.distance, 4), 0), 2)
+    / Math.max(Math.pow(distance, light.decay), 1);
+  assert.ok(exposedBeam(3) < 2, 'close beam energy should be controlled at three metres');
+  assert.ok(exposedBeam(3) < exposedBeam(60) * 1.5,
+    'nearby surfaces should not receive vastly more light than distant terrain');
+
   assert.ok(farGroundLight(60) > 10, 'beam should remain substantial at 60 metres');
   assert.ok(farGroundLight(80) > 4, 'beam should remain visible beyond 80 metres');
 });
