@@ -1,0 +1,47 @@
+name: Headlamp browser visual check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/head-torch.js'
+      - 'src/main.js'
+      - 'src/materials.js'
+      - 'src/night-fill.js'
+      - 'tools/headlamp/visual-test.mjs'
+      - '.github/workflows/headlamp-visual.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  screenshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install game and screenshot runner
+        run: |
+          npm ci
+          npm install --no-save --package-lock=false playwright-core pngjs
+      - name: Start actual Oasis dev server
+        run: |
+          npm run dev -- --host 127.0.0.1 > /tmp/oasis-vite.log 2>&1 &
+          echo $! > /tmp/oasis-vite.pid
+      - name: Screenshot same night scene with lamp off and on
+        run: node tools/headlamp/visual-test.mjs
+      - name: Upload real browser captures and comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: headlamp-visual
+          path: headlamp-visual/
+          if-no-files-found: warn
+      - name: Show dev server errors if screenshot failed
+        if: failure()
+        run: tail -100 /tmp/oasis-vite.log || true
