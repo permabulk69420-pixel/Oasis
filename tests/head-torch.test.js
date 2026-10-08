@@ -69,7 +69,11 @@ test('beam follows the world head pose after movement and turning, with no meshe
   assert.ok(f.torch.light.position.distanceTo(expected) < 1e-8);
   const direction = f.torch.light.target.position.clone().sub(f.torch.light.position).normalize();
   assert.ok(direction.distanceTo(f.view.getWorldDirection(new THREE.Vector3())) < 1e-8);
+  assert.ok(f.torch.spill.position.distanceTo(expected) < 1e-8, 'spill must track the same head position');
+  const spillDirection = f.torch.spill.target.position.clone().sub(f.torch.spill.position).normalize();
+  assert.ok(spillDirection.distanceTo(direction) < 1e-8, 'spill must follow the head direction');
   assert.equal(f.torch.light.castShadow, false);
+  assert.equal(f.torch.spill.castShadow, false);
   let meshes = 0; f.scene.traverse(object => { if (object.isMesh) meshes++; });
   assert.equal(meshes, 0);
 });
@@ -77,61 +81,79 @@ test('beam follows the world head pose after movement and turning, with no meshe
 test('ground/water share the live beam and exposure compensation; handheld torch markers remain', () => {
   const f = setup(); f.update(0); f.reach(); f.update(100);
   f.setExposure(0.035); f.update(500);
-  assert.ok(Math.abs(f.torch.light.intensity * 0.035 - 1.8) < 1e-8);
+  assert.ok(Math.abs(f.torch.light.intensity * 0.035 - 1.1) < 1e-8);
+  assert.ok(Math.abs(f.torch.spill.intensity * 0.035 - 0.25) < 1e-8);
   for (const [index, material] of f.materials.entries()) {
     assert.equal(material.uniforms.uHeadTorchPower.value, f.torch.light.intensity);
+    assert.equal(material.uniforms.uHeadTorchSpillPower.value, f.torch.spill.intensity);
     assert.equal(material.uniforms.uHeadTorchPosition.value, f.torch.light.position);
     for (const marker of Object.values(Object.values(TORCH_SHADER_MARKERS)[index])) assert.ok(material.fragmentShader.includes(marker));
   }
   f.away(); f.update(600); f.reach(); f.update(700);
-  for (const material of f.materials) assert.equal(material.uniforms.uHeadTorchPower.value, 0);
-});
-
-test('head torch has a focused, long-range beam shared by terrain and water', () => {
-  const f = setup(); f.update(0); f.reach(); f.update(100);
-  const { light } = f.torch;
-  assert.ok(light.angle > Math.PI / 18 && light.angle <= Math.PI / 12, 'the full beam should be wider than 20 degrees but no wider than 30 degrees');
-  assert.ok(light.distance >= 60, 'beam should extend well beyond the original 18 metres');
-  assert.ok(light.intensity >= 1.5 && light.intensity <= 2.5, 'the longer beam should be useful without blowing out nearby objects');
-  assert.ok(light.penumbra >= 0.3 && light.penumbra <= 0.4, 'beam edge should be softened rather than a hard white circle');
-
-  const sharedCone = `smoothstep(${Math.cos(light.angle)}, ${Math.cos(light.angle * (1 - light.penumbra))},`;
   for (const material of f.materials) {
-    assert.ok(material.fragmentShader.includes(sharedCone), 'custom shaders should match spotlight focus');
-    assert.ok(material.fragmentShader.includes(`d / ${light.distance.toFixed(1)}`), 'custom shaders should match spotlight range');
+    assert.equal(material.uniforms.uHeadTorchPower.value, 0);
+    assert.equal(material.uniforms.uHeadTorchSpillPower.value, 0);
+  }
+  assert.equal(f.torch.spill.intensity, 0);
+});
+
+test('headlamp has a long, soft centre and a genuinely wide, shorter spill', () => {
+  const f = setup(); f.update(0); f.reach(); f.update(100);
+  const { light, spill } = f.torch;
+
+  assert.ok(light.angle >= Math.PI / 12 && light.angle <= Math.PI / 9,
+    'central beam should be roughly 30 to 40 degrees wide');
+  assert.ok(spill.angle >= Math.PI / 4 && spill.angle <= Math.PI / 3,
+    'spill should illuminate a much wider field');
+  assert.ok(light.distance >= 100, 'central beam should reach across distant terrain');
+  assert.ok(spill.distance >= 35 && spill.distance <= 50, 'spill should fade around nearby objects');
+  assert.ok(light.penumbra >= 0.7 && spill.penumbra >= 0.8, 'both edges should feather gradually');
+  assert.ok(spill.intensity > 0 && spill.intensity < light.intensity / 3,
+    'spill is a separate dim light, not another bright hotspot');
+  assert.equal(light.decay, 0);
+  assert.equal(spill.decay, 0);
+
+  const coreCone = `smoothstep(${Math.cos(light.angle)}, ${Math.cos(light.angle * (1 - light.penumbra))}, alignment)`;
+  const spillCone = `smoothstep(${Math.cos(spill.angle)}, ${Math.cos(spill.angle * (1 - spill.penumbra))}, alignment)`;
+  for (const material of f.materials) {
+    assert.ok(material.fragmentShader.includes(coreCone), 'ground/water must match the core cone');
+    assert.ok(material.fragmentShader.includes(spillCone), 'ground/water must match the spill cone');
+    assert.ok(material.fragmentShader.includes(`d / ${light.distance.toFixed(1)}`));
+    assert.ok(material.fragmentShader.includes(`d / ${spill.distance.toFixed(1)}`));
+    assert.ok(material.fragmentShader.includes('uHeadTorchSpillPower * halo * spillFade'),
+      'ground/water should render a separate spill component');
+    assert.ok(material.fragmentShader.includes('vec3 headTorchBeam'),
+      'ground and water must preserve the separate beam and spill colours');
   }
 });
 
-test('balanced attenuation keeps distant ground visible without the close-range hotspot', () => {
+test('close-range brightness is bounded while off-axis ground receives spill', () => {
   const f = setup(); f.update(0); f.reach(); f.update(100);
-  f.setExposure(0.035); f.update(500); // darkest night
-  const { light } = f.torch;
-  assert.equal(light.decay, 0, 'the spotlight should not amplify close-range surfaces relative to distant ones');
-  assert.ok(light.distance >= 100);
-
-  const terrainShader = f.materials[0].fragmentShader;
-  const waterShader = f.materials[1].fragmentShader;
-  for (const shader of [terrainShader, waterShader]) {
-    assert.ok(shader.includes('max(pow(d, 0.0), 1.0)'), 'custom light falloff must match the spotlight decay');
-  }
-  assert.ok(terrainShader.includes('0.28 + 0.72 * max(dot(n, toHead), 0.0)'),
-    'terrain should retain a minimum diffuse response at grazing angles');
-
-  const farGroundLight = distance => {
-    const fade = Math.pow(Math.max(1 - Math.pow(distance / light.distance, 4), 0), 2);
-    const nearHorizontalFacing = 0.28 + 0.72 * (1.68 / Math.hypot(distance, 1.68));
-    return light.intensity * fade / Math.max(Math.pow(distance, light.decay), 1) * nearHorizontalFacing;
+  const { light, spill } = f.torch;
+  const smoothstep = (a, b, x) => {
+    const u = Math.max(0, Math.min(1, (x - a) / (b - a)));
+    return u * u * (3 - 2 * u);
   };
-  // Exposure-compensated brightness no longer spikes into a white disc near the eyes.
-  const exposedBeam = distance => light.intensity * 0.035
-    * Math.pow(Math.max(1 - Math.pow(distance / light.distance, 4), 0), 2)
-    / Math.max(Math.pow(distance, light.decay), 1);
-  assert.ok(exposedBeam(3) < 2, 'close beam energy should be controlled at three metres');
-  assert.ok(exposedBeam(3) < exposedBeam(60) * 1.5,
-    'nearby surfaces should not receive vastly more light than distant terrain');
+  const sample = (degrees, distance) => {
+    const alignment = Math.cos(degrees * Math.PI / 180);
+    return [light, spill].reduce((sum, part) => {
+      const cone = smoothstep(Math.cos(part.angle), Math.cos(part.angle * (1 - part.penumbra)), alignment);
+      const fade = Math.pow(Math.max(0, 1 - Math.pow(distance / part.distance, 4)), 2);
+      return sum + part.intensity * cone * fade;
+    }, 0);
+  };
 
-  assert.ok(farGroundLight(60) > 10, 'beam should remain substantial at 60 metres');
-  assert.ok(farGroundLight(80) > 4, 'beam should remain visible beyond 80 metres');
+  assert.ok(sample(0, 3) < 1.5, 'nearby surfaces should not be overwhelmed');
+  assert.ok(sample(0, 80) > 0.6, 'the central beam must retain useful long-range strength');
+  assert.ok(sample(35, 12) > 0.10, 'outer halo should light surfaces far outside the core');
+  assert.ok(sample(35, 12) < sample(0, 12) / 3, 'spill must remain softer and dimmer than the centre');
+  assert.ok(sample(35, 65) < 0.01, 'spill should fade before becoming a distant broad searchlight');
+
+  f.setExposure(0.035); f.update(500); // darkest night
+  assert.ok(Math.abs(f.torch.light.intensity * 0.035 - light.intensity * 1) < 1e-8,
+    'exposure change should preserve the effective core brightness');
+  assert.ok(Math.abs(f.torch.spill.intensity * 0.035 - spill.intensity * 1) < 1e-8,
+    'exposure change should preserve the effective spill brightness');
 });
 
 test('head tap requires a small, upper-head contact zone', () => {
