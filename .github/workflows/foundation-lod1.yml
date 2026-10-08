@@ -1,0 +1,47 @@
+name: Foundation LOD1 - headless Blender workspace
+
+on:
+  push:
+    branches:
+      - work/foundation-lod1-headless-20261008
+    paths:
+      - .github/workflows/foundation-lod1.yml
+      - tools/building/headless_foundation_lod1.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  foundation-lod1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Install Blender
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y blender
+          blender --version
+      - name: Import, verify, save workspace and render foundation LOD1
+        run: |
+          blender --background --threads 4 --python-exit-code 1 --python tools/building/headless_foundation_lod1.py
+      - name: Upload working files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: foundation-lod1-headless-blender
+          path: tools/building/working/
+          if-no-files-found: warn
+      - name: Commit verified Blender workspace to work branch
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/building/working/foundation_lod1_work.blend tools/building/working/foundation_lod1_preview.png tools/building/working/foundation_lod1_report.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Save reviewed foundation LOD1 Blender workspace"
+            git push origin HEAD:work/foundation-lod1-headless-20261008
+          fi
