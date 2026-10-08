@@ -14,7 +14,7 @@ const DECAY = 0;
 const CONTACT = 0.11, RELEASE = 0.33, COOLDOWN_MS = 400;
 
 // No mesh: a head-following beam, plus the same beam on the custom ground/water shaders.
-export function createHeadTorch({ scene, states, sand, water, getExposure = () => 1, startEnabled = false }) {
+export function createHeadTorch({ scene, states, sand, water, getExposure = () => 1 }) {
   const light = new THREE.SpotLight(0xfff1da, 0, BEAM.range, BEAM.angle, BEAM.penumbra, DECAY);
   light.name = 'Head torch beam';
   light.castShadow = false;
@@ -74,7 +74,7 @@ export function createHeadTorch({ scene, states, sand, water, getExposure = () =
   const head = new THREE.Vector3(), hand = new THREE.Vector3(), localHand = new THREE.Vector3();
   const rotation = new THREE.Quaternion(), inverseRotation = new THREE.Quaternion();
   const touching = new Map(states.map(state => [state, true]));
-  let enabled = Boolean(startEnabled), lastTap = -Infinity;
+  let enabled = false, lastTap = -Infinity;
 
   function update(view, { active, interactive, time }) {
     view.updateWorldMatrix(true, false);
