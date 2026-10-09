@@ -35,6 +35,7 @@ import { createColossus } from './colossus.js';
 import { createSandKart, KART } from './sand-kart.js';
 import { createGlider } from './glider.js';
 import { createWatch } from './watch.js';
+import { ITEMS } from './crafting.js';
 import { createColossusAudio } from './colossus-audio.js';
 import { createColossusClimb } from './colossus-climb.js';
 import { createWindAudio } from './wind-audio.js';
@@ -55,7 +56,7 @@ import { BUILDING_START_KIT, isBuildingPiece } from './building-kit.js';
 import { createGlowGarden } from './glow-garden.js';
 import { pulseHaptics } from './haptics.js';
 import { createSurvivorMenu } from './survivor-menu.js';
-import { getInventoryWeight, getCarryCapacity, getCarrySpeedMultiplier, addInventoryItem, removeInventoryItem, getInventoryItems, importInventoryItems, getInventoryCount } from './inventory.js';
+import { getInventoryWeight, getCarryCapacity, getCarrySpeedMultiplier, addInventoryItem, removeInventoryItem, getInventoryItems, importInventoryItems, getInventoryCount, onInventoryGain } from './inventory.js';
 import { createSaveStore, createAutosave, wantsFresh } from './save-game.js';
 
 // Every model and texture asks for ?v=<build id>, so a new deploy is never answered from the browser's 10 minute cache.
@@ -606,6 +607,8 @@ const watch = createWatch({
   renderer,
   onError: message => console.warn(message),
 });
+// Gathering a resource (a stick, a log, fibre, a shard...) shows "+3 Wood" on the watch.
+onInventoryGain((type, amount) => { if (ITEMS[type]?.category === 'RESOURCE') watch.notify(ITEMS[type].name, amount); });
 if (import.meta.env.DEV) window.__watch = watch; // dev only: for screenshots
 inventoryToggle.addEventListener('click', () => survivorMenu.toggle());
 

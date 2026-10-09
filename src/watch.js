@@ -4,6 +4,7 @@ import { getSurvivalStats, STAT_MAX } from './survival.js';
 import { exposureGlow } from './glow.js';
 import { pulseHaptics } from './haptics.js';
 import { reflectMetal, gadgetReflection } from './gadget-env.js';
+import { createPickupToasts } from './pickup-toast.js';
 
 // The survival watch on the left wrist (the owner's note, 6 Oct): glance at it for health, hunger, water and stamina (bars, green to red) and the time
 // of day; tap it with the other hand's index finger and the menu opens in front of you. The model is built in Blender (tools/watch/build_watch.py) in
@@ -70,6 +71,7 @@ export function createWatch({ states, getDay, getExposure = () => 1, getHead, on
     });
   }, undefined, error => onError(`[Watch] ${error?.message || error}`));
 
+  const toasts = createPickupToasts();
   let brightness = 0, redrawIn = 0, tapCool = 0, blink = 0, lastKey = '', wasTouching = false;
   const facePos = new THREE.Vector3(), faceNormal = new THREE.Vector3(), toEye = new THREE.Vector3(), tip = new THREE.Vector3(), q = new THREE.Quaternion();
 
@@ -116,9 +118,19 @@ export function createWatch({ states, getDay, getExposure = () => 1, getHead, on
     for (let i = 16; i < S; i += 16) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, S); ctx.moveTo(0, i); ctx.lineTo(S, i); ctx.stroke(); }
     // the time and the sun or moon, with the day's progress under them
     const hours = day?.hours ?? 12;
+    const notes = toasts.visible();
     ctx.fillStyle = '#e8fbfc'; ctx.font = '700 50px system-ui, -apple-system, "Segoe UI", sans-serif'; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
-    ctx.fillText(clockText(hours), 20, 66);
-    icon(day?.isDay === false ? 'moon' : 'sun', 214, 46, 34, day?.isDay === false ? '#cfe3ff' : '#ffd36a');
+    if (notes.length) {
+      // gathering something: the clock gives way to "+3 Wood" for a moment
+      ctx.font = `700 ${notes.length > 1 ? 30 : 44}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+      notes.forEach(({ text, alpha }, i) => {
+        ctx.fillStyle = `rgba(127, 240, 160, ${alpha})`;
+        ctx.fillText(text, 20, notes.length > 1 ? 36 + i * 34 : 62);
+      });
+    } else {
+      ctx.fillText(clockText(hours), 20, 66);
+      icon(day?.isDay === false ? 'moon' : 'sun', 214, 46, 34, day?.isDay === false ? '#cfe3ff' : '#ffd36a');
+    }
     ctx.fillStyle = 'rgba(110, 222, 236, 0.18)'; rounded(20, 80, S - 40, 5, 2.5); ctx.fill();
     ctx.fillStyle = '#7fe6f2'; rounded(20, 80, Math.max(5, (S - 40) * (hours / 24)), 5, 2.5); ctx.fill();
     // the four bars
@@ -172,15 +184,17 @@ export function createWatch({ states, getDay, getExposure = () => 1, getHead, on
     const daylight = THREE.MathUtils.smoothstep(day?.daylight ?? 1, 0.05, 0.6);
     const lo = WATCH.screen.idle.night + (WATCH.screen.idle.day - WATCH.screen.idle.night) * daylight;
     const hi = WATCH.screen.lit.night + (WATCH.screen.lit.day - WATCH.screen.lit.night) * daylight;
-    screenMaterial.color.setScalar(lo + (hi - lo) * brightness);
+    const shown = Math.max(brightness, toasts.active() ? 0.65 : 0); // a note lights the face so it catches the eye
+    screenMaterial.color.setScalar(lo + (hi - lo) * shown);
     // ---- the display (redrawn a few times a second, and only when what it shows has changed)
     blink = (blink + dt) % 1;
+    toasts.update(dt);
     redrawIn -= dt;
     if (redrawIn <= 0) {
-      redrawIn = WATCH.redrawEvery;
+      redrawIn = toasts.active() ? 0.05 : WATCH.redrawEvery;
       const stats = getSurvivalStats();
       const blinkOn = blink < 0.6;
-      const key = [Object.values(stats).map(Math.round).join(','), clockText(day?.hours ?? 12), day?.isDay, blinkOn && Object.values(stats).some(v => v / STAT_MAX < WATCH.low)].join('|');
+      const key = [Object.values(stats).map(Math.round).join(','), clockText(day?.hours ?? 12), day?.isDay, toasts.signature(), blinkOn && Object.values(stats).some(v => v / STAT_MAX < WATCH.low)].join('|');
       if (key !== lastKey) { lastKey = key; draw(stats, day, blinkOn); }
     }
     // ---- a tap: the other hand's index fingertip arriving on the display (it has to leave again before the next tap)
@@ -204,6 +218,8 @@ export function createWatch({ states, getDay, getExposure = () => 1, getHead, on
 
   return {
     update,
+    // "+3 Wood" on the face
+    notify: (label, amount) => toasts.add(label, amount),
     get root() { return watch; },
     facePosition: target => (face ? face.getWorldPosition(target) : null),
     // dev: draw the display now (for screenshots)

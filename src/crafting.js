@@ -5,7 +5,7 @@ export const ITEMS = Object.freeze({
   stick: { name: 'Stick', category: 'RESOURCE', description: 'Gather loose sticks around the oasis.' },
   stone: { name: 'Stone', category: 'RESOURCE', description: 'Gather loose stones around the oasis.' },
   wood: { name: 'Wood', category: 'RESOURCE', description: 'Logs split from a felled alien tree.' },
-  fibre: { name: 'Fibre', category: 'RESOURCE', description: 'Tough strands cut from a spire plant, for future recipes.' },
+  fibre: { name: 'Fibre', category: 'RESOURCE', description: 'Tough strands stripped from a felled tree or cut from a spire plant. Used to bind buildings together.' },
   crystal: { name: 'Crystal', category: 'RESOURCE', description: 'A glowing shard broken from a crystal cluster out in the dunes. Its use is still a mystery.' },
   axe: { name: 'Stone axe', category: 'TOOL', description: 'Fells trees for wood and sticks. Put it on a hip to carry it.', equippable: true },
   torch: { name: 'Torch', category: 'TOOL', description: 'Light it with B (right hand) or X (left). Put it on a hip to carry it.', equippable: true },
