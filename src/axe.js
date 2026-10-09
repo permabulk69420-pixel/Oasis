@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { SPAWN } from './world.js';
+import { SPAWN, terrainHeight } from './world.js';
 import { pulseHaptics } from './haptics.js';
 import { setGripSurface } from './grip-contact.js';
 import { createClips } from './audio.js';
 import { spawnDrop } from './resource-drops.js';
+import { createBurstPool } from './bursts.js';
 
 const AXE_URL = `${import.meta.env?.BASE_URL ?? '/'}models/axe/stone_survival_axe.glb`;
 const CHOP_AUDIO_URLS = [1, 2, 3].map(index => `${import.meta.env?.BASE_URL ?? '/'}audio/chopping/axe_chop_0${index}.mp3`);
@@ -22,7 +23,7 @@ export const TREE_CHOP_TOP = 1.9;
 const MIN_CHOP_SWING_SPEED = 1.25;
 const HIT_COOLDOWN = 0.16;
 const HIT_SHAKE_TIME = 0.22;
-const HIT_SHAKE_ANGLE = 0.035;
+const HIT_SHAKE_ANGLE = 0.05;
 const FALL_DELAY = 0.10;
 const FALL_DURATION = 1.25;
 const FALL_ANGLE = Math.PI * 0.485;
@@ -46,7 +47,19 @@ export const TREE_DROPS = Object.freeze([
   Object.freeze({ type: 'stick', along: 5.0, side: -0.9 }),
   Object.freeze({ type: 'stick', along: 6.0, side: 0.8 }),
   Object.freeze({ type: 'stick', along: 7.1, side: -0.3 }),
+  // Strips of tough inner bark, for binding.
+  Object.freeze({ type: 'fibre', along: 2.4, side: -0.7 }),
+  Object.freeze({ type: 'fibre', along: 4.1, side: 0.75 }),
 ]);
+
+// Impact: every clean blow throws bark chips back at the swinger; the felling blow throws more and a spray of leaves from the crown.
+const CHOP_CHIP_COLOURS = [0x6b4a30, 0x8a6240, 0x4f3523, 0xb08a5c];
+const CHOP_LEAF_COLOURS = [0x2f8f9c, 0x3fb0b8, 0x246f80];
+const CHOP_HIT_CHIPS = 9;
+const CHOP_FELL_CHIPS = 22;
+const CHOP_FELL_LEAVES = 18;
+const CHOP_CHIP_HEIGHT = 0.9; // where on the trunk (scaled) the chips fly from, near where the blade lands
+const CHOP_CROWN_HEIGHT = 1.7;
 
 // The GLB origin is in the lower handle grip area; its lowest point is ~13 cm below.
 const AXE_BOTTOM_BELOW_GRIP = 0.131;
@@ -81,6 +94,13 @@ function ensureTreeChopState(tree) {
 export function createAxeKind({ scene, onError = console.warn }) {
   const chopAudio = createClips(CHOP_AUDIO_URLS, { volume: CHOP_VOLUME, onError });
   let treeGroup = null;
+  const chips = createBurstPool({
+    capacity: 96,
+    material: new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0 }),
+    heightAt: terrainHeight,
+  });
+  chips.mesh.name = 'Chop chips';
+  scene.add(chips.mesh);
 
   function playChopSound() {
     chopAudio.play();
@@ -116,7 +136,7 @@ export function createAxeKind({ scene, onError = console.warn }) {
     return best;
   }
 
-  function hitTree(tree, holder) {
+  function hitTree(tree, holder, swingSpeed = MIN_CHOP_SWING_SPEED) {
     const state = ensureTreeChopState(tree);
     if (state.phase !== 'standing') return;
     tree.getWorldPosition(treePosition);
@@ -131,7 +151,19 @@ export function createAxeKind({ scene, onError = console.warn }) {
     state.hits += 1;
     const felling = state.hits >= TREE_HITS_TO_FELL;
     playChopSound();
-    pulseHaptics(holder, felling ? FELL_HAPTIC_STRENGTH : CHOP_HAPTIC_STRENGTH, felling ? FELL_HAPTIC_MS : CHOP_HAPTIC_MS);
+    // A harder swing hits harder: up to a third more on the haptics, and more chips.
+    const force = THREE.MathUtils.clamp(swingSpeed / 4, 0.75, 1.35);
+    pulseHaptics(holder, Math.min(1, (felling ? FELL_HAPTIC_STRENGTH : CHOP_HAPTIC_STRENGTH) * force), felling ? FELL_HAPTIC_MS : CHOP_HAPTIC_MS);
+    const scale = Math.max(tree.scale.x, 0.001);
+    const back = [-fallDirection.x * 0.7, 0.5, -fallDirection.z * 0.7]; // the chips fly back at the swinger
+    chips.emit(axeHeadPosition.x, treePosition.y + CHOP_CHIP_HEIGHT * scale, axeHeadPosition.z, Math.round((felling ? CHOP_FELL_CHIPS : CHOP_HIT_CHIPS) * force), {
+      speed: felling ? 3.6 : 2.6 * force, along: back, spread: 1.3, colours: CHOP_CHIP_COLOURS, sizes: felling ? [0.03, 0.09] : [0.025, 0.065], lifetime: [0.7, 1.3],
+    });
+    if (felling) {
+      chips.emit(treePosition.x, treePosition.y + CHOP_CROWN_HEIGHT * scale, treePosition.z, CHOP_FELL_LEAVES, {
+        speed: 2.2, along: [fallDirection.x * 0.3, 0.6, fallDirection.z * 0.3], spread: 1.6, colours: CHOP_LEAF_COLOURS, sizes: [0.05, 0.13], lifetime: [1.0, 1.8], upward: 0.6,
+      });
+    }
 
     if (felling) {
       state.phase = 'falling';
@@ -262,7 +294,7 @@ export function createAxeKind({ scene, onError = console.warn }) {
     }),
     onGrab({ state }) { state.ready = false; state.rearmed = true; },
     onRelease({ state }) { state.ready = false; state.rearmed = true; },
-    updateShared: dt => updateTrees(dt),
+    updateShared: dt => { updateTrees(dt); chips.update(dt); },
 
     update({ root, heldBy, state }, dt) {
       state.cooldown = Math.max(0, state.cooldown - dt);
@@ -286,7 +318,7 @@ export function createAxeKind({ scene, onError = console.warn }) {
       const tree = findTreeAtHead();
       if (!tree) { state.rearmed = true; return; }
       if (state.rearmed && state.cooldown <= 0 && swingSpeed >= MIN_CHOP_SWING_SPEED) {
-        hitTree(tree, heldBy);
+        hitTree(tree, heldBy, swingSpeed);
         state.cooldown = HIT_COOLDOWN;
         state.rearmed = false;
       }

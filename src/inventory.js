@@ -31,6 +31,14 @@ const ITEM_WEIGHTS = Object.freeze({
   ...Object.fromEntries(Object.keys(BUILDING_PIECES).map(type => [type, 0])),
 });
 
+// Listeners told whenever something is added (picked up, broken off a node, stored from a hand). The watch uses it for "+3 Wood";
+// crafting and loading a save change counts without going through here.
+const gainListeners = new Set();
+export function onInventoryGain(listener) {
+  gainListeners.add(listener);
+  return () => gainListeners.delete(listener);
+}
+
 export function addInventoryItem(type, amount = 1) {
   if (typeof type !== 'string' || !type) return 0;
   const value = Number(amount);
@@ -40,6 +48,7 @@ export function addInventoryItem(type, amount = 1) {
   const next = current + delta;
   if (!Number.isSafeInteger(next)) return current;
   counts.set(type, next);
+  for (const listener of gainListeners) listener(type, delta);
   return next;
 }
 

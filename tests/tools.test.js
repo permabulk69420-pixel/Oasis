@@ -157,7 +157,7 @@ test('holsters mirror left and right', () => {
   assert.ok(Math.abs(left.x + right.x) < 1e-6 && Math.abs(left.y - right.y) < 1e-6);
 });
 
-test('six real swings fell a tree, which drops logs and sticks along where it fell', t => {
+test('six real swings fell a tree, which drops logs, sticks and fibre along where it fell', t => {
   const scene = new THREE.Scene();
   const trees = new THREE.Group();
   trees.name = 'Alien desert trees';
@@ -168,7 +168,7 @@ test('six real swings fell a tree, which drops logs and sticks along where it fe
   tree.userData.layoutItem = {};
   trees.add(tree);
   const drops = [];
-  for (const type of ['wood', 'stick']) registerDropSpawner(type, (x, z) => drops.push({ type, x, z }));
+  for (const type of ['wood', 'stick', 'fibre']) registerDropSpawner(type, (x, z) => drops.push({ type, x, z }));
 
   const kind = createAxeKind({ scene, onError: () => {} });
   kind.prepareTemplate(toolModel('WoodenHandle'));
