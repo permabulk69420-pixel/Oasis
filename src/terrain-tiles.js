@@ -1,12 +1,20 @@
-import { WATER } from './world.js';
+import { WATER, smooth } from './world.js';
 import { AREA } from './zones.js';
 
 // The sand is drawn as a quadtree of square tiles around the player: small and detailed close by, doubling in size
 // (and halving in detail) with distance, out to the mountain rim. A tile splits into four when the player is within
 // `split` metres of it. The smallest tile is the 62.5 m chunk the oasis has always used, with the same two levels of
 // detail (32 or 16 segments), so the oasis looks exactly as it did.
+// How far out the detailed tiles reach, as a multiple of the distances in `sizes` (and of fineDistance). 1 is the old reach.
+// `?reach=2` in the page address tries another (between 0.5 and 4).
+export function terrainReach(search = '') {
+  const value = Number(new URLSearchParams(search).get('reach'));
+  return Number.isFinite(value) && value >= 0.5 && value <= 4 ? value : 2;
+}
+
 export const TERRAIN = Object.freeze({
   chunk: 62.5,
+  reach: terrainReach(typeof location === 'undefined' ? '' : location.search),
   sizes: [
     { size: 62.5, segments: 16 },
     { size: 125, segments: 16, split: 240 },
@@ -39,13 +47,19 @@ const POND = {
 // The mesh name of a tile. The torch and fire lighting find the terrain material through names starting 'sand-' (night-fill.js findTerrainMesh).
 export function tileName(leaf) { return `sand-${leaf.size}-${leaf.x}-${leaf.z}`; }
 
-export function chooseTiles(px, pz, scale = 1, state = null) {
+// `altitude` is how far you are above the ground under you. High up, the ground beneath you is as far away as ground that far off to the side,
+// so it is drawn as coarsely (flying at 450 m, the chunk under the glider need not be drawn at 2 m detail). The first 30 m count for nothing, so
+// a hill beside a low flight keeps its detail.
+export function chooseTiles(px, pz, scale = 1, state = null, altitude = 0) {
+  // Reach grows with height, to a third more by 200 m up: from the air you see further, and what is under you needs less.
+  scale *= TERRAIN.reach * (1 + 0.35 * smooth(60, 200, altitude));
+  const up = Math.max(0, altitude - 30);
   const out = [], split = new Set(), fine = new Set();
   const rootR = TERRAIN.rootRange;
   const visit = (level, x0, z0) => {
     const { size, segments, split: limit } = TERRAIN.sizes[level];
     const key = `${size}:${x0}:${z0}`;
-    const near = Math.hypot(Math.max(x0 - px, 0, px - (x0 + size)), Math.max(z0 - pz, 0, pz - (z0 + size)));
+    const near = Math.hypot(Math.max(x0 - px, 0, px - (x0 + size)), Math.max(z0 - pz, 0, pz - (z0 + size)), up);
     if (level > 0) {
       const keepOpen = state && state.split.has(key);
       const forced = x0 + size > POND.x0 && x0 < POND.x1 && z0 + size > POND.z0 && z0 < POND.z1;
@@ -59,7 +73,7 @@ export function chooseTiles(px, pz, scale = 1, state = null) {
       return;
     }
     // a chunk: full detail when close (with hysteresis); always full detail round the pond
-    const mx = x0 + size / 2, mz = z0 + size / 2, d = Math.hypot(mx - px, mz - pz);
+    const mx = x0 + size / 2, mz = z0 + size / 2, d = Math.hypot(mx - px, mz - pz, up);
     const inPond = mx > POND.x0 && mx < POND.x1 && mz > POND.z0 && mz < POND.z1;
     const wasFine = state && state.fine.has(key);
     const isFine = inPond || d < TERRAIN.fineDistance * scale || (wasFine && d < TERRAIN.fineDistance * scale * TERRAIN.hysteresis);
