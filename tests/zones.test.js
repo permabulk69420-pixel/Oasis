@@ -104,9 +104,9 @@ test('every metre of the world is covered by exactly one tile, small near the pl
   const at = (x, z) => tiles.find(t => x >= t.x && x < t.x + t.size && z >= t.z && z < t.z + t.size);
   assert.equal(at(319, -292).size, TERRAIN.chunk, 'chunks under the player');
   assert.equal(at(319, -292).segments, TERRAIN.fineSegments, 'at full detail');
-  assert.ok(at(319 + 700 * TERRAIN.reach, -292).size >= 250 && at(319 + 3000, -292).size >= 500);
+  assert.ok(at(319 + 700, -292).size >= 250 && at(319 + 3000, -292).size >= 500);
   for (const t of tiles) assert.ok(t.size >= TERRAIN.chunk && t.segments >= 16 && t.segments <= 32);
-  assert.ok(tiles.length < 700, `${tiles.length} tiles in all`);
+  assert.ok(tiles.length < 420, `${tiles.length} tiles in all`);
   // the pond always has its full-detail chunks, wherever the player is
   const far = chooseTiles(-1000, 800).tiles;
   const pond = far.find(t => t.size === TERRAIN.chunk && 300 >= t.x && 300 < t.x + t.size && -400 >= t.z && -400 < t.z + t.size);

@@ -106,9 +106,8 @@ export function createTerrain(field, material) {
 
   let tileState = null;
   let speed = 0; // metres per second, so tiles are built further ahead when the player is moving fast
-  let altitude = 0; // metres above the ground under the player (see chooseTiles)
   function refresh(px, pz, immediate) {
-    const now = chooseTiles(px, pz, 1, tileState, altitude);
+    const now = chooseTiles(px, pz, 1, tileState);
     tileState = now.state;
     const show = now.tiles;
     wanted.clear();
@@ -125,7 +124,7 @@ export function createTerrain(field, material) {
     }
     stats.leaves = show.length;
     // what will be needed soon: built a few at a time, nearest first
-    const ahead = chooseTiles(px, pz, TERRAIN.lead + Math.min(0.55, speed * 0.02), null, altitude).tiles;
+    const ahead = chooseTiles(px, pz, TERRAIN.lead + Math.min(0.55, speed * 0.02)).tiles;
     pending = ahead.filter(leaf => !cache.has(leaf.key)).sort((a, b) => a.near - b.near);
     for (const leaf of ahead) { const e = cache.get(leaf.key); if (e) e.used = clock; }
     if (immediate) { for (const leaf of pending) geometryOf(leaf); pending = []; }
@@ -212,10 +211,9 @@ export function createTerrain(field, material) {
   let nearbyTime = -Infinity;
   // Called every little while with the player's ground position. Tiles are re-chosen when the player has moved a few
   // metres, and new ones are built a little at a time, nearest first, so nothing is ever drawn late or in a rush.
-  function update(x, z, metresPerSecond = 0, above = 0) {
+  function update(x, z, metresPerSecond = 0) {
     speed = metresPerSecond;
-    const climbed = Math.abs(above - altitude) > 8; // a long climb or dive redraws the ground beneath you at the new distance
-    if (Math.hypot(x - lastX, z - lastZ) > 3 || climbed) { altitude = above; refresh(x, z, false); lastX = x; lastZ = z; }
+    if (Math.hypot(x - lastX, z - lastZ) > 3) { refresh(x, z, false); lastX = x; lastZ = z; }
     build(TERRAIN.buildBudgetMs * (1 + Math.min(1, speed / 10)));
     const now = performance.now();
     if (now - nearbyTime > 340) {

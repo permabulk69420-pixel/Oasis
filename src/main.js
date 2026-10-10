@@ -1093,7 +1093,7 @@ function frame(time) {
       footprints.walk(head.x, head.z, { onGround: jumpHeight <= 0.001, speed: Math.hypot(velocity.x, velocity.z) });
     }
   }
-  if (time - lodTime > 100) { terrain.update(head.x, head.z, velocity.length(), head.y - field.sample(head.x, head.z)); skyScenery.update(head.x, head.z, head.y); farPickups.update(head.x, head.z); lodTime = time; }
+  if (time - lodTime > 100) { terrain.update(head.x, head.z, velocity.length()); skyScenery.update(head.x, head.z, head.y); farPickups.update(head.x, head.z); lodTime = time; }
   playerFeetY = groundY + jumpHeight;
   materials.water.uniforms.uTime.value = time * 0.001;
   rig.updateMatrixWorld(true);
