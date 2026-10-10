@@ -36,6 +36,7 @@ import { createSandKart, KART } from './sand-kart.js';
 import { createGlider } from './glider.js';
 import { createWatch } from './watch.js';
 import { ITEMS } from './crafting.js';
+import { createFernPicking } from './fern-picking.js';
 import { createColossusAudio } from './colossus-audio.js';
 import { createColossusClimb } from './colossus-climb.js';
 import { createWindAudio } from './wind-audio.js';
@@ -128,6 +129,7 @@ await new Promise(requestAnimationFrame);
 const field = createHeightField();
 const materials = createMaterials(renderer, field);
 const terrain = createTerrain(field, materials.sand);
+const fernPicking = createFernPicking({ states: hands.states, greenFerns: terrain.greenFerns }); // squeeze a grip in a fern to pull fibre off it
 scene.add(terrain.group);
 const skyIsland = createSkyIsland(materials.sand);
 scene.add(skyIsland.group);
@@ -845,6 +847,7 @@ function frame(time) {
   // Resource storage compares controller and headset WORLD positions. Refresh
   // the XR camera first; its raw pose at frame start is reference-space local.
   hands.update(dt);
+  fernPicking.update(dt);
   for (const state of hands.states) {
     const pressed = Boolean(state.inputSource?.gamepad?.buttons?.[0]?.pressed);
     if (pressed && !doorTriggerDown.get(state) && playing && renderer.xr.isPresenting && !placement.isActive() && !survivorMenu.isOpen() && state.controller.visible) {

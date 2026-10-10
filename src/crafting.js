@@ -2,10 +2,9 @@ import { getInventoryCount, exchangeInventoryItems } from './inventory.js';
 import { BUILDING_PIECES } from './building-kit.js';
 
 export const ITEMS = Object.freeze({
-  stick: { name: 'Stick', category: 'RESOURCE', description: 'Gather loose sticks around the oasis.' },
   stone: { name: 'Stone', category: 'RESOURCE', description: 'Gather loose stones around the oasis.' },
-  wood: { name: 'Wood', category: 'RESOURCE', description: 'Logs split from a felled alien tree.' },
-  fibre: { name: 'Fibre', category: 'RESOURCE', description: 'Tough strands stripped from a felled tree or cut from a spire plant. Used to bind buildings together.' },
+  wood: { name: 'Wood', category: 'RESOURCE', description: 'Chopped from alien trees, or picked up as dead wood around the oasis.' },
+  fibre: { name: 'Fibre', category: 'RESOURCE', description: 'Tough strands pulled from the ferns round the oasis, or cut from a spire plant. Used to bind buildings together.' },
   crystal: { name: 'Crystal', category: 'RESOURCE', description: 'A glowing shard broken from a crystal cluster out in the dunes. Its use is still a mystery.' },
   axe: { name: 'Stone axe', category: 'TOOL', description: 'Fells trees for wood and sticks. Put it on a hip to carry it.', equippable: true },
   torch: { name: 'Torch', category: 'TOOL', description: 'Light it with B (right hand) or X (left). Put it on a hip to carry it.', equippable: true },
@@ -19,11 +18,11 @@ export const ITEMS = Object.freeze({
 
 // Use resources that can already be collected.
 export const RECIPES = Object.freeze([
-  Object.freeze({ id: 'axe', name: 'Stone axe', description: 'Lash a stone head to a wooden handle.', ingredients: Object.freeze({ stick: 3, stone: 2 }), output: 'axe' }),
-  Object.freeze({ id: 'torch', name: 'Torch', description: 'Bundle dry sticks with a striking stone.', ingredients: Object.freeze({ stick: 2, stone: 1 }), output: 'torch' }),
-  Object.freeze({ id: 'spear', name: 'Stone-tipped spear', description: 'Lash a stone point to a long, straight shaft.', ingredients: Object.freeze({ stick: 3, stone: 1 }), output: 'spear' }),
-  Object.freeze({ id: 'pickaxe', name: 'Stone pickaxe', description: 'Lash a pointed stone across a stout haft.', ingredients: Object.freeze({ stick: 3, stone: 3 }), output: 'pickaxe' }),
-  Object.freeze({ id: 'campfire', name: 'Campfire', description: 'Stack sticks for kindling and ring them with stones. Light it with a torch.', ingredients: Object.freeze({ stick: 6, stone: 5 }), output: 'campfire' }),
+  Object.freeze({ id: 'axe', name: 'Stone axe', description: 'Lash a stone head to a wooden handle.', ingredients: Object.freeze({ wood: 3, stone: 2 }), output: 'axe' }),
+  Object.freeze({ id: 'torch', name: 'Torch', description: 'Bundle dry wood with a striking stone.', ingredients: Object.freeze({ wood: 2, stone: 1 }), output: 'torch' }),
+  Object.freeze({ id: 'spear', name: 'Stone-tipped spear', description: 'Lash a stone point to a long, straight shaft.', ingredients: Object.freeze({ wood: 3, stone: 1 }), output: 'spear' }),
+  Object.freeze({ id: 'pickaxe', name: 'Stone pickaxe', description: 'Lash a pointed stone across a stout haft.', ingredients: Object.freeze({ wood: 3, stone: 3 }), output: 'pickaxe' }),
+  Object.freeze({ id: 'campfire', name: 'Campfire', description: 'Stack wood for kindling and ring them with stones. Light it with a torch.', ingredients: Object.freeze({ wood: 6, stone: 5 }), output: 'campfire' }),
   ...Object.entries(BUILDING_PIECES).map(([id, part]) => Object.freeze({ id, name: part.name, description: part.description, ingredients: part.ingredients, output: id })),
 ]);
 

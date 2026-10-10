@@ -21,11 +21,11 @@ const ZERO = new THREE.Vector3();
 
 test('the inventory goes out as plain data and comes back as it was, replacing what was there', () => {
   importInventoryItems([]);
-  addInventoryItem('stick', 3); addInventoryItem('stone', 2); addInventoryItem('axe', 1);
+  addInventoryItem('wood', 3); addInventoryItem('stone', 2); addInventoryItem('axe', 1);
   const saved = JSON.parse(JSON.stringify(getInventoryItems()));
   const weight = getInventoryWeight();
   importInventoryItems([{ type: 'fibre', count: 9 }]);
-  assert.equal(getInventoryCount('stick'), 0, 'importing replaces; it does not add');
+  assert.equal(getInventoryCount('wood'), 0, 'importing replaces; it does not add');
   assert.equal(importInventoryItems(saved), 3);
   assert.deepEqual(getInventoryItems().sort((a, b) => a.type.localeCompare(b.type)), saved.sort((a, b) => a.type.localeCompare(b.type)));
   assert.equal(getInventoryWeight(), weight);
@@ -34,11 +34,11 @@ test('the inventory goes out as plain data and comes back as it was, replacing w
 
 test('the inventory ignores what is not a real count, and never grows past its limits', () => {
   importInventoryItems([
-    { type: 'stick', count: 2 }, { type: 'stick', count: 1 }, { type: 'bad', count: 0 }, { type: 'bad', count: -1 },
+    { type: 'wood', count: 2 }, { type: 'wood', count: 1 }, { type: 'bad', count: 0 }, { type: 'bad', count: -1 },
     { type: 'bad', count: NaN }, { type: '', count: 1 }, { type: 'x'.repeat(INVENTORY_LIMITS.maxTypeLength + 1), count: 1 },
     { type: 'many', count: 1e12 }, { type: 'huge', count: 1e20 }, null, 'stick',
   ]);
-  assert.equal(getInventoryCount('stick'), 3, 'two entries for one thing add up');
+  assert.equal(getInventoryCount('wood'), 3, 'two entries for one thing add up');
   assert.equal(getInventoryCount('bad'), 0);
   assert.equal(getInventoryCount('many'), INVENTORY_LIMITS.maxCount, 'a silly count is cut down');
   assert.equal(getInventoryCount('huge'), 0, 'and one that is not even a whole number the game can count is dropped');

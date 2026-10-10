@@ -37,6 +37,6 @@ export function getHeldGripPose(state) {
   const heldObject = state.objectGrip?.children?.[0] || null;
   if (!heldObject) return null;
   const profile = heldObject.userData?.gripProfile
-    || (heldObject.userData?.collectibleResource === 'stick' ? GRIP_PROFILE.THIN : GRIP_PROFILE.MEDIUM);
+    || GRIP_PROFILE.MEDIUM;
   return GRIP_POSES[profile] || GRIP_POSES[GRIP_PROFILE.MEDIUM];
 }

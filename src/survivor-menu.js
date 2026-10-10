@@ -193,9 +193,6 @@ export function createSurvivorMenu({ scene, renderer, states, tools = null, back
         }
         if (type === 'door') { ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(13, 3, 3, 0, Math.PI * 2); ctx.fill(); }
       }
-    } else if (type === 'stick') {
-      handle(-26, 24, 24, -24, 7);
-      ctx.strokeStyle = '#b48a5c'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(4, -4); ctx.lineTo(-6, -24); ctx.stroke();
     } else if (type === 'axe') {
       handle(-22, 30, 14, -26);
       ctx.fillStyle = '#9fb0ad'; ctx.strokeStyle = '#5f7270'; ctx.lineWidth = 3;

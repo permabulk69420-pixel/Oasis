@@ -199,7 +199,8 @@ export function createGroundSticks({ field, onError = console.warn }) {
     function makeStick(scale) {
       const stick = source.clone(true);
       stick.scale.setScalar(scale);
-      stick.userData.collectibleResource = 'stick';
+      stick.userData.collectibleResource = 'wood'; // sticks and logs are all wood now
+      stick.userData.gripProfile = 'thin';
       stick.userData.looseStick = true;
       stick.userData.sourceBottom = sourceBottom;
       stick.userData.gripPoint = naturalGripPoint.toArray();

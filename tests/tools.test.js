@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createTools, holsterPose, inHolsterZone, HOLSTER_RADIUS, HOLSTER_HALF_HEIGHT } from '../src/tools.js';
-import { createAxeKind, TREE_DROPS, TREE_HITS_TO_FELL, TREE_TRUNK_RADIUS, TREE_CHOP_REACH, TREE_CHOP_TOP } from '../src/axe.js';
+import { createAxeKind, TREE_WOOD_PER_HIT, TREE_WOOD_ON_FELLING, rollWood, TREE_HITS_TO_FELL, TREE_TRUNK_RADIUS, TREE_CHOP_REACH, TREE_CHOP_TOP } from '../src/axe.js';
 import { createTorchKind } from '../src/torch.js';
 import { registerDropSpawner } from '../src/resource-drops.js';
 import { addInventoryItem, getInventoryCount, removeInventoryItem } from '../src/inventory.js';
@@ -157,7 +157,7 @@ test('holsters mirror left and right', () => {
   assert.ok(Math.abs(left.x + right.x) < 1e-6 && Math.abs(left.y - right.y) < 1e-6);
 });
 
-test('six real swings fell a tree, which drops logs, sticks and fibre along where it fell', t => {
+test('six real swings fell a tree, and every blow puts wood straight into the inventory', t => {
   const scene = new THREE.Scene();
   const trees = new THREE.Group();
   trees.name = 'Alien desert trees';
@@ -167,8 +167,6 @@ test('six real swings fell a tree, which drops logs, sticks and fibre along wher
   tree.userData.oasisTree = true;
   tree.userData.layoutItem = {};
   trees.add(tree);
-  const drops = [];
-  for (const type of ['wood', 'stick', 'fibre']) registerDropSpawner(type, (x, z) => drops.push({ type, x, z }));
 
   const kind = createAxeKind({ scene, onError: () => {} });
   kind.prepareTemplate(toolModel('WoodenHandle'));
@@ -184,16 +182,33 @@ test('six real swings fell a tree, which drops logs, sticks and fibre along wher
     kind.update(instance, 0.016);
     kind.updateShared(0.016);
   };
+  const wood = () => getInventoryCount('wood');
+  const start = wood();
   frame(false);
-  for (let i = 0; i < TREE_HITS_TO_FELL; i++) { frame(true); for (let j = 0; j < 12; j++) frame(false); }
+  const gains = [];
+  for (let i = 0; i < TREE_HITS_TO_FELL; i++) {
+    const before = wood();
+    frame(true);
+    gains.push(wood() - before);
+    for (let j = 0; j < 12; j++) frame(false);
+  }
   assert.equal(tree.userData.chopState.phase, 'falling');
   assert.equal(tree.userData.layoutItem.felled, true, 'its shadow is removed');
-  for (let i = 0; i < 120; i++) kind.updateShared(0.016);
-  assert.equal(drops.length, TREE_DROPS.length);
-  assert.deepEqual(drops.map(drop => drop.type).sort(), TREE_DROPS.map(drop => drop.type).sort());
-  assert.ok(drops.every(drop => drop.z < -2), 'drops land on the far side, away from the swing');
-  for (let i = 0; i < 400; i++) kind.updateShared(0.016);
+  gains.forEach((gain, i) => {
+    const [min, max] = i === gains.length - 1 ? TREE_WOOD_ON_FELLING : TREE_WOOD_PER_HIT;
+    assert.ok(gain >= min && gain <= max, `blow ${i + 1} gave ${gain}, expected ${min} to ${max}`);
+  });
+  assert.equal(wood() - start, gains.reduce((a, b) => a + b, 0));
+  for (let i = 0; i < 520; i++) kind.updateShared(0.016);
   assert.equal(tree.visible, false, 'the felled trunk sinks away');
+  assert.equal(wood() - start, gains.reduce((a, b) => a + b, 0), 'and leaves nothing to pick up or add');
+});
+
+test('a wood roll covers its whole range and nothing outside it', () => {
+  const seen = new Set();
+  for (let i = 0; i < 300; i++) seen.add(rollWood([1, 3], () => i / 300));
+  assert.deepEqual([...seen].sort(), [1, 2, 3]);
+  assert.equal(rollWood([1, 3], () => 0.999999), 3);
 });
 
 test('the chop zone follows the real trunk: a 2x tree is not choppable through thin air', () => {
