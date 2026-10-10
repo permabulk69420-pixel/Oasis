@@ -48,11 +48,6 @@ export const AREA = Object.freeze({
 
 const HOME_CX = (AREA.home.minX + AREA.home.maxX) / 2, HOME_CZ = (AREA.home.minZ + AREA.home.maxZ) / 2;
 const HOME_HW = (AREA.home.maxX - AREA.home.minX) / 2, HOME_HH = (AREA.home.maxZ - AREA.home.minZ) / 2;
-// How far the world beyond the oasis square has taken over at (x, z): 0 anywhere in the square, easing to 1 `homeBlend` metres outside it.
-// The zones use it, and so do the dunes (src/world.js), which stop marching in step out there.
-export function homeLive(x, z) {
-  return smooth(0, AREA.homeBlend, Math.hypot(Math.max(Math.abs(x - HOME_CX) - HOME_HW, 0), Math.max(Math.abs(z - HOME_CZ) - HOME_HH, 0)));
-}
 
 // Strata: the cliff rises in ledges, wobbled so the layers do not run level.
 function strata(p, steps, x, z, seed) {
@@ -85,7 +80,8 @@ export function shapeTerrain(x, z, dune, out) {
   out.rock = 0; out.salt = 0; out.gravel = 0;
   const b = AREA.bounds, rim = AREA.rim;
   // The home square is untouched; the zones fade in beyond it.
-  const live = homeLive(x, z);
+  const outside = Math.hypot(Math.max(Math.abs(x - HOME_CX) - HOME_HW, 0), Math.max(Math.abs(z - HOME_CZ) - HOME_HH, 0));
+  const live = smooth(0, AREA.homeBlend, outside);
   if (live <= 0) return dune;
   let h = dune;
 
