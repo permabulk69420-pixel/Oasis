@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { WATER } from './world.js';
 import { addWindSwayToModel, SWAY } from './wind.js';
+import { FERN_HARVEST, fernScale } from './fern-harvest.js';
 
 const HIGH_URL = `${import.meta.env.BASE_URL}models/vegetation/green-fern/ark_style_fern.glb`;
 const LOW_URL = `${import.meta.env.BASE_URL}models/vegetation/green-fern/ark_style_fern_lod1_fixed.glb`;
@@ -75,11 +76,27 @@ export function createGreenFerns({ field, onError = console.warn }) {
 
       root.add(high, low);
       group.add(root);
-      ferns.push({ root, high, low });
+      ferns.push({ root, high, low, x, y: groundY, z, since: Infinity }); // `since`: seconds since it was pulled (Infinity: never)
     }
   }).catch(error => {
     onError(`[Oasis green ferns] Failed to load fern LODs: ${error?.message || error}`);
   });
+
+  // Tear fibre off one: it drops to a stub (see src/fern-harvest.js) and grows back.
+  function pull(fern) {
+    fern.since = 0;
+    fern.root.scale.setScalar(FERN_HARVEST.stubScale);
+  }
+
+  // Every frame: the pulled ones grow back.
+  function tick(dt) {
+    for (const fern of ferns) {
+      if (!Number.isFinite(fern.since)) continue;
+      fern.since += dt;
+      if (fern.since >= FERN_HARVEST.regrow) { fern.since = Infinity; fern.root.scale.setScalar(1); }
+      else fern.root.scale.setScalar(fernScale(fern.since));
+    }
+  }
 
   function update(playerX, playerZ) {
     const lodSq = LOD_DISTANCE * LOD_DISTANCE;
@@ -99,5 +116,5 @@ export function createGreenFerns({ field, onError = console.warn }) {
     }
   }
 
-  return { group, update };
+  return { group, update, tick, pull, ferns };
 }

@@ -14,9 +14,8 @@ let packWorn = false;
 
 const DEFAULT_ITEM_WEIGHT = 1;
 const ITEM_WEIGHTS = Object.freeze({
-  stick: 4,
   stone: 8,
-  wood: 6,
+  wood: 2, // light on purpose: trees now hand you wood straight from the swing, a dozen at a time
   fibre: 1,
   axe: 10,
   torch: 5,
@@ -126,13 +125,16 @@ export function getInventoryItems() {
 // For the save: the whole pool as plain data, and back again. Whatever is not a sensible count is left out.
 export const INVENTORY_LIMITS = Object.freeze({ maxTypes: 64, maxCount: 9999, maxTypeLength: 40 });
 
+// Things that used to be their own item, and what they became (an older save still has sticks: they are wood now).
+const RENAMED_ITEMS = Object.freeze({ stick: 'wood' });
+
 export function importInventoryItems(items) {
   counts.clear();
   if (!Array.isArray(items)) return 0;
   for (const item of items) {
     if (counts.size >= INVENTORY_LIMITS.maxTypes) break;
-    const type = item?.type;
     const count = Number(item?.count);
+    const type = RENAMED_ITEMS[item?.type] ?? item?.type;
     if (typeof type !== 'string' || !type || type.length > INVENTORY_LIMITS.maxTypeLength) continue;
     if (!Number.isSafeInteger(count) || count <= 0) continue;
     counts.set(type, Math.min(INVENTORY_LIMITS.maxCount, (counts.get(type) || 0) + count));

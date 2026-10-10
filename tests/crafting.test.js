@@ -8,23 +8,23 @@ test('gather, craft, and carry the axe and torch without partial spends or dupli
   assert.deepEqual(getInventoryItems(), []);
   assert.equal(craftItem('axe'), false);
   assert.equal(craftItem('unknown'), false);
-  addInventoryItem('stick', 5);
+  addInventoryItem('wood', 5);
   addInventoryItem('stone', 1);
   const before = getInventoryItems();
   assert.equal(getRecipeStatus('axe').canCraft, false);
   assert.equal(craftItem('axe'), false);
-  assert.deepEqual(getInventoryItems(), before, 'missing stone must not consume sticks');
+  assert.deepEqual(getInventoryItems(), before, 'missing stone must not consume wood');
   addInventoryItem('stone', 2);
-  assert.equal(getInventoryWeight(), 44);
+  assert.equal(getInventoryWeight(), 34);
   assert.equal(craftItem('axe'), true);
   assert.equal(getInventoryCount('axe'), 1);
-  assert.equal(getInventoryCount('stick'), 2);
+  assert.equal(getInventoryCount('wood'), 2);
   assert.equal(getInventoryCount('stone'), 1);
-  assert.equal(getInventoryWeight(), 26);
+  assert.equal(getInventoryWeight(), 22);
   assert.equal(craftItem('torch'), true);
   assert.equal(getInventoryCount('torch'), 1);
   assert.equal(getInventoryWeight(), 15);
-  assert.equal(getInventoryCount('stick'), 0);
+  assert.equal(getInventoryCount('wood'), 0);
   assert.equal(getInventoryCount('stone'), 0);
   assert.equal(craftItem('torch'), false, 'repeated click cannot duplicate a tool');
   assert.equal(getInventoryCount('torch'), 1);
@@ -35,7 +35,7 @@ test('gather, craft, and carry the axe and torch without partial spends or dupli
 
 test('invalid amounts and invalid transactions cannot corrupt the shared inventory', () => {
   const before = getInventoryItems();
-  for (const amount of [Infinity, -Infinity, NaN, -1, 0, 1.5, Number.MAX_SAFE_INTEGER + 1]) addInventoryItem('stick', amount);
+  for (const amount of [Infinity, -Infinity, NaN, -1, 0, 1.5, Number.MAX_SAFE_INTEGER + 1]) addInventoryItem('wood', amount);
   assert.deepEqual(getInventoryItems(), before);
   for (const cost of [{}, { axe: -1 }, { axe: Infinity }, { axe: 1.5 }, { axe: 2 }]) {
     assert.equal(exchangeInventoryItems(cost, { torch: 1 }), false);
@@ -44,21 +44,21 @@ test('invalid amounts and invalid transactions cannot corrupt the shared invento
   assert.deepEqual(getInventoryItems(), before);
 });
 
-test('the campfire recipe takes sticks and stones, never partially, and weighs something in the pack', () => {
+test('the campfire recipe takes wood and stones, never partially, and weighs something in the pack', () => {
   assert.equal(getRecipeStatus('campfire').recipe.output, 'campfire');
-  const sticks = getInventoryCount('stick'), stones = getInventoryCount('stone');
-  addInventoryItem('stick', 5);
+  const woods = getInventoryCount('wood'), stones = getInventoryCount('stone');
+  addInventoryItem('wood', 5);
   addInventoryItem('stone', 5);
   const before = getInventoryItems();
-  assert.equal(getRecipeStatus('campfire').canCraft, false, 'one stick short');
+  assert.equal(getRecipeStatus('campfire').canCraft, false, 'one wood short');
   assert.equal(craftItem('campfire'), false);
   assert.deepEqual(getInventoryItems(), before, 'a failed craft spends nothing');
-  addInventoryItem('stick', 1);
+  addInventoryItem('wood', 1);
   const weight = getInventoryWeight();
   assert.equal(craftItem('campfire'), true);
   assert.equal(getInventoryCount('campfire'), 1);
-  assert.equal(getInventoryCount('stick'), sticks);
+  assert.equal(getInventoryCount('wood'), woods);
   assert.equal(getInventoryCount('stone'), stones);
-  assert.equal(getInventoryWeight(), weight - 6 * 4 - 5 * 8 + 25);
+  assert.equal(getInventoryWeight(), weight - 6 * 2 - 5 * 8 + 25);
   assert.equal(craftItem('campfire'), false, 'repeated click cannot duplicate it');
 });

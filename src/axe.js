@@ -3,7 +3,7 @@ import { SPAWN, terrainHeight } from './world.js';
 import { pulseHaptics } from './haptics.js';
 import { setGripSurface } from './grip-contact.js';
 import { createClips } from './audio.js';
-import { spawnDrop } from './resource-drops.js';
+import { addInventoryItem } from './inventory.js';
 import { createBurstPool } from './bursts.js';
 
 const AXE_URL = `${import.meta.env?.BASE_URL ?? '/'}models/axe/stone_survival_axe.glb`;
@@ -39,18 +39,11 @@ const CHOP_HAPTIC_MS = 55;
 const FELL_HAPTIC_STRENGTH = 0.90;
 const FELL_HAPTIC_MS = 95;
 
-// What one felled tree leaves, in metres along the fallen trunk (scaled by tree size).
-// Logs lie along the trunk line; sticks scatter around the crown.
-export const TREE_DROPS = Object.freeze([
-  Object.freeze({ type: 'wood', along: 1.6, side: 0.0 }),
-  Object.freeze({ type: 'wood', along: 3.2, side: 0.35 }),
-  Object.freeze({ type: 'stick', along: 5.0, side: -0.9 }),
-  Object.freeze({ type: 'stick', along: 6.0, side: 0.8 }),
-  Object.freeze({ type: 'stick', along: 7.1, side: -0.3 }),
-  // Strips of tough inner bark, for binding.
-  Object.freeze({ type: 'fibre', along: 2.4, side: -0.7 }),
-  Object.freeze({ type: 'fibre', along: 4.1, side: 0.75 }),
-]);
+// What a tree gives: wood straight into your inventory on every blow (the watch shows the "+2 Wood"), a little more on the felling blow.
+// Nothing is left on the ground to bend down for.
+export const TREE_WOOD_PER_HIT = Object.freeze([1, 3]);
+export const TREE_WOOD_ON_FELLING = Object.freeze([2, 4]);
+export const rollWood = ([min, max], random = Math.random) => min + Math.floor(random() * (max - min + 1));
 
 // Impact: every clean blow throws bark chips back at the swinger; the felling blow throws more and a spray of leaves from the crown.
 const CHOP_CHIP_COLOURS = [0x6b4a30, 0x8a6240, 0x4f3523, 0xb08a5c];
@@ -150,6 +143,7 @@ export function createAxeKind({ scene, onError = console.warn }) {
     state.shakeTime = HIT_SHAKE_TIME;
     state.hits += 1;
     const felling = state.hits >= TREE_HITS_TO_FELL;
+    addInventoryItem('wood', rollWood(felling ? TREE_WOOD_ON_FELLING : TREE_WOOD_PER_HIT));
     playChopSound();
     // A harder swing hits harder: up to a third more on the haptics, and more chips.
     const force = THREE.MathUtils.clamp(swingSpeed / 4, 0.75, 1.35);
@@ -174,19 +168,6 @@ export function createAxeKind({ scene, onError = console.warn }) {
       // Its projected ground shadow goes with it.
       if (tree.userData.layoutItem) tree.userData.layoutItem.felled = true;
     }
-  }
-
-  function dropResources(state) {
-    const scale = state.baseScale;
-    const sideX = -state.fallDirection.z, sideZ = state.fallDirection.x;
-    const trunkYaw = Math.atan2(-state.fallDirection.z, state.fallDirection.x);
-    TREE_DROPS.forEach((drop, index) => {
-      const x = state.basePosition.x + (state.fallDirection.x * drop.along + sideX * drop.side) * scale;
-      const z = state.basePosition.z + (state.fallDirection.z * drop.along + sideZ * drop.side) * scale;
-      // Logs roughly follow the trunk; sticks land at loose angles.
-      const yaw = drop.type === 'wood' ? trunkYaw + (index % 2 ? 0.25 : -0.15) : trunkYaw + index * 1.9;
-      spawnDrop(drop.type, x, z, yaw);
-    });
   }
 
   function updateTrees(dt) {
@@ -216,7 +197,6 @@ export function createAxeKind({ scene, onError = console.warn }) {
         if (t >= 1) {
           state.phase = 'settling';
           state.timer = 0;
-          dropResources(state);
         }
       } else if (state.phase === 'settling') {
         if (state.timer >= SETTLE_TIME) { state.phase = 'sinking'; state.timer = 0; }
