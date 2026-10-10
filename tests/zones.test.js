@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createHeightField, terrainHeight, terrainSurface, GRID_STEP, HALF_WORLD, TILE } from '../src/world.js';
-import { AREA, WALK } from '../src/zones.js';
+import { createHeightField, terrainHeight, terrainSurface, homeHeight, GRID_STEP, HALF_WORLD, TILE } from '../src/world.js';
+import { AREA, WALK, homeLive } from '../src/zones.js';
 import { TERRAIN, chooseTiles } from '../src/terrain-tiles.js';
 import { GROUND_WINDOW, packHeight, unpackHeight } from '../src/ground-window.js';
 
@@ -121,4 +121,25 @@ test('the ground window packs heights to well under a centimetre across a mesa-t
   for (const h of [-30, 0, 2.4, 15.123, 140, 220]) assert.ok(Math.abs(unpackHeight(packHeight(h)) - h) < 0.005, `${h}`);
   assert.equal(packHeight(-1000), 0); assert.equal(packHeight(1000), 65535);
   assert.ok(GROUND_WINDOW.cells * GRID_STEP > 200, 'a window covers more than the sand reaches');
+});
+
+test('beyond the oasis the dunes stop marching in step, but keep dune shapes and reach the oasis without a seam', () => {
+  // inside the square the dunes are the old ones exactly
+  for (const [x, z] of [[0, 0], [319, -292], [-480, 470], [499, -499], [500, 0], [0, -500]]) {
+    assert.equal(homeLive(x, z), 0, `(${x}, ${z}) is inside the oasis square`);
+    assert.equal(homeHeight(x, z, homeLive(x, z)), homeHeight(x, z, 0));
+  }
+  assert.equal(homeLive(0, 0), 0);
+  assert.equal(homeLive(500 + AREA.homeBlend, 0), 1);
+  // far out they are different from the old dunes in many places, by a lot in some, and always plausible dunes
+  let differing = 0, biggest = 0, steepest = 0, n = 0;
+  for (let x = 900; x < 1900; x += 25) for (let z = -700; z < 800; z += 25) {
+    const varied = homeHeight(x, z, 1), old = homeHeight(x, z, 0);
+    const d = Math.abs(varied - old); biggest = Math.max(biggest, d); if (d > 2) differing++;
+    steepest = Math.max(steepest, Math.hypot(homeHeight(x + 2, z, 1) - varied, homeHeight(x, z + 2, 1) - varied) / 2); n++;
+    assert.ok(Number.isFinite(varied) && varied > -5 && varied < 80, `(${x}, ${z}) is ${varied}`);
+  }
+  assert.ok(differing / n > 0.5, `most of the far desert is shaped differently (${(100 * differing / n).toFixed(0)}%)`);
+  assert.ok(biggest > 10, `and in places by a lot (${biggest.toFixed(1)} m)`);
+  assert.ok(steepest < 1.8, `with no sheer faces (steepest ${(Math.atan(steepest) * 180 / Math.PI).toFixed(0)} degrees)`);
 });

@@ -393,6 +393,22 @@ export function createMaterials(renderer, field) {
         vec3 mappedNormal = normalize(tangent * mapNormal.x + bitangent * mapNormal.y + baseNormal * max(mapNormal.z, 0.05));
         float normalFade = 1.0 - smoothstep(20.0, 70.0, distance);
         vec3 sandNormal = normalize(mix(baseNormal, mappedNormal, uHasPbrNormal * normalFade * (1.0 - grass) * (1.0 - max(max(max(rockAmt, saltAmt), gravelAmt), stoneAmt))));
+        // Wind ripples: long soft ridges across the wind, so the dunes keep some texture beyond the 70 m where the sand photo's own detail has
+        // faded and the ground used to go smooth. Two crossed wavelengths, wobbled and patchy so they never read as corduroy. Each one fades out
+        // as it nears a pixel across (fwidth), so they never shimmer; the nearer the ground, the finer the ripples that show.
+        {
+          vec2 windDir = vec2(0.84, 0.54);
+          float wobble = groundNoise(vWorld.xz * 0.045 + 5.3) * 2.2 + groundNoise(vWorld.xz * 0.16 - 9.1) * 0.6;
+          float phaseA = rotatedXZ.x / 6.3 + wobble;
+          float phaseB = rotatedXZ.x / 11.8 - wobble * 0.7 + 0.37;
+          float fadeA = 1.0 - smoothstep(0.30, 0.65, fwidth(phaseA));
+          float fadeB = 1.0 - smoothstep(0.30, 0.65, fwidth(phaseB));
+          float patchy = 0.35 + 0.65 * smoothstep(0.30, 0.70, groundNoise(vWorld.xz * 0.021 + 31.0));
+          float slope = 6.2831853 * (0.55 * fadeA * cos(6.2831853 * phaseA) / 6.3 + 0.8 * fadeB * cos(6.2831853 * phaseB) / 11.8);
+          float onSand = (1.0 - grass) * (1.0 - max(max(max(rockAmt, saltAmt), gravelAmt), stoneAmt));
+          float rippleStrength = 0.36 * patchy * onSand * smoothstep(12.0, 60.0, distance);
+          sandNormal = normalize(sandNormal - rippleStrength * slope * vec3(windDir.x, 0.0, windDir.y) * (1.0 - baseNormal.y * 0.5));
+        }
         vec3 grassNormal = baseNormal;
         if (grass > 0.001 && uHasGrassNormal > 0.5 && normalFade > 0.001) {
           vec3 grassMapNormal = grassPbrNormal(texture2D(uGrassNormal, grassUv).rg);
