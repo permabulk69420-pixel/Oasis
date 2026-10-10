@@ -1,6 +1,6 @@
 // Metres, Y-up. Keep world shape independent of the renderer and locomotion.
 import { clamp, mix, smooth, noise } from './world-math.js';
-import { shapeTerrain } from './zones.js';
+import { shapeTerrain, homeLive } from './zones.js';
 export { clamp, mix, smooth, noise };
 
 export const WORLD_SIZE = 1000;
@@ -39,19 +39,32 @@ export function grassCover(x, z) {
 }
 
 // The dunes and the oasis basin: the whole world before the zones (src/zones.js) were added, and still all of it inside the oasis square.
-function homeHeight(x, z) {
+// `vary` (0 in the oasis square, easing to 1 beyond it: homeLive) is how far the dunes have stopped marching in step. Out in the desert a slow
+// warp bends and stretches the ridges region by region (so they are not one set of parallel stripes), some places raise huge dunes and others
+// flatten to open sand, and in patches a second set of ridges crosses the first. With vary at 0 nothing here changes the oasis by a hair.
+export function homeHeight(x, z, vary = 0) {
   const wind = x * 0.84 + z * 0.54;
   const across = -x * 0.54 + z * 0.84;
-  const bend = 44 * (noise(x * 0.0045 + 20, z * 0.0045) - 0.5)
+  let bend = 44 * (noise(x * 0.0045 + 20, z * 0.0045) - 0.5)
     + 28 * Math.sin(across * 0.010) + 13 * Math.sin(across * 0.024 + 0.8);
+  let size = 1, cross = 0, secondaryWeight = 1;
+  if (vary > 0) {
+    // Warp the ridge coordinate: a big slow bend (the ridges turn and spread apart over a kilometre) and a smaller one (they wander).
+    bend += vary * (620 * (noise(x * 0.0011 + 70, z * 0.0011 - 50) - 0.5) + 150 * (noise(x * 0.0029 - 33, z * 0.0029 + 12) - 0.5));
+    size = 1 + vary * (0.55 * smooth(0.58, 0.82, noise(x * 0.0017 + 3, z * 0.0017 - 8)) // some places: very tall dunes
+      - 0.85 * smooth(0.58, 0.72, noise(x * 0.0022 - 12, z * 0.0022 + 4))); // others: almost flat sand
+    secondaryWeight = 1 + vary * 2.4 * smooth(0.45, 0.75, noise(x * 0.0026 + 55, z * 0.0026 + 9));
+    const crossing = smooth(0.50, 0.74, noise(x * 0.0019 - 61, z * 0.0019 + 27)); // a second set of ridges, about 40 degrees off the first
+    if (crossing > 0) cross = vary * crossing * 8 * (duneProfile((x * 0.30 + z * 0.95 + bend * 0.5) / 95 + 3.1) - 0.5);
+  }
   const wavelength = (wind + bend) / 113 + 0.61;
   const amplitude = 8 + 9 * noise(x * 0.0031 + 41, z * 0.0031 - 31);
-  const mainDunes = amplitude * duneProfile(wavelength);
-  const secondary = 3.8 * duneProfile((x * 0.94 + z * 0.34 + bend * 0.65) / 71 + 1.7)
+  const mainDunes = amplitude * size * duneProfile(wavelength);
+  const secondary = 3.8 * secondaryWeight * duneProfile((x * 0.94 + z * 0.34 + bend * 0.65) / 71 + 1.7)
     * (0.25 + 0.75 * noise(across * 0.008, wind * 0.005));
   const rolls = 7 * noise(x * 0.003 - 19, z * 0.003 + 17)
     + 1.0 * noise(x * 0.014 + 7, z * 0.014);
-  let height = 5 + mainDunes + secondary + rolls;
+  let height = 5 + mainDunes + secondary + rolls + cross;
   const r = basinRadius(x, z);
   if (r < 3.2) {
     const bowl = WATER.y - 0.88 + 0.88 * Math.pow(r, 2.2);
@@ -64,9 +77,9 @@ function homeHeight(x, z) {
 }
 
 const zoneScratch = { rock: 0, salt: 0, gravel: 0 };
-export function terrainHeight(x, z) { return shapeTerrain(x, z, homeHeight(x, z), zoneScratch); }
+export function terrainHeight(x, z) { return shapeTerrain(x, z, homeHeight(x, z, homeLive(x, z)), zoneScratch); }
 // The same, also reporting what the ground is made of: out.rock, out.salt, out.gravel (each 0 to 1).
-export function terrainSurface(x, z, out) { return shapeTerrain(x, z, homeHeight(x, z), out); }
+export function terrainSurface(x, z, out) { return shapeTerrain(x, z, homeHeight(x, z, homeLive(x, z)), out); }
 
 // True when ground at (x, z) sits under the pond's still water by enough to be wading, not just
 // at the wet edge. `ground` is the terrain height there (pass field.sample for the live one).
